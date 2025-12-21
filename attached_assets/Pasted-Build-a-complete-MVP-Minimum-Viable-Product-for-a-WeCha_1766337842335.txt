@@ -1,0 +1,36 @@
+Build a complete MVP (Minimum Viable Product) for a WeChat-inspired super app called “TempoChat” using Replit’s environment from the ground up. This is Version 1, focused on core messaging and payments on the Tempo blockchain testnet (which is EVM-compatible, so treat it like Ethereum for setup). Use React Native with Expo for the mobile app (cross-platform for iOS/Android), Solidity for smart contracts, and integrate necessary libraries. Assume I’m a beginner, so generate all code step-by-step, explain each part, and make it runnable in Replit. At the end, provide instructions on how to test and deploy the app.
+Key Features to Implement:
+	1	User Onboarding:
+	◦	Sign-up with email or phone number.
+	◦	Use passkey authentication (e.g., Face ID or fingerprint) for secure, self-custodial wallet creation. Use libraries like @passkeys/web or similar if available.
+	◦	Integrate fiat on-ramps using Ramp’s free SDK to allow users to buy stablecoins (e.g., USDC) directly in the app.
+	2	Basic Messaging:
+	◦	End-to-end encrypted 1:1 and small group chats (up to 10 people).
+	◦	Use XMTP SDK for decentralized messaging.
+	◦	Simple chat interface with message sending and receiving.
+	3	Payments Core:
+	◦	P2P money transfers within chats.
+	◦	Use Tempo’s dedicated payment lanes for fast (<0.5 seconds) and low-cost (~$0.001) settlements.
+	◦	Support TIP-20 tokens (similar to ERC-20; use USDC as example).
+	◦	Include memos/notes for each transfer (e.g., “For coffee”).
+	◦	Implement gas sponsorship so the app covers fees in stablecoins, making it feel free for users.
+	◦	Deploy smart contracts to Tempo testnet (provide RPC URL if needed; use public ones from docs.tempo.xyz).
+Tech Stack and Setup:
+	•	Frontend: React Native + Expo for mobile UI. Include screens for login, chat list, individual chats, and wallet balance.
+	•	Backend/Smart Contracts: Solidity for a basic P2P payment contract. Use Hardhat for testing and deployment in Replit.
+	•	Integrations:
+	◦	Ethers.js for blockchain interactions.
+	◦	XMTP for messaging.
+	◦	Ramp SDK for fiat on-ramps.
+	◦	Install all via npm in Replit (e.g., npm install ethers @xmtp/xmtp-js @ramp-network/ramp-instant-sdk).
+	•	Tempo Testnet Config: RPC URL: https://testnet.tempo.xyz/rpc (or latest from docs). Get test tokens from Tempo faucet.
+	•	UI/UX: Keep it simple – one-tap payments in chats, show transaction confirmations quickly.
+	•	Compliance Basics: Add optional KYC prompt using Persona’s free tier SDK, but make it skippable for MVP.
+	•	Testing: Ensure it works in Replit’s preview and via Expo Go app on phone. Simulate chats and payments.
+Structure the Output:
+	•	Step 1: Set up the Replit project (e.g., create folders for contracts and app).
+	•	Step 2: Write and deploy Solidity contracts.
+	•	Step 3: Build the React Native app code, including all components and integrations.
+	•	Step 4: Provide full code files (e.g., App.js, PaymentContract.sol).
+	•	Step 5: Instructions for running, testing on phone, and debugging common errors.
+Make sure everything is free-tier compatible in Replit, no paid features needed. If something can’t be done exactly, suggest workarounds. Generate the entire working MVP code.
