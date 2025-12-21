@@ -30,6 +30,7 @@ const styles = StyleSheet.create({
   icon: {
     width: 28,
     height: 28,
+    borderRadius: 6,
     marginRight: Spacing.sm,
   },
   title: {
