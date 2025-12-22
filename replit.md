@@ -107,6 +107,7 @@ shared/
 - GET /api/wallet/:userId - Get wallet by user
 - POST /api/wallet/privy - Link Privy-created wallet to user account
 - POST /api/wallet/import - Import wallet using seed phrase or private key (validates with viem)
+- DELETE /api/wallet/:userId - Delete wallet (can be recovered via import)
 - GET /api/wallet/:userId/recovery - Get encrypted recovery phrase
 
 ## Design System

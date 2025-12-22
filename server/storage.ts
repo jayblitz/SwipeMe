@@ -130,4 +130,9 @@ export const storage = {
       .returning();
     return wallet;
   },
+
+  async deleteWallet(userId: string): Promise<boolean> {
+    const result = await db.delete(wallets).where(eq(wallets.userId, userId));
+    return true;
+  },
 };

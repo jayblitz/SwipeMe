@@ -367,6 +367,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/wallet/:userId", async (req: Request, res: Response) => {
+    try {
+      const wallet = await storage.getWalletByUserId(req.params.userId);
+      if (!wallet) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      
+      await storage.deleteWallet(req.params.userId);
+      
+      res.json({ 
+        success: true,
+        message: "Wallet deleted successfully. You can recover it by importing your seed phrase or private key.",
+      });
+    } catch (error) {
+      console.error("Delete wallet error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/wallet/:userId/recovery", async (req: Request, res: Response) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);

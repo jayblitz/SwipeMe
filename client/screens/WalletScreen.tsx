@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, FlatList, Pressable, RefreshControl, Alert } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
@@ -11,8 +12,8 @@ import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius, Shadows } from "@/constants/theme";
-import { getBalance, getTransactions, addFunds, Transaction } from "@/lib/storage";
-import { getApiUrl } from "@/lib/query-client";
+import { Transaction } from "@/lib/storage";
+import { getApiUrl, apiRequest } from "@/lib/query-client";
 import WalletSetupScreen from "./WalletSetupScreen";
 
 interface Wallet {
@@ -144,12 +145,11 @@ export default function WalletScreen() {
   }, [user]);
 
   const loadData = useCallback(async () => {
-    const [loadedBalance, loadedTransactions] = await Promise.all([
-      getBalance(),
-      getTransactions(),
-    ]);
-    setBalance(loadedBalance);
-    setTransactions(loadedTransactions);
+    // For MVP, balance starts at 0 and will be fetched from blockchain in Phase 2
+    // Transactions will also come from blockchain in Phase 2
+    // For now, show empty state for fresh wallets
+    setBalance(0);
+    setTransactions([]);
   }, []);
 
   useFocusEffect(
@@ -166,26 +166,93 @@ export default function WalletScreen() {
   };
 
   const handleAddFunds = () => {
+    // In Phase 2, this will integrate with Ramp SDK for fiat on-ramp
+    // For MVP, show a placeholder message
     Alert.alert(
-      "Add Funds",
-      "Choose an amount to add to your wallet",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "$25", onPress: () => addFundsAmount(25) },
-        { text: "$50", onPress: () => addFundsAmount(50) },
-        { text: "$100", onPress: () => addFundsAmount(100) },
-      ]
+      "Coming Soon",
+      "Fiat on-ramp will be available in a future update. For now, you can receive USDC on Tempo Testnet from other users or faucets.",
+      [{ text: "OK" }]
     );
-  };
-
-  const addFundsAmount = async (amount: number) => {
-    await addFunds(amount);
-    await loadData();
-    Alert.alert("Success", `$${amount.toFixed(2)} added to your wallet`);
   };
 
   const handleWalletCreated = (newWallet: { address: string }) => {
     setWallet(newWallet as Wallet);
+  };
+
+  const handleCopyAddress = async () => {
+    if (wallet?.address) {
+      await Clipboard.setStringAsync(wallet.address);
+      Alert.alert("Copied", "Wallet address copied to clipboard");
+    }
+  };
+
+  const handleDeleteWallet = () => {
+    Alert.alert(
+      "Delete Wallet",
+      "Are you sure you want to remove this wallet from your account? You can recover it later by importing your seed phrase or private key.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete Wallet", 
+          style: "destructive",
+          onPress: confirmDeleteWallet,
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteWallet = async () => {
+    if (!user) return;
+    
+    try {
+      const response = await apiRequest("DELETE", `/api/wallet/${user.id}`, {});
+      const data = await response.json();
+      
+      if (data.success) {
+        setWallet(null);
+        Alert.alert(
+          "Wallet Removed",
+          "Your wallet has been removed. You can add a new wallet or import your existing one using your recovery phrase."
+        );
+      } else {
+        throw new Error(data.error || "Failed to delete wallet");
+      }
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to delete wallet");
+    }
+  };
+
+  const handleManageWallet = () => {
+    const options = ["Copy Address", "Delete Wallet", "Cancel"];
+    const destructiveButtonIndex = 1;
+    const cancelButtonIndex = 2;
+
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          destructiveButtonIndex,
+          cancelButtonIndex,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 0) {
+            handleCopyAddress();
+          } else if (buttonIndex === 1) {
+            handleDeleteWallet();
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        "Manage Wallet",
+        "Choose an action",
+        [
+          { text: "Copy Address", onPress: handleCopyAddress },
+          { text: "Delete Wallet", style: "destructive", onPress: handleDeleteWallet },
+          { text: "Cancel", style: "cancel" },
+        ]
+      );
+    }
   };
 
   if (isLoadingWallet) {
@@ -246,17 +313,29 @@ export default function WalletScreen() {
               <ThemedText style={[styles.balanceLabel, { color: theme.textSecondary }]}>
                 Available Balance
               </ThemedText>
-              <View style={[styles.currencyBadge, { backgroundColor: theme.primary }]}>
-                <ThemedText style={styles.currencyText}>USDC</ThemedText>
+              <View style={styles.headerActions}>
+                <View style={[styles.currencyBadge, { backgroundColor: theme.primary }]}>
+                  <ThemedText style={styles.currencyText}>USDC</ThemedText>
+                </View>
+                <Pressable onPress={handleManageWallet} style={styles.manageButton}>
+                  <Feather name="more-horizontal" size={20} color={theme.textSecondary} />
+                </Pressable>
               </View>
             </View>
             <ThemedText style={styles.balanceAmount}>
               ${balance.toFixed(2)}
             </ThemedText>
-            <View style={styles.walletInfo}>
+            <Pressable onPress={handleCopyAddress} style={styles.walletInfo}>
               <Feather name="credit-card" size={14} color={theme.textSecondary} />
               <ThemedText style={[styles.walletAddress, { color: theme.textSecondary }]}>
                 {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
+              </ThemedText>
+              <Feather name="copy" size={12} color={theme.textSecondary} />
+            </Pressable>
+            <View style={[styles.networkIndicator, { backgroundColor: theme.backgroundSecondary }]}>
+              <View style={styles.networkDot} />
+              <ThemedText style={[styles.networkText, { color: theme.textSecondary }]}>
+                Tempo Testnet
               </ThemedText>
             </View>
           </Card>
@@ -310,10 +389,18 @@ const styles = StyleSheet.create({
   balanceLabel: {
     fontSize: 14,
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
   currencyBadge: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.xs,
+  },
+  manageButton: {
+    padding: Spacing.xs,
   },
   currencyText: {
     color: "#FFFFFF",
@@ -333,6 +420,26 @@ const styles = StyleSheet.create({
   walletAddress: {
     fontSize: 13,
     fontFamily: "monospace",
+    flex: 1,
+  },
+  networkIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+    alignSelf: "flex-start",
+  },
+  networkDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.light.success,
+  },
+  networkText: {
+    fontSize: 12,
   },
   sectionHeader: {
     fontSize: 13,
