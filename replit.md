@@ -22,14 +22,19 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - Contacts permission handling in Discover tab with FAB popup menu
 - Theme persistence via AsyncStorage
 
+**MVP Phase 2 (In Progress):**
+- Real-time token balance fetching for all Tempo testnet assets (pathUSD, AlphaUSD, BetaUSD, ThetaUSD)
+- Multi-asset display in Wallet screen with individual token balances
+- Direct blockchain queries using viem for ERC-20 balances
+
 **MVP Limitations (Production Improvements Needed):**
 - API endpoints lack session-based authentication (production needs JWT or session tokens)
 - No XMTP integration yet (messages use local mock data)
-- Balance fetching and transaction signing not yet implemented
+- Transaction signing not yet implemented
 
-**Planned Features (Phase 2):**
+**Planned Features (Phase 3):**
 - XMTP SDK integration for E2E encrypted messaging
-- Balance fetching and transaction signing on Tempo testnet
+- Transaction signing and sending on Tempo testnet
 - Ramp SDK for fiat on-ramp
 - Session-based API authentication
 
@@ -61,7 +66,8 @@ client/                     # Expo/React Native frontend
 │   └── ProfileStackNavigator.tsx  # Profile + RecoveryPhrase screens
 ├── lib/
 │   ├── storage.ts          # AsyncStorage data layer (mock data for chats/transactions)
-│   └── query-client.ts     # React Query setup + API helpers
+│   ├── query-client.ts     # React Query setup + API helpers
+│   └── tempo-tokens.ts     # Tempo testnet token configs + balance fetching via viem
 ├── constants/
 │   └── theme.ts            # Design tokens, colors, shadows
 ├── hooks/
