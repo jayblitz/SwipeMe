@@ -54,6 +54,10 @@
       font-size: 14px;
     }
     
+    #privy-container {
+      width: 100%;
+    }
+    
     .loading {
       display: flex;
       flex-direction: column;
@@ -159,85 +163,49 @@
       border-radius: 50%;
     }
     
-    .info-box {
-      background: rgba(0, 102, 255, 0.1);
-      border: 1px solid rgba(0, 102, 255, 0.2);
-      padding: 16px;
-      border-radius: 12px;
-      margin-top: 20px;
-      text-align: left;
+    .input-group {
+      margin-bottom: 16px;
     }
     
-    .info-box h3 {
-      font-size: 14px;
-      color: #0066FF;
+    .input-label {
+      display: block;
+      text-align: left;
       margin-bottom: 8px;
-    }
-    
-    .info-box p {
-      font-size: 12px;
       color: #a0a0a0;
-      line-height: 1.5;
-    }
-    
-    .recovery-phrase {
-      background: rgba(255, 193, 7, 0.1);
-      border: 1px solid rgba(255, 193, 7, 0.3);
-      padding: 16px;
-      border-radius: 12px;
-      margin-top: 16px;
-    }
-    
-    .recovery-phrase h3 {
-      color: #ffc107;
       font-size: 14px;
-      margin-bottom: 12px;
     }
     
-    .recovery-phrase .words {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    
-    .recovery-phrase .word {
+    .text-input {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
       background: rgba(255,255,255,0.05);
-      padding: 8px;
-      border-radius: 6px;
-      font-family: monospace;
-      font-size: 12px;
-      text-align: center;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      color: white;
+      outline: none;
     }
     
-    .recovery-phrase .word-num {
+    .text-input:focus {
+      border-color: #0066FF;
+    }
+    
+    .text-input::placeholder {
       color: #666;
-      font-size: 10px;
     }
     
-    .warning {
-      color: #ff6b6b;
-      font-size: 11px;
-      margin-top: 8px;
+    .code-input {
+      letter-spacing: 8px;
+      text-align: center;
+      font-size: 24px;
     }
     
-    .checkbox-container {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-top: 16px;
-      text-align: left;
-    }
-    
-    .checkbox-container input {
-      margin-top: 2px;
-      width: 18px;
-      height: 18px;
-    }
-    
-    .checkbox-container label {
-      font-size: 13px;
-      color: #a0a0a0;
+    #privy-iframe {
+      position: absolute;
+      width: 0;
+      height: 0;
+      border: none;
+      visibility: hidden;
     }
   </style>
 </head>
@@ -245,25 +213,33 @@
   <div class="container">
     <div class="logo">T</div>
     <h1>TempoChat Wallet</h1>
-    <p class="subtitle">Create your secure wallet</p>
+    <p class="subtitle">Secure wallet powered by Privy</p>
     
     <div id="status">
       <div class="loading">
         <div class="spinner"></div>
-        <p>Loading wallet generator...</p>
+        <p>Initializing Privy...</p>
       </div>
     </div>
+    
+    <div id="privy-container"></div>
+    <iframe id="privy-iframe"></iframe>
   </div>
 
   <script type="module">
-    import { generateMnemonic, mnemonicToAccount } from 'https://esm.sh/viem@2.21.0/accounts';
-    import { english } from 'https://esm.sh/@scure/bip39@1.4.0/wordlists/english';
+    import Privy, { LocalStorage, getUserEmbeddedEthereumWallet } from 'https://esm.sh/@privy-io/js-sdk-core@0.54.2';
     
+    const PRIVY_APP_ID = '{{PRIVY_APP_ID}}';
+    const PRIVY_CLIENT_ID_MOBILE = '{{PRIVY_CLIENT_ID_MOBILE}}';
+    const PRIVY_CLIENT_ID_WEB = '{{PRIVY_CLIENT_ID_WEB}}';
     const TEMPO_TESTNET_CHAIN_ID = 42429;
     
-    let generatedMnemonic = null;
-    let generatedAddress = null;
-    let generatedPrivateKey = null;
+    const isMobile = window.ReactNativeWebView !== undefined;
+    const CLIENT_ID = isMobile ? PRIVY_CLIENT_ID_MOBILE : PRIVY_CLIENT_ID_WEB;
+    
+    let privy = null;
+    let currentUser = null;
+    let currentEmail = null;
     
     function postToReactNative(type, data) {
       const message = JSON.stringify({ type, data });
@@ -277,26 +253,46 @@
       document.getElementById('status').innerHTML = html;
     }
     
-    async function generateNewWallet() {
+    async function initPrivy() {
       try {
-        updateStatus(`
-          <div class="loading">
-            <div class="spinner"></div>
-            <p>Generating secure wallet...</p>
-          </div>
-        `);
+        console.log('Initializing Privy with:', { appId: PRIVY_APP_ID, clientId: CLIENT_ID, isMobile });
         
-        generatedMnemonic = generateMnemonic(english);
-        const account = mnemonicToAccount(generatedMnemonic);
-        generatedAddress = account.address;
+        privy = new Privy({
+          appId: PRIVY_APP_ID,
+          clientId: CLIENT_ID,
+          storage: new LocalStorage(),
+        });
         
-        showRecoveryPhrase();
+        const iframe = document.getElementById('privy-iframe');
+        const iframeUrl = privy.embeddedWallet.getURL();
+        iframe.src = iframeUrl;
+        
+        await new Promise((resolve) => {
+          iframe.onload = resolve;
+          setTimeout(resolve, 3000);
+        });
+        
+        privy.setMessagePoster(iframe.contentWindow);
+        
+        window.addEventListener('message', (e) => {
+          if (e.origin.includes('privy')) {
+            privy.embeddedWallet.onMessage(e.data);
+          }
+        });
+        
+        const user = await privy.user.get();
+        if (user) {
+          currentUser = user;
+          await handleAuthenticatedUser(user);
+        } else {
+          showLoginOptions();
+        }
         
       } catch (error) {
-        console.error('Wallet generation error:', error);
+        console.error('Privy init error:', error);
         updateStatus(`
           <div class="error">
-            <p>Failed to generate wallet</p>
+            <p>Failed to initialize wallet service</p>
             <p style="font-size: 12px; margin-top: 8px;">${error.message}</p>
           </div>
           <button class="btn" onclick="location.reload()">Try Again</button>
@@ -304,91 +300,209 @@
       }
     }
     
-    function showRecoveryPhrase() {
-      const words = generatedMnemonic.split(' ');
-      const wordsHtml = words.map((word, i) => 
-        `<div class="word"><span class="word-num">${i + 1}</span> ${word}</div>`
-      ).join('');
-      
+    function showLoginOptions() {
       updateStatus(`
-        <div class="recovery-phrase">
-          <h3>Your Recovery Phrase</h3>
-          <div class="words">${wordsHtml}</div>
-          <p class="warning">Write this down and store it safely. You will need it to recover your wallet.</p>
+        <div class="input-group">
+          <label class="input-label">Email address</label>
+          <input type="email" id="email-input" class="text-input" placeholder="you@example.com" autocomplete="email">
         </div>
-        
-        <div class="checkbox-container">
-          <input type="checkbox" id="saved-checkbox">
-          <label for="saved-checkbox">I have saved my recovery phrase in a secure location</label>
-        </div>
-        
-        <button class="btn" id="continue-btn" disabled>Continue</button>
-        <button class="btn btn-secondary" id="copy-btn">Copy Recovery Phrase</button>
+        <button class="btn" id="email-login-btn">Continue with Email</button>
+        <p style="margin-top: 16px; color: #666; font-size: 12px;">
+          Your wallet will be created automatically
+        </p>
       `);
       
-      const checkbox = document.getElementById('saved-checkbox');
-      const continueBtn = document.getElementById('continue-btn');
-      const copyBtn = document.getElementById('copy-btn');
+      const emailInput = document.getElementById('email-input');
+      const loginBtn = document.getElementById('email-login-btn');
       
-      checkbox.addEventListener('change', () => {
-        continueBtn.disabled = !checkbox.checked;
+      loginBtn.addEventListener('click', async () => {
+        const email = emailInput.value.trim();
+        if (email && email.includes('@')) {
+          await loginWithEmail(email);
+        } else {
+          emailInput.style.borderColor = '#ff6b6b';
+        }
       });
       
-      continueBtn.addEventListener('click', () => {
-        completeWalletCreation();
-      });
-      
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(generatedMnemonic).then(() => {
-          copyBtn.textContent = 'Copied!';
-          setTimeout(() => {
-            copyBtn.textContent = 'Copy Recovery Phrase';
-          }, 2000);
-        });
+      emailInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          loginBtn.click();
+        }
       });
     }
     
-    function completeWalletCreation() {
-      const walletData = {
-        walletAddress: generatedAddress,
-        seedPhrase: generatedMnemonic,
-        chainId: TEMPO_TESTNET_CHAIN_ID,
-        isImported: false,
-      };
-      
-      postToReactNative('wallet_created', walletData);
-      
-      updateStatus(`
-        <div class="success">
-          <h2>Wallet Created</h2>
-          <p>Your wallet is ready to use</p>
-          <div class="wallet-address">${generatedAddress}</div>
-          <div class="network-badge">
-            <span class="network-dot"></span>
-            Tempo Testnet
+    async function loginWithEmail(email) {
+      try {
+        currentEmail = email;
+        updateStatus(`
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Sending verification code to ${email}...</p>
           </div>
-        </div>
-        <button class="btn" id="done-btn">Continue to App</button>
-      `);
-      
-      document.getElementById('done-btn').addEventListener('click', () => {
-        postToReactNative('complete', walletData);
-      });
+        `);
+        
+        await privy.auth.email.sendCode(email);
+        
+        updateStatus(`
+          <p style="margin-bottom: 16px;">Enter the code sent to <strong>${email}</strong></p>
+          <div class="input-group">
+            <input type="text" id="code-input" class="text-input code-input" 
+                   placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+          </div>
+          <button class="btn" id="verify-btn">Verify Code</button>
+          <button class="btn btn-secondary" id="resend-btn">Resend Code</button>
+          <button class="btn btn-secondary" id="back-btn" style="margin-top: 8px;">Use different email</button>
+        `);
+        
+        const codeInput = document.getElementById('code-input');
+        const verifyBtn = document.getElementById('verify-btn');
+        const resendBtn = document.getElementById('resend-btn');
+        const backBtn = document.getElementById('back-btn');
+        
+        codeInput.focus();
+        
+        verifyBtn.addEventListener('click', async () => {
+          const code = codeInput.value.trim();
+          if (code.length === 6) {
+            await verifyEmailCode(email, code);
+          } else {
+            codeInput.style.borderColor = '#ff6b6b';
+          }
+        });
+        
+        codeInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            verifyBtn.click();
+          }
+        });
+        
+        resendBtn.addEventListener('click', () => {
+          loginWithEmail(email);
+        });
+        
+        backBtn.addEventListener('click', () => {
+          showLoginOptions();
+        });
+        
+      } catch (error) {
+        console.error('Email login error:', error);
+        updateStatus(`
+          <div class="error">
+            <p>Failed to send verification code</p>
+            <p style="font-size: 12px; margin-top: 8px;">${error.message}</p>
+          </div>
+          <button class="btn" id="retry-btn">Try Again</button>
+        `);
+        document.getElementById('retry-btn').addEventListener('click', showLoginOptions);
+      }
     }
     
-    function showStartScreen() {
-      updateStatus(`
-        <div class="info-box">
-          <h3>Secure Self-Custodial Wallet</h3>
-          <p>Your wallet keys are stored securely on your device. Only you have access to your funds. Make sure to save your recovery phrase.</p>
-        </div>
-        <button class="btn" id="create-btn">Create New Wallet</button>
-      `);
-      
-      document.getElementById('create-btn').addEventListener('click', generateNewWallet);
+    async function verifyEmailCode(email, code) {
+      try {
+        updateStatus(`
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Verifying code and setting up wallet...</p>
+          </div>
+        `);
+        
+        const { user } = await privy.auth.email.loginWithCode(email, code);
+        currentUser = user;
+        
+        await handleAuthenticatedUser(user);
+        
+      } catch (error) {
+        console.error('Verify code error:', error);
+        updateStatus(`
+          <div class="error">
+            <p>Invalid verification code</p>
+            <p style="font-size: 12px; margin-top: 8px;">${error.message}</p>
+          </div>
+          <button class="btn" id="retry-btn">Try Again</button>
+        `);
+        document.getElementById('retry-btn').addEventListener('click', () => {
+          loginWithEmail(currentEmail);
+        });
+      }
     }
     
-    showStartScreen();
+    async function handleAuthenticatedUser(user) {
+      try {
+        updateStatus(`
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Setting up your wallet...</p>
+          </div>
+        `);
+        
+        let wallet = getUserEmbeddedEthereumWallet(user);
+        
+        if (!wallet) {
+          updateStatus(`
+            <div class="loading">
+              <div class="spinner"></div>
+              <p>Creating your wallet...</p>
+            </div>
+          `);
+          
+          const result = await privy.embeddedWallet.create({});
+          currentUser = result.user;
+          wallet = getUserEmbeddedEthereumWallet(result.user);
+        }
+        
+        const walletAddress = wallet?.address || null;
+        const accessToken = await privy.getAccessToken();
+        const emailAddress = user.email?.address || user.linked_accounts?.find(a => a.type === 'email')?.address || null;
+        
+        const userData = {
+          userId: user.id,
+          email: emailAddress,
+          walletAddress: walletAddress,
+          accessToken: accessToken,
+          chainId: TEMPO_TESTNET_CHAIN_ID,
+        };
+        
+        postToReactNative('authenticated', userData);
+        
+        updateStatus(`
+          <div class="success">
+            <h2>Wallet Ready</h2>
+            <p>Connected to Tempo Testnet</p>
+            <div class="wallet-address">${walletAddress || 'Creating wallet...'}</div>
+            <div class="network-badge">
+              <span class="network-dot"></span>
+              Tempo Testnet
+            </div>
+          </div>
+          <button class="btn" id="done-btn">Continue to App</button>
+          <button class="btn btn-secondary" id="logout-btn">Disconnect</button>
+        `);
+        
+        document.getElementById('done-btn').addEventListener('click', () => {
+          postToReactNative('complete', userData);
+        });
+        
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+          await privy.logout();
+          currentUser = null;
+          postToReactNative('logout', {});
+          showLoginOptions();
+        });
+        
+      } catch (error) {
+        console.error('Handle user error:', error);
+        updateStatus(`
+          <div class="error">
+            <p>Failed to set up wallet</p>
+            <p style="font-size: 12px; margin-top: 8px;">${error.message}</p>
+          </div>
+          <button class="btn" id="retry-btn">Try Again</button>
+        `);
+        document.getElementById('retry-btn').addEventListener('click', () => location.reload());
+      }
+    }
+    
+    initPrivy();
   </script>
 </body>
 </html>
