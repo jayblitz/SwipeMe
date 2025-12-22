@@ -14,7 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { Transaction } from "@/lib/storage";
 import { getApiUrl, apiRequest } from "@/lib/query-client";
-import { fetchTokenBalances, getTotalBalance, TokenBalance } from "@/lib/tempo-tokens";
+import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS } from "@/lib/tempo-tokens";
 import WalletSetupScreen from "./WalletSetupScreen";
 
 interface Wallet {
@@ -122,7 +122,13 @@ export default function WalletScreen() {
   const { user } = useAuth();
   
   const [wallet, setWallet] = useState<Wallet | null | undefined>(undefined);
-  const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
+  const initialBalances: TokenBalance[] = TEMPO_TOKENS.map(token => ({
+    token,
+    balance: "0",
+    balanceFormatted: "0",
+    balanceUsd: 0,
+  }));
+  const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>(initialBalances);
   const [totalBalance, setTotalBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -203,6 +209,9 @@ export default function WalletScreen() {
 
   const handleWalletCreated = (newWallet: { address: string }) => {
     setWallet(newWallet as Wallet);
+    if (newWallet.address) {
+      loadBalances(newWallet.address);
+    }
   };
 
   const handleCopyAddress = async () => {
