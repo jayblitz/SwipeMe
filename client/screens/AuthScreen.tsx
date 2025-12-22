@@ -318,30 +318,16 @@ export default function AuthScreen() {
         <Pressable onPress={goBack} style={styles.backButton}>
           <Feather name="arrow-left" size={24} color={theme.text} />
         </Pressable>
-        <View style={styles.stepIndicator}>
-          <View style={[styles.stepDot, styles.stepDotCompleted]}>
-            <Feather name="check" size={12} color="#FFFFFF" />
-          </View>
-          <View style={[styles.stepLine, styles.stepLineActive]} />
-          <View style={[styles.stepDot, styles.stepDotCompleted]}>
-            <Feather name="check" size={12} color="#FFFFFF" />
-          </View>
-          <View style={[styles.stepLine, styles.stepLineActive]} />
-          <View style={[styles.stepDot, styles.stepDotActive]} />
-        </View>
       </View>
 
-      <ThemedText type="h3" style={styles.stepTitle}>Set your password</ThemedText>
-      <ThemedText style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        Create a secure password for your account
-      </ThemedText>
+      <ThemedText type="h3" style={styles.stepTitle}>Create a password</ThemedText>
 
       <View style={styles.form}>
         <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: error ? Colors.light.error : theme.border }]}>
           <Feather name="lock" size={20} color={theme.textSecondary} style={styles.inputIcon} />
           <TextInput
             style={[styles.input, { color: theme.text }]}
-            placeholder="Password (min 8 characters)"
+            placeholder="Password"
             placeholderTextColor={theme.textSecondary}
             value={password}
             onChangeText={(text) => { setPassword(text); setError(""); }}
