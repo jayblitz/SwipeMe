@@ -6,6 +6,15 @@ import { signupSchema, verifyCodeSchema, setPasswordSchema, loginSchema } from "
 import { z } from "zod";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
+import { 
+  generateWallet, 
+  importWalletFromMnemonic, 
+  importWalletFromPrivateKey,
+  encryptSensitiveData,
+  decryptSensitiveData,
+  getBalance,
+  tempoTestnet
+} from "./wallet";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup/start", async (req: Request, res: Response) => {
@@ -215,14 +224,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/wallet/create", async (req: Request, res: Response) => {
     try {
-      const { userId, address, encryptedPrivateKey, encryptedSeedPhrase, isImported } = req.body;
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
       
       const existingWallet = await storage.getWalletByUserId(userId);
       if (existingWallet) {
         return res.status(400).json({ error: "Wallet already exists" });
       }
       
-      const wallet = await storage.createWallet(userId, address, encryptedPrivateKey, encryptedSeedPhrase, isImported);
+      const { address, mnemonic } = generateWallet();
+      
+      const encryptedSeedPhrase = encryptSensitiveData(mnemonic);
+      
+      const wallet = await storage.createWallet(
+        userId, 
+        address, 
+        undefined,
+        encryptedSeedPhrase, 
+        false
+      );
       
       res.json({ 
         success: true,
@@ -231,10 +254,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
           address: wallet.address,
           isImported: wallet.isImported,
           createdAt: wallet.createdAt,
-        } 
+        },
+        network: {
+          name: tempoTestnet.name,
+          chainId: tempoTestnet.id,
+        }
       });
     } catch (error) {
       console.error("Create wallet error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/wallet/import", async (req: Request, res: Response) => {
+    try {
+      const { userId, seedPhrase, privateKey } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+      
+      if (!seedPhrase && !privateKey) {
+        return res.status(400).json({ error: "Seed phrase or private key is required" });
+      }
+      
+      const existingWallet = await storage.getWalletByUserId(userId);
+      if (existingWallet) {
+        return res.status(400).json({ error: "Wallet already exists" });
+      }
+      
+      let address: string;
+      let encryptedSeedPhrase: string | undefined = undefined;
+      let encryptedPrivateKey: string | undefined = undefined;
+      
+      if (seedPhrase) {
+        const result = importWalletFromMnemonic(seedPhrase);
+        address = result.address;
+        encryptedSeedPhrase = encryptSensitiveData(result.mnemonic);
+      } else {
+        const result = importWalletFromPrivateKey(privateKey);
+        address = result.address;
+        encryptedPrivateKey = encryptSensitiveData(result.privateKey);
+      }
+      
+      const wallet = await storage.createWallet(
+        userId, 
+        address, 
+        encryptedPrivateKey,
+        encryptedSeedPhrase, 
+        true
+      );
+      
+      res.json({ 
+        success: true,
+        wallet: { 
+          id: wallet.id, 
+          address: wallet.address,
+          isImported: wallet.isImported,
+          createdAt: wallet.createdAt,
+        },
+        network: {
+          name: tempoTestnet.name,
+          chainId: tempoTestnet.id,
+        }
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Import wallet error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
