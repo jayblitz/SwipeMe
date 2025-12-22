@@ -133,6 +133,12 @@ shared/
 - Biometric authentication via expo-local-authentication
 - Contacts permission via expo-contacts
 - Clipboard access via expo-clipboard
+- Privy wallet integration uses SDK v0.54+ with:
+  - Environment variables: PRIVY_APP_ID, PRIVY_CLIENT_ID_MOBILE, PRIVY_CLIENT_ID_WEB
+  - Email OTP flow with sendCode/loginWithCode API
+  - LocalStorage adapter for web persistence
+  - Iframe-based embedded wallet setup
+  - Auto-detection of mobile vs web client ID based on ReactNativeWebView presence
 
 ## User Preferences
 
