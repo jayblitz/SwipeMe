@@ -60,6 +60,3 @@ ensurePreviewReachable = "/status"
 
 [userenv.shared]
 WALLET_ENCRYPTION_KEY = "4865e88a0501d04f116ccc6d7321fa48353c15067b6ab5e2accf0b52702156ae"
-PRIVY_APP_ID = "cmjhn4u9k02o7i60d2d7b6k1b"
-PRIVY_CLIENT_ID_MOBILE = "client-WY6UErRq31kaTUPy3u6u1ng56bUC2Na9rEp9yKQRQFGWd"
-PRIVY_CLIENT_ID_WEB = "client-WY6UErRq31kaTUPy3u6u1ng56bUC2Na9rEzXaAxBreV1S"
