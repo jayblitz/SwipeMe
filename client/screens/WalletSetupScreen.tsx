@@ -1,20 +1,19 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import * as SecureStore from "expo-secure-store";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
-import PrivyWalletWebView from "@/components/PrivyWalletWebView";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import { generateMnemonic, english, mnemonicToAccount } from "viem/accounts";
 
-type SetupStep = "choose" | "privy" | "import" | "creating";
+type SetupStep = "choose" | "creating" | "showPhrase" | "import";
 
 interface WalletSetupScreenProps {
   onWalletCreated: (wallet: { address: string }) => void;
@@ -28,75 +27,59 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
   const [step, setStep] = useState<SetupStep>("choose");
   const [seedPhrase, setSeedPhrase] = useState("");
   const [privateKey, setPrivateKey] = useState("");
+  const [generatedPhrase, setGeneratedPhrase] = useState("");
+  const [generatedAddress, setGeneratedAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [importType, setImportType] = useState<"seed" | "private">("seed");
+  const [phraseConfirmed, setPhraseConfirmed] = useState(false);
 
-  const handlePrivyAuthenticated = async (data: {
-    userId: string;
-    email: string | null;
-    walletAddress: string | null;
-    accessToken: string;
-    chainId: number;
-  }) => {
-    console.log("Privy authenticated:", data);
+  const handleCreateNewWallet = async () => {
+    if (!user) return;
     
-    if (Platform.OS !== "web") {
-      try {
-        await SecureStore.setItemAsync("privy_access_token", data.accessToken);
-        await SecureStore.setItemAsync("privy_user_id", data.userId);
-      } catch (err) {
-        console.error("Failed to store Privy credentials:", err);
-      }
-    }
-  };
-
-  const handlePrivyComplete = async (data: {
-    userId: string;
-    email: string | null;
-    walletAddress: string | null;
-    accessToken: string;
-    chainId: number;
-  }) => {
-    if (!user || !data.walletAddress) {
-      Alert.alert("Error", "Failed to get wallet address");
-      setStep("choose");
-      return;
-    }
-
+    setStep("creating");
     setIsLoading(true);
-
+    
     try {
-      const response = await apiRequest("POST", "/api/wallet/privy", {
-        userId: user.id,
-        privyUserId: data.userId,
-        walletAddress: data.walletAddress,
-        accessToken: data.accessToken,
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        onWalletCreated(result.wallet);
-      } else {
-        throw new Error(result.error || "Failed to link wallet");
-      }
+      const mnemonic = generateMnemonic(english);
+      const account = mnemonicToAccount(mnemonic);
+      
+      setGeneratedPhrase(mnemonic);
+      setGeneratedAddress(account.address);
+      setStep("showPhrase");
     } catch (err: any) {
-      console.error("Link wallet failed:", err);
-      Alert.alert("Error", err.message || "Failed to link wallet to your account");
+      console.error("Create wallet failed:", err);
+      Alert.alert("Error", "Failed to generate wallet. Please try again.");
       setStep("choose");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePrivyLogout = () => {
-    setStep("choose");
-  };
-
-  const handlePrivyError = (errorMessage: string) => {
-    Alert.alert("Wallet Error", errorMessage);
-    setStep("choose");
+  const handleConfirmAndSaveWallet = async () => {
+    if (!user || !generatedPhrase) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const response = await apiRequest("POST", "/api/wallet/import", {
+        userId: user.id,
+        seedPhrase: generatedPhrase,
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        onWalletCreated(data.wallet);
+      } else {
+        throw new Error(data.error || "Failed to save wallet");
+      }
+    } catch (err: any) {
+      console.error("Save wallet failed:", err);
+      Alert.alert("Error", err.message || "Failed to save wallet to your account");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleImportWallet = async () => {
@@ -167,15 +150,15 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
         <Card style={styles.optionCard} elevation={1}>
           <Pressable 
             style={styles.optionButton}
-            onPress={() => setStep("privy")}
+            onPress={handleCreateNewWallet}
           >
             <View style={[styles.optionIcon, { backgroundColor: Colors.light.primaryLight }]}>
-              <Feather name="mail" size={24} color={Colors.light.primary} />
+              <Feather name="plus-circle" size={24} color={Colors.light.primary} />
             </View>
             <View style={styles.optionContent}>
-              <ThemedText style={styles.optionTitle}>Continue with Email</ThemedText>
+              <ThemedText style={styles.optionTitle}>Create New Wallet</ThemedText>
               <ThemedText style={[styles.optionDescription, { color: theme.textSecondary }]}>
-                Create a secure wallet linked to your email via Privy
+                Generate a new secure wallet with recovery phrase
               </ThemedText>
             </View>
             <Feather name="chevron-right" size={24} color={theme.textSecondary} />
@@ -225,31 +208,98 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
     </View>
   );
 
-  const renderPrivyStep = () => (
-    <View style={styles.privyContainer}>
-      <View style={styles.privyHeader}>
-        <Pressable onPress={() => setStep("choose")} style={styles.backButton}>
-          <Feather name="x" size={24} color={theme.text} />
-        </Pressable>
-        <ThemedText type="h3">Create Wallet</ThemedText>
-        <View style={{ width: 40 }} />
-      </View>
-      
-      {isLoading ? (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
-          <ThemedText style={styles.loadingText}>Linking wallet to your account...</ThemedText>
-        </View>
-      ) : (
-        <PrivyWalletWebView
-          onAuthenticated={handlePrivyAuthenticated}
-          onComplete={handlePrivyComplete}
-          onLogout={handlePrivyLogout}
-          onError={handlePrivyError}
-        />
-      )}
+  const renderCreatingStep = () => (
+    <View style={styles.creatingContainer}>
+      <ActivityIndicator size="large" color={Colors.light.primary} />
+      <ThemedText style={styles.creatingText}>Generating your secure wallet...</ThemedText>
     </View>
   );
+
+  const renderShowPhraseStep = () => {
+    const words = generatedPhrase.split(" ");
+    
+    return (
+      <KeyboardAwareScrollViewCompat
+        contentContainerStyle={[
+          styles.phraseContainer,
+          { paddingBottom: insets.bottom + Spacing.xl },
+        ]}
+      >
+        <View style={styles.phraseHeader}>
+          <Pressable 
+            onPress={() => {
+              setStep("choose");
+              setGeneratedPhrase("");
+              setGeneratedAddress("");
+              setPhraseConfirmed(false);
+            }} 
+            style={styles.backButton}
+          >
+            <Feather name="arrow-left" size={24} color={theme.text} />
+          </Pressable>
+          <ThemedText type="h3">Your Recovery Phrase</ThemedText>
+        </View>
+
+        <View style={[styles.successBadge, { backgroundColor: Colors.light.successLight }]}>
+          <Feather name="check-circle" size={20} color={Colors.light.success} />
+          <ThemedText style={[styles.successText, { color: Colors.light.success }]}>
+            Wallet Created Successfully
+          </ThemedText>
+        </View>
+
+        <View style={[styles.addressCard, { backgroundColor: theme.backgroundSecondary }]}>
+          <ThemedText style={[styles.addressLabel, { color: theme.textSecondary }]}>
+            Your wallet address
+          </ThemedText>
+          <ThemedText style={styles.addressText} numberOfLines={1}>
+            {generatedAddress}
+          </ThemedText>
+        </View>
+
+        <View style={styles.warningCard}>
+          <Feather name="alert-triangle" size={20} color={Colors.light.warning} />
+          <ThemedText style={[styles.warningText, { color: theme.textSecondary }]}>
+            Write down these 12 words in order and store them securely. This is the only way to recover your wallet if you lose access.
+          </ThemedText>
+        </View>
+
+        <View style={styles.wordsGrid}>
+          {words.map((word, index) => (
+            <View key={index} style={[styles.wordItem, { backgroundColor: theme.backgroundSecondary }]}>
+              <ThemedText style={[styles.wordNumber, { color: theme.textSecondary }]}>{index + 1}</ThemedText>
+              <ThemedText style={styles.wordText}>{word}</ThemedText>
+            </View>
+          ))}
+        </View>
+
+        <Pressable 
+          style={styles.confirmCheckbox}
+          onPress={() => setPhraseConfirmed(!phraseConfirmed)}
+        >
+          <View style={[
+            styles.checkbox, 
+            { 
+              backgroundColor: phraseConfirmed ? Colors.light.primary : "transparent",
+              borderColor: phraseConfirmed ? Colors.light.primary : theme.border,
+            }
+          ]}>
+            {phraseConfirmed ? <Feather name="check" size={14} color="#FFFFFF" /> : null}
+          </View>
+          <ThemedText style={[styles.confirmText, { color: theme.textSecondary }]}>
+            I have saved my recovery phrase securely
+          </ThemedText>
+        </Pressable>
+
+        <Button 
+          onPress={handleConfirmAndSaveWallet} 
+          disabled={!phraseConfirmed || isLoading}
+          style={styles.continueButton}
+        >
+          {isLoading ? <ActivityIndicator color="#FFFFFF" /> : "Continue to Wallet"}
+        </Button>
+      </KeyboardAwareScrollViewCompat>
+    );
+  };
 
   const renderImportStep = () => (
     <KeyboardAwareScrollViewCompat
@@ -361,9 +411,10 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
   );
 
   return (
-    <ThemedView style={[styles.container, { paddingTop: step === "privy" ? 0 : insets.top + Spacing.xl }]}>
+    <ThemedView style={[styles.container, { paddingTop: step === "choose" || step === "creating" ? insets.top + Spacing.xl : insets.top + Spacing.md }]}>
       {step === "choose" ? renderChooseStep() : null}
-      {step === "privy" ? renderPrivyStep() : null}
+      {step === "creating" ? renderCreatingStep() : null}
+      {step === "showPhrase" ? renderShowPhraseStep() : null}
       {step === "import" ? renderImportStep() : null}
     </ThemedView>
   );
@@ -459,26 +510,6 @@ const styles = StyleSheet.create({
   networkText: {
     fontSize: 13,
   },
-  privyContainer: {
-    flex: 1,
-  },
-  privyHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.md,
-  },
-  loadingOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: Spacing.lg,
-    fontSize: 14,
-  },
   backButton: {
     padding: Spacing.sm,
     marginLeft: -Spacing.sm,
@@ -550,6 +581,93 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   importButton: {
+    marginTop: Spacing.md,
+  },
+  creatingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  creatingText: {
+    marginTop: Spacing.lg,
+    fontSize: 16,
+  },
+  phraseContainer: {
+    paddingHorizontal: Spacing.lg,
+  },
+  phraseHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  successBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.lg,
+  },
+  successText: {
+    fontWeight: "600",
+  },
+  addressCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.lg,
+  },
+  addressLabel: {
+    fontSize: 12,
+    marginBottom: Spacing.xs,
+  },
+  addressText: {
+    fontFamily: "monospace",
+    fontSize: 14,
+  },
+  wordsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+    marginBottom: Spacing.xl,
+  },
+  wordItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    width: "48%",
+    gap: Spacing.sm,
+  },
+  wordNumber: {
+    fontSize: 12,
+    width: 20,
+    textAlign: "center",
+  },
+  wordText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  confirmCheckbox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  continueButton: {
     marginTop: Spacing.md,
   },
 });

@@ -13,7 +13,7 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - PostgreSQL database with 8 tables: users, verification_codes, wallets, contacts, chats, chat_participants, messages, transactions
 - 4-tab navigation (Chats, Wallet, Discover, Profile)
 - Wallet setup with two options:
-  - "Continue with Email" - Privy wallet creation via embedded WebView (works around Expo Go native SDK limitation)
+  - "Create New Wallet" - Local wallet generation using viem with 12-word recovery phrase
   - "Import Wallet" - Real wallet import using viem with seed phrase (12/24 words) or private key validation
 - Wallet import validates against Tempo testnet (chain ID 42429) and derives real addresses using viem
 - Seed phrases and private keys encrypted with AES-256-GCM before database storage (WALLET_ENCRYPTION_KEY required)
@@ -23,8 +23,6 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - Theme persistence via AsyncStorage
 
 **MVP Limitations (Production Improvements Needed):**
-- Privy integration uses WebView workaround since native Privy SDK incompatible with Expo Go
-- Privy wallets store address only (MPC key shares managed by Privy client-side)
 - API endpoints lack session-based authentication (production needs JWT or session tokens)
 - No XMTP integration yet (messages use local mock data)
 - Balance fetching and transaction signing not yet implemented
@@ -34,6 +32,8 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - Balance fetching and transaction signing on Tempo testnet
 - Ramp SDK for fiat on-ramp
 - Session-based API authentication
+
+**Note:** Privy integration was removed due to SDK incompatibility with Expo Go (native SDK requires development build, JS SDK Core has "Invalid nativeAppID" errors in WebView context). Wallet creation now uses local viem-based wallet generation.
 
 ## Project Architecture
 
