@@ -1,38 +1,131 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { eq, and, gt, desc } from "drizzle-orm";
+import { db } from "./db";
+import { 
+  users, 
+  verificationCodes, 
+  wallets, 
+  contacts, 
+  chats, 
+  chatParticipants, 
+  messages, 
+  transactions,
+  type User,
+  type VerificationCode,
+  type Wallet
+} from "@shared/schema";
+import { randomBytes, createHash, scrypt, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 
-// modify the interface with any CRUD methods
-// you might need
+const scryptAsync = promisify(scrypt);
 
-export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+  return salt + ":" + derivedKey.toString("hex");
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const [salt, key] = hash.split(":");
+  const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+  const keyBuffer = Buffer.from(key, "hex");
+  return timingSafeEqual(derivedKey, keyBuffer);
+}
 
-  constructor() {
-    this.users = new Map();
-  }
+function generateVerificationCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+export const storage = {
+  async getUserById(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
-  }
-}
+  },
 
-export const storage = new MemStorage();
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
+    return user;
+  },
+
+  async createUser(email: string, password: string): Promise<User> {
+    const hashedPassword = await hashPassword(password);
+    const [user] = await db.insert(users).values({
+      email: email.toLowerCase(),
+      password: hashedPassword,
+    }).returning();
+    return user;
+  },
+
+  async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  },
+
+  async createVerificationCode(email: string, type: string = "signup"): Promise<string> {
+    const code = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    
+    await db.update(verificationCodes)
+      .set({ used: true })
+      .where(and(
+        eq(verificationCodes.email, email.toLowerCase()),
+        eq(verificationCodes.type, type),
+        eq(verificationCodes.used, false)
+      ));
+    
+    await db.insert(verificationCodes).values({
+      email: email.toLowerCase(),
+      code,
+      type,
+      expiresAt,
+    });
+    
+    return code;
+  },
+
+  async verifyCode(email: string, code: string, type: string = "signup"): Promise<boolean> {
+    const [verification] = await db.select()
+      .from(verificationCodes)
+      .where(and(
+        eq(verificationCodes.email, email.toLowerCase()),
+        eq(verificationCodes.code, code),
+        eq(verificationCodes.type, type),
+        eq(verificationCodes.used, false),
+        gt(verificationCodes.expiresAt, new Date())
+      ));
+    
+    if (!verification) return false;
+    
+    await db.update(verificationCodes)
+      .set({ used: true })
+      .where(eq(verificationCodes.id, verification.id));
+    
+    return true;
+  },
+
+  async getWalletByUserId(userId: string): Promise<Wallet | undefined> {
+    const [wallet] = await db.select().from(wallets).where(eq(wallets.userId, userId));
+    return wallet;
+  },
+
+  async createWallet(userId: string, address: string, encryptedPrivateKey?: string, encryptedSeedPhrase?: string, isImported: boolean = false): Promise<Wallet> {
+    const [wallet] = await db.insert(wallets).values({
+      userId,
+      address,
+      encryptedPrivateKey,
+      encryptedSeedPhrase,
+      isImported,
+    }).returning();
+    return wallet;
+  },
+
+  async updateWallet(id: string, data: Partial<Wallet>): Promise<Wallet | undefined> {
+    const [wallet] = await db.update(wallets)
+      .set(data)
+      .where(eq(wallets.id, id))
+      .returning();
+    return wallet;
+  },
+};

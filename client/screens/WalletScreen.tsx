@@ -8,11 +8,19 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
 import { Card } from "@/components/Card";
-import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { getBalance, getTransactions, addFunds, Transaction } from "@/lib/storage";
+import { getApiUrl } from "@/lib/query-client";
+import WalletSetupScreen from "./WalletSetupScreen";
+
+interface Wallet {
+  id: string;
+  address: string;
+  isImported: boolean;
+  createdAt: string;
+}
 
 function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
@@ -111,9 +119,29 @@ export default function WalletScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   
+  const [wallet, setWallet] = useState<Wallet | null | undefined>(undefined);
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [isLoadingWallet, setIsLoadingWallet] = useState(true);
+
+  const loadWallet = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(new URL(`/api/wallet/${user.id}`, baseUrl), {
+        credentials: "include",
+      });
+      const data = await response.json();
+      setWallet(data.wallet);
+    } catch (error) {
+      console.error("Failed to load wallet:", error);
+      setWallet(null);
+    } finally {
+      setIsLoadingWallet(false);
+    }
+  }, [user]);
 
   const loadData = useCallback(async () => {
     const [loadedBalance, loadedTransactions] = await Promise.all([
@@ -126,13 +154,14 @@ export default function WalletScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      loadWallet();
       loadData();
-    }, [loadData])
+    }, [loadWallet, loadData])
   );
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([loadWallet(), loadData()]);
     setRefreshing(false);
   };
 
@@ -155,6 +184,18 @@ export default function WalletScreen() {
     Alert.alert("Success", `$${amount.toFixed(2)} added to your wallet`);
   };
 
+  const handleWalletCreated = (newWallet: { address: string }) => {
+    setWallet(newWallet as Wallet);
+  };
+
+  if (isLoadingWallet) {
+    return <ThemedView style={styles.container} />;
+  }
+
+  if (!wallet) {
+    return <WalletSetupScreen onWalletCreated={handleWalletCreated} />;
+  }
+
   const groupedTransactions = transactions.reduce((groups, transaction) => {
     const date = formatDate(transaction.timestamp);
     if (!groups[date]) {
@@ -169,7 +210,7 @@ export default function WalletScreen() {
     data: items,
   }));
 
-  const renderItem = ({ item, index }: { item: Transaction; index: number }) => {
+  const renderItem = ({ item }: { item: Transaction }) => {
     const section = sections.find(s => s.data.includes(item));
     const isFirst = section?.data[0] === item;
     
@@ -215,7 +256,7 @@ export default function WalletScreen() {
             <View style={styles.walletInfo}>
               <Feather name="credit-card" size={14} color={theme.textSecondary} />
               <ThemedText style={[styles.walletAddress, { color: theme.textSecondary }]}>
-                {user?.walletAddress?.slice(0, 6)}...{user?.walletAddress?.slice(-4)}
+                {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
               </ThemedText>
             </View>
           </Card>

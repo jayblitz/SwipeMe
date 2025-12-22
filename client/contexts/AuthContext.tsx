@@ -1,13 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 
-interface User {
+export interface User {
   id: string;
   email: string;
-  displayName: string;
-  phone?: string;
-  avatarId: string;
-  walletAddress: string;
+  displayName?: string | null;
+  profileImage?: string | null;
+  status?: string | null;
+  twitterLink?: string | null;
+  telegramLink?: string | null;
+  themePreference?: string | null;
+  biometricEnabled?: boolean;
+  twoFactorEnabled?: boolean;
 }
 
 interface AuthContextType {
@@ -15,30 +20,17 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<void>;
+  startSignUp: (email: string) => Promise<void>;
+  verifyCode: (email: string, code: string) => Promise<void>;
+  completeSignUp: (email: string, code: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_STORAGE_KEY = "@tempochat_auth";
 const USER_STORAGE_KEY = "@tempochat_user";
-
-function generateWalletAddress(): string {
-  const chars = "0123456789abcdef";
-  let address = "0x";
-  for (let i = 0; i < 40; i++) {
-    address += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return address;
-}
-
-function generateUserId(): string {
-  return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-const avatarOptions = ["coral", "teal", "purple", "amber", "rose", "ocean", "orange", "green"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -61,58 +53,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signIn = useCallback(async (email: string, _password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const response = await apiRequest("POST", "/api/auth/login", { email, password });
+      const data = await response.json();
       
-      const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        if (parsedUser.email === email) {
-          setUser(parsedUser);
-          return;
-        }
+      if (!data.success) {
+        throw new Error(data.error || "Login failed");
       }
       
-      const newUser: User = {
-        id: generateUserId(),
-        email,
-        displayName: email.split("@")[0],
-        avatarId: avatarOptions[Math.floor(Math.random() * avatarOptions.length)],
-        walletAddress: generateWalletAddress(),
-      };
-      
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, "true");
-      setUser(newUser);
-    } catch (error) {
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+      setUser(data.user);
+    } catch (error: any) {
       console.error("Sign in failed:", error);
-      throw new Error("Sign in failed. Please try again.");
+      if (error.message.includes("401")) {
+        throw new Error("Incorrect email or password");
+      }
+      throw new Error(error.message || "Sign in failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const signUp = useCallback(async (email: string, _password: string, displayName: string) => {
+  const startSignUp = useCallback(async (email: string) => {
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const response = await apiRequest("POST", "/api/auth/signup/start", { email });
+      const data = await response.json();
       
-      const newUser: User = {
-        id: generateUserId(),
-        email,
-        displayName,
-        avatarId: avatarOptions[Math.floor(Math.random() * avatarOptions.length)],
-        walletAddress: generateWalletAddress(),
-      };
+      if (!data.success) {
+        throw new Error(data.error || "Failed to send verification code");
+      }
+    } catch (error: any) {
+      console.error("Start signup failed:", error);
+      if (error.message.includes("400")) {
+        throw new Error("Email already registered");
+      }
+      throw new Error(error.message || "Failed to send verification code");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const verifyCode = useCallback(async (email: string, code: string) => {
+    setIsLoading(true);
+    try {
+      const response = await apiRequest("POST", "/api/auth/signup/verify", { email, code });
+      const data = await response.json();
       
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, "true");
-      setUser(newUser);
-    } catch (error) {
-      console.error("Sign up failed:", error);
-      throw new Error("Sign up failed. Please try again.");
+      if (!data.success) {
+        throw new Error(data.error || "Invalid verification code");
+      }
+    } catch (error: any) {
+      console.error("Verify code failed:", error);
+      throw new Error("Invalid or expired verification code");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const completeSignUp = useCallback(async (email: string, code: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const response = await apiRequest("POST", "/api/auth/signup/complete", { email, code, password });
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || "Signup failed");
+      }
+      
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+      setUser(data.user);
+    } catch (error: any) {
+      console.error("Complete signup failed:", error);
+      throw new Error(error.message || "Signup failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      await AsyncStorage.multiRemove([AUTH_STORAGE_KEY, USER_STORAGE_KEY]);
+      await AsyncStorage.removeItem(USER_STORAGE_KEY);
       setUser(null);
     } catch (error) {
       console.error("Sign out failed:", error);
@@ -130,9 +145,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUser = useCallback(async (updates: Partial<User>) => {
     if (!user) return;
     
-    const updatedUser = { ...user, ...updates };
-    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
-    setUser(updatedUser);
+    try {
+      const response = await apiRequest("PUT", `/api/user/${user.id}`, updates);
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || "Update failed");
+      }
+      
+      const updatedUser = { ...user, ...data.user };
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    } catch (error: any) {
+      console.error("Update user failed:", error);
+      throw new Error(error.message || "Failed to update profile");
+    }
+  }, [user]);
+
+  const refreshUser = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(new URL(`/api/user/${user.id}`, baseUrl), {
+        credentials: "include",
+      });
+      const data = await response.json();
+      
+      if (data.user) {
+        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+        setUser(data.user);
+      }
+    } catch (error) {
+      console.error("Refresh user failed:", error);
+    }
   }, [user]);
 
   return (
@@ -142,9 +188,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         signIn,
-        signUp,
+        startSignUp,
+        verifyCode,
+        completeSignUp,
         signOut,
         updateUser,
+        refreshUser,
       }}
     >
       {children}

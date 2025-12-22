@@ -2,11 +2,13 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ProfileScreen from "@/screens/ProfileScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
+import RecoveryPhraseScreen from "@/screens/RecoveryPhraseScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   Settings: undefined;
+  RecoveryPhrase: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -30,6 +32,14 @@ export default function ProfileStackNavigator() {
         options={{
           ...opaqueOptions,
           headerTitle: "Settings",
+        }}
+      />
+      <Stack.Screen
+        name="RecoveryPhrase"
+        component={RecoveryPhraseScreen}
+        options={{
+          ...opaqueOptions,
+          headerTitle: "Recovery Phrase",
         }}
       />
     </Stack.Navigator>

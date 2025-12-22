@@ -7,18 +7,32 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 ## Current State
 
 **MVP Phase 1 Complete:**
-- Full authentication system with email/password signup
+- Full authentication system with email verification via Resend
+- Multi-step signup flow: email → verification code → password
+- Login with proper error handling ("Incorrect email or password")
+- PostgreSQL database with 8 tables: users, verification_codes, wallets, contacts, chats, chat_participants, messages, transactions
 - 4-tab navigation (Chats, Wallet, Discover, Profile)
-- Floating action button for quick new chat/payment access
-- Mock data layer using AsyncStorage for local persistence
-- Complete UI screens for all core features
+- Wallet setup with two options: Create via email or Import existing wallet (seed phrase/private key)
+- Wallet data persisted to server with base64-encoded seed phrases
+- Recovery phrase export screen with biometric gating
+- Profile settings: biometric authentication, 2FA setup, edit profile, appearance switcher (light/dark/system)
+- Contacts permission handling in Discover tab with FAB popup menu
+- Theme persistence via AsyncStorage
+
+**MVP Limitations (Production Improvements Needed):**
+- Wallet generation uses mock addresses and seed phrases (requires Privy SDK or ethers.js for real blockchain integration)
+- Seed phrase "encryption" uses base64 encoding (production needs AES-GCM encryption with key derivation from password)
+- API endpoints lack session-based authentication (production needs JWT or session tokens)
+- No XMTP integration yet (messages use local mock data)
+- No Tempo testnet integration yet (payments use local mock data)
 
 **Planned Features (Phase 2):**
 - XMTP SDK integration for E2E encrypted messaging
 - Tempo testnet blockchain integration for payments
+- Privy SDK for real wallet generation
 - Ramp SDK for fiat on-ramp
-- Passkey/biometric authentication
-- Self-custodial wallet generation
+- Proper cryptographic key storage
+- Session-based API authentication
 
 ## Project Architecture
 
@@ -26,35 +40,72 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 client/                     # Expo/React Native frontend
 ├── App.tsx                 # Root app component with providers
 ├── contexts/
-│   └── AuthContext.tsx     # Authentication state management
+│   └── AuthContext.tsx     # Authentication state management (signup, login, user updates)
 ├── screens/
-│   ├── AuthScreen.tsx      # Login/signup with form validation
+│   ├── AuthScreen.tsx      # Multi-step login/signup with email verification
 │   ├── ChatsScreen.tsx     # Chat list with search
 │   ├── ChatScreen.tsx      # Messages + integrated payment modal
-│   ├── WalletScreen.tsx    # Balance card + transaction history
-│   ├── DiscoverScreen.tsx  # Contact search/discovery
-│   ├── ProfileScreen.tsx   # User settings and profile
-│   └── SettingsScreen.tsx  # App preferences
+│   ├── WalletScreen.tsx    # Balance card + transaction history (shows WalletSetupScreen if no wallet)
+│   ├── WalletSetupScreen.tsx # Wallet creation/import flow
+│   ├── DiscoverScreen.tsx  # Contact search with permissions + FAB menu
+│   ├── ProfileScreen.tsx   # Settings: biometric, 2FA, edit profile, appearance
+│   ├── RecoveryPhraseScreen.tsx # Export wallet recovery phrase with biometric auth
+│   └── SettingsScreen.tsx  # Additional settings
 ├── navigation/
 │   ├── RootStackNavigator.tsx    # Auth flow + main app
 │   ├── MainTabNavigator.tsx      # 4-tab bottom navigation
 │   ├── ChatsStackNavigator.tsx   # Chat screens stack
 │   ├── WalletStackNavigator.tsx  # Wallet screens stack
 │   ├── DiscoverStackNavigator.tsx # Discovery screens stack
-│   └── ProfileStackNavigator.tsx  # Profile screens stack
+│   └── ProfileStackNavigator.tsx  # Profile + RecoveryPhrase screens
 ├── lib/
-│   └── storage.ts          # AsyncStorage data layer
+│   ├── storage.ts          # AsyncStorage data layer (mock data for chats/transactions)
+│   └── query-client.ts     # React Query setup + API helpers
 ├── constants/
-│   └── theme.ts            # Design tokens and colors
+│   └── theme.ts            # Design tokens, colors, shadows
 ├── hooks/
-│   └── useTheme.ts         # Theme management hook
+│   └── useTheme.ts         # Theme management with mode persistence (ThemeProvider)
 └── components/             # Reusable UI components
 
 server/                     # Express backend (port 5000)
 ├── index.ts               # API server entry
+├── routes.ts              # API endpoints (auth, user, wallet)
+├── storage.ts             # Database operations (Drizzle ORM)
+├── email.ts               # Resend email service for verification codes
 └── templates/
     └── landing-page.html  # Static landing page
+
+shared/
+└── schema.ts              # Drizzle ORM schema + Zod validation
 ```
+
+## Database Schema
+
+- **users**: id, email, password (hashed), displayName, profileImage, status, social links, theme, biometric/2FA settings
+- **verification_codes**: id, email, code, type (signup/password_reset), expiresAt, used
+- **wallets**: id, userId, address, encryptedPrivateKey, encryptedSeedPhrase, isImported, timestamps
+- **contacts**: id, userId, contactUserId, nickname, timestamps
+- **chats**: id, type (direct/group), name, timestamps
+- **chat_participants**: id, chatId, userId, role, timestamps
+- **messages**: id, chatId, senderId, content, type, timestamps
+- **transactions**: id, chatId, messageId, senderId, receiverId, amount, currency, status, txHash, timestamps
+
+## API Routes
+
+**Auth:**
+- POST /api/auth/signup/start - Send verification email
+- POST /api/auth/signup/verify - Verify email code
+- POST /api/auth/signup/complete - Set password and create account
+- POST /api/auth/login - Login with email/password
+
+**User:**
+- GET /api/user/:id - Get user profile
+- PUT /api/user/:id - Update user profile/settings
+
+**Wallet:**
+- GET /api/wallet/:userId - Get wallet by user
+- POST /api/wallet/create - Create or import wallet
+- GET /api/wallet/:userId/recovery - Get encrypted recovery phrase
 
 ## Design System
 
@@ -63,6 +114,7 @@ server/                     # Express backend (port 5000)
 - **Typography:** System fonts
 - **Spacing Scale:** 4px, 8px, 12px, 16px, 24px, 32px
 - **Border Radius:** 8px (small), 12px (medium), 16px (large)
+- **Theme:** Light/Dark/System with persistence
 
 ## Running the App
 
@@ -72,10 +124,12 @@ server/                     # Express backend (port 5000)
 
 ## Technical Notes
 
-- AsyncStorage v2.2.0 requires custom Metro resolver for `./hooks` module resolution
-- Uses React Navigation 7+ with bottom tabs
-- Supports light/dark theme modes
-- Mock data stored in AsyncStorage for offline development
+- Email verification uses Resend with 10-minute code expiration
+- Password hashing uses Node.js crypto with PBKDF2
+- Theme preference persisted via AsyncStorage
+- Biometric authentication via expo-local-authentication
+- Contacts permission via expo-contacts
+- Clipboard access via expo-clipboard
 
 ## User Preferences
 
