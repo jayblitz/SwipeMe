@@ -85,7 +85,7 @@ export const storage = {
     return code;
   },
 
-  async verifyCode(email: string, code: string, type: string = "signup"): Promise<boolean> {
+  async verifyCode(email: string, code: string, type: string = "signup", markAsUsed: boolean = true): Promise<boolean> {
     const [verification] = await db.select()
       .from(verificationCodes)
       .where(and(
@@ -98,9 +98,11 @@ export const storage = {
     
     if (!verification) return false;
     
-    await db.update(verificationCodes)
-      .set({ used: true })
-      .where(eq(verificationCodes.id, verification.id));
+    if (markAsUsed) {
+      await db.update(verificationCodes)
+        .set({ used: true })
+        .where(eq(verificationCodes.id, verification.id));
+    }
     
     return true;
   },

@@ -36,7 +36,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, code } = verifyCodeSchema.parse(req.body);
       
-      const isValid = await storage.verifyCode(email, code, "signup");
+      // Don't mark as used yet - just validate the code
+      const isValid = await storage.verifyCode(email, code, "signup", false);
       if (!isValid) {
         return res.status(400).json({ error: "Invalid or expired verification code" });
       }
