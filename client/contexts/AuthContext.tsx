@@ -18,6 +18,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  isInitializing: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   startSignUp: (email: string) => Promise<void>;
@@ -34,7 +35,8 @@ const USER_STORAGE_KEY = "@tempochat_user";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     loadStoredAuth();
@@ -49,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Failed to load stored auth:", error);
     } finally {
-      setIsLoading(false);
+      setIsInitializing(false);
     }
   };
 
@@ -186,6 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         isLoading,
+        isInitializing,
         isAuthenticated: !!user,
         signIn,
         startSignUp,

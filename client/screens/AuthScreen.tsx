@@ -68,12 +68,9 @@ export default function AuthScreen() {
     }
     
     try {
-      console.log("Starting signup for:", email.trim());
       await startSignUp(email.trim());
-      console.log("Signup successful, transitioning to verify step");
       setStep("signup-verify");
     } catch (err: any) {
-      console.error("Signup error in handleStartSignUp:", err);
       setError(err.message || "Failed to send verification code");
     }
   };
