@@ -668,7 +668,7 @@ export default function ProfileScreen() {
   };
 
   const handleViewRecoveryPhrase = () => {
-    navigation.navigate("RecoveryPhrase" as any);
+    navigation.navigate("RecoveryPhrase");
   };
 
   const handleDeleteAccount = () => {

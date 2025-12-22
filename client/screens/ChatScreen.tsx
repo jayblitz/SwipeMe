@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, StyleSheet, FlatList, TextInput, Pressable, Modal, Alert, ActivityIndicator } from "react-native";
+import { View, StyleSheet, FlatList, TextInput, Pressable, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -210,6 +211,7 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const route = useRoute<RouteProp<ChatsStackParamList, "Chat">>();
   const { chatId, name } = route.params;
@@ -276,65 +278,69 @@ export default function ChatScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <MessageBubble message={item} isOwnMessage={item.senderId === "me"} />
-        )}
-        inverted
-        contentContainerStyle={[
-          styles.messagesList,
-          { paddingBottom: Spacing.md },
-        ]}
-        showsVerticalScrollIndicator={false}
-      />
-      
-      <View style={[
-        styles.inputContainer, 
-        { 
-          backgroundColor: theme.backgroundRoot,
-          paddingBottom: insets.bottom + Spacing.sm,
-          borderTopColor: theme.border,
-        }
-      ]}>
-        <Pressable 
-          onPress={() => setShowPayment(true)}
-          style={[styles.paymentButton, { backgroundColor: theme.primary }]}
-        >
-          <Feather name="dollar-sign" size={20} color="#FFFFFF" />
-        </Pressable>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={headerHeight}
+      >
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <MessageBubble message={item} isOwnMessage={item.senderId === "me"} />
+          )}
+          inverted
+          contentContainerStyle={styles.messagesList}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
         
-        <View style={[styles.textInputContainer, { backgroundColor: theme.backgroundDefault }]}>
-          <TextInput
-            style={[styles.textInput, { color: theme.text }]}
-            placeholder="Message..."
-            placeholderTextColor={theme.textSecondary}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={1000}
-          />
+        <View style={[
+          styles.inputContainer, 
+          { 
+            backgroundColor: theme.backgroundRoot,
+            paddingBottom: Math.max(insets.bottom, Spacing.sm),
+            borderTopColor: theme.border,
+          }
+        ]}>
+          <Pressable 
+            onPress={() => setShowPayment(true)}
+            style={[styles.paymentButton, { backgroundColor: theme.primary }]}
+          >
+            <Feather name="dollar-sign" size={20} color="#FFFFFF" />
+          </Pressable>
+          
+          <View style={[styles.textInputContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+            <TextInput
+              style={[styles.textInput, { color: theme.text }]}
+              placeholder="Type a message..."
+              placeholderTextColor={theme.textSecondary}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={1000}
+            />
+          </View>
+          
+          <Pressable 
+            onPress={handleSend}
+            disabled={!inputText.trim()}
+            style={[
+              styles.sendButton,
+              { 
+                backgroundColor: inputText.trim() ? theme.primary : theme.backgroundSecondary,
+              }
+            ]}
+          >
+            <Feather 
+              name="send" 
+              size={18} 
+              color={inputText.trim() ? "#FFFFFF" : theme.textSecondary} 
+            />
+          </Pressable>
         </View>
-        
-        <Pressable 
-          onPress={handleSend}
-          disabled={!inputText.trim()}
-          style={[
-            styles.sendButton,
-            { 
-              backgroundColor: inputText.trim() ? theme.primary : theme.backgroundSecondary,
-            }
-          ]}
-        >
-          <Feather 
-            name="send" 
-            size={18} 
-            color={inputText.trim() ? "#FFFFFF" : theme.textSecondary} 
-          />
-        </Pressable>
-      </View>
+      </KeyboardAvoidingView>
 
       {participant ? (
         <PaymentModal
@@ -355,9 +361,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   messagesList: {
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
+    flexGrow: 1,
   },
   messageBubble: {
     maxWidth: "80%",
@@ -435,10 +445,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+    minHeight: 44,
     maxHeight: 120,
+    borderWidth: 1,
   },
   textInput: {
     fontSize: 16,
+    minHeight: 24,
     maxHeight: 100,
   },
   sendButton: {

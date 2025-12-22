@@ -204,13 +204,14 @@ export default function RecoveryPhraseScreen() {
 
         <View style={styles.footer}>
           {isRevealed ? (
-            <Button 
-              variant="secondary" 
+            <Pressable 
               onPress={() => setIsRevealed(false)}
-              style={styles.hideButton}
+              style={[styles.hideButton, { borderColor: theme.border }]}
             >
-              Hide Recovery Phrase
-            </Button>
+              <ThemedText style={[styles.hideButtonText, { color: theme.textSecondary }]}>
+                Hide Recovery Phrase
+              </ThemedText>
+            </Pressable>
           ) : (
             <Button onPress={authenticateAndReveal}>
               Reveal Recovery Phrase
@@ -388,6 +389,15 @@ const styles = StyleSheet.create({
   },
   hideButton: {
     backgroundColor: "transparent",
+    height: 48,
+    borderRadius: BorderRadius.button,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hideButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
   },
   tips: {
     gap: Spacing.sm,
