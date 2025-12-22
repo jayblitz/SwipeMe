@@ -5,31 +5,28 @@ import { getApiUrl } from "@/lib/query-client";
 import { useTheme } from "@/hooks/useTheme";
 import { ThemedText } from "./ThemedText";
 
-interface PrivyAuthData {
-  userId: string;
-  email: string | null;
-  walletAddress: string | null;
-  accessToken: string;
+export interface WalletCreationData {
+  walletAddress: string;
+  seedPhrase: string;
   chainId: number;
+  isImported: boolean;
 }
 
 interface PrivyWalletWebViewProps {
-  onAuthenticated: (data: PrivyAuthData) => void;
-  onComplete: (data: PrivyAuthData) => void;
-  onLogout: () => void;
+  onWalletCreated: (data: WalletCreationData) => void;
+  onComplete: (data: WalletCreationData) => void;
   onError?: (error: string) => void;
 }
 
 export default function PrivyWalletWebView({
-  onAuthenticated,
+  onWalletCreated,
   onComplete,
-  onLogout,
   onError,
 }: PrivyWalletWebViewProps) {
   const webViewRef = useRef<WebView>(null!);
   const { theme } = useTheme();
 
-  const privyUrl = `${getApiUrl()}/privy-wallet`;
+  const walletUrl = `${getApiUrl()}/privy-wallet`;
 
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {
@@ -38,14 +35,11 @@ export default function PrivyWalletWebView({
         const { type, data } = message;
 
         switch (type) {
-          case "authenticated":
-            onAuthenticated(data as PrivyAuthData);
+          case "wallet_created":
+            onWalletCreated(data as WalletCreationData);
             break;
           case "complete":
-            onComplete(data as PrivyAuthData);
-            break;
-          case "logout":
-            onLogout();
+            onComplete(data as WalletCreationData);
             break;
           case "error":
             onError?.(data.message || "Unknown error");
@@ -57,7 +51,7 @@ export default function PrivyWalletWebView({
         console.error("Failed to parse WebView message:", error);
       }
     },
-    [onAuthenticated, onComplete, onLogout, onError]
+    [onWalletCreated, onComplete, onError]
   );
 
   if (Platform.OS === "web") {
@@ -77,7 +71,7 @@ export default function PrivyWalletWebView({
     <View style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ uri: privyUrl }}
+        source={{ uri: walletUrl }}
         onMessage={handleMessage}
         style={styles.webview}
         javaScriptEnabled={true}
@@ -89,7 +83,7 @@ export default function PrivyWalletWebView({
           <View style={[styles.loading, { backgroundColor: theme.backgroundDefault }]}>
             <ActivityIndicator size="large" color={theme.primary} />
             <ThemedText style={styles.loadingText}>
-              Loading wallet service...
+              Loading wallet generator...
             </ThemedText>
           </View>
         )}

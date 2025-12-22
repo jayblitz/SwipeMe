@@ -32,31 +32,20 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
   const [error, setError] = useState("");
   const [importType, setImportType] = useState<"seed" | "private">("seed");
 
-  const handlePrivyAuthenticated = async (data: {
-    userId: string;
-    email: string | null;
-    walletAddress: string | null;
-    accessToken: string;
+  const handleWalletCreated = async (data: {
+    walletAddress: string;
+    seedPhrase: string;
     chainId: number;
+    isImported: boolean;
   }) => {
-    console.log("Privy authenticated:", data);
-    
-    if (Platform.OS !== "web") {
-      try {
-        await SecureStore.setItemAsync("privy_access_token", data.accessToken);
-        await SecureStore.setItemAsync("privy_user_id", data.userId);
-      } catch (err) {
-        console.error("Failed to store Privy credentials:", err);
-      }
-    }
+    console.log("Wallet created:", data.walletAddress);
   };
 
-  const handlePrivyComplete = async (data: {
-    userId: string;
-    email: string | null;
-    walletAddress: string | null;
-    accessToken: string;
+  const handleWalletComplete = async (data: {
+    walletAddress: string;
+    seedPhrase: string;
     chainId: number;
+    isImported: boolean;
   }) => {
     if (!user || !data.walletAddress) {
       Alert.alert("Error", "Failed to get wallet address");
@@ -67,11 +56,9 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
     setIsLoading(true);
 
     try {
-      const response = await apiRequest("POST", "/api/wallet/privy", {
+      const response = await apiRequest("POST", "/api/wallet/import", {
         userId: user.id,
-        privyUserId: data.userId,
-        walletAddress: data.walletAddress,
-        accessToken: data.accessToken,
+        seedPhrase: data.seedPhrase,
       });
 
       const result = await response.json();
@@ -79,22 +66,18 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
       if (result.success) {
         onWalletCreated(result.wallet);
       } else {
-        throw new Error(result.error || "Failed to link wallet");
+        throw new Error(result.error || "Failed to save wallet");
       }
     } catch (err: any) {
-      console.error("Link wallet failed:", err);
-      Alert.alert("Error", err.message || "Failed to link wallet to your account");
+      console.error("Save wallet failed:", err);
+      Alert.alert("Error", err.message || "Failed to save wallet to your account");
       setStep("choose");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePrivyLogout = () => {
-    setStep("choose");
-  };
-
-  const handlePrivyError = (errorMessage: string) => {
+  const handleWalletError = (errorMessage: string) => {
     Alert.alert("Wallet Error", errorMessage);
     setStep("choose");
   };
@@ -238,14 +221,13 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
       {isLoading ? (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={Colors.light.primary} />
-          <ThemedText style={styles.loadingText}>Linking wallet to your account...</ThemedText>
+          <ThemedText style={styles.loadingText}>Saving wallet to your account...</ThemedText>
         </View>
       ) : (
         <PrivyWalletWebView
-          onAuthenticated={handlePrivyAuthenticated}
-          onComplete={handlePrivyComplete}
-          onLogout={handlePrivyLogout}
-          onError={handlePrivyError}
+          onWalletCreated={handleWalletCreated}
+          onComplete={handleWalletComplete}
+          onError={handleWalletError}
         />
       )}
     </View>
