@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const startSignUp = useCallback(async (email: string) => {
+  const startSignUp = useCallback(async (email: string): Promise<void> => {
     setIsLoading(true);
     try {
       const response = await apiRequest("POST", "/api/auth/signup/start", { email });
@@ -87,10 +87,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       console.error("Start signup failed:", error);
-      if (error.message.includes("400")) {
+      if (error.message && error.message.includes("400")) {
         throw new Error("Email already registered");
       }
-      throw new Error(error.message || "Failed to send verification code");
+      throw error;
     } finally {
       setIsLoading(false);
     }
