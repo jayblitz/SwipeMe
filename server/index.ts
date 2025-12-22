@@ -177,7 +177,6 @@ function configureExpoAndLanding(app: express.Application) {
     let privyTemplate = fs.readFileSync(privyTemplatePath, "utf-8");
     privyTemplate = privyTemplate
       .replace(/\{\{PRIVY_APP_ID\}\}/g, process.env.PRIVY_APP_ID || "")
-      .replace(/\{\{PRIVY_CLIENT_ID_MOBILE\}\}/g, process.env.PRIVY_CLIENT_ID_MOBILE || "")
       .replace(/\{\{PRIVY_CLIENT_ID_WEB\}\}/g, process.env.PRIVY_CLIENT_ID_WEB || "");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.status(200).send(privyTemplate);

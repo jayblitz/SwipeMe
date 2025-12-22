@@ -230,12 +230,10 @@
     import Privy, { LocalStorage, getUserEmbeddedEthereumWallet } from 'https://esm.sh/@privy-io/js-sdk-core@0.54.2';
     
     const PRIVY_APP_ID = '{{PRIVY_APP_ID}}';
-    const PRIVY_CLIENT_ID_MOBILE = '{{PRIVY_CLIENT_ID_MOBILE}}';
     const PRIVY_CLIENT_ID_WEB = '{{PRIVY_CLIENT_ID_WEB}}';
     const TEMPO_TESTNET_CHAIN_ID = 42429;
     
-    const isMobile = window.ReactNativeWebView !== undefined;
-    const CLIENT_ID = isMobile ? PRIVY_CLIENT_ID_MOBILE : PRIVY_CLIENT_ID_WEB;
+    const CLIENT_ID = PRIVY_CLIENT_ID_WEB;
     
     let privy = null;
     let currentUser = null;
