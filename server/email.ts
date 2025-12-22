@@ -43,32 +43,60 @@ export async function getResendClient() {
 
 export async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
   try {
+    console.log(`Sending verification email to: ${email}`);
     const { client, fromEmail } = await getResendClient();
+    console.log(`Using from email: ${fromEmail}`);
     
-    await client.emails.send({
-      from: fromEmail || 'TempoChat <noreply@tempochat.app>',
+    const senderEmail = fromEmail?.includes('@gmail.com') || fromEmail?.includes('@yahoo.com') || fromEmail?.includes('@hotmail.com')
+      ? 'TempoChat <onboarding@resend.dev>'
+      : fromEmail || 'TempoChat <onboarding@resend.dev>';
+    
+    console.log(`Sending from: ${senderEmail}`);
+    
+    const result = await client.emails.send({
+      from: senderEmail,
       to: email,
-      subject: 'Your TempoChat Verification Code',
+      subject: 'Confirm your email address',
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-          <div style="text-align: center; margin-bottom: 32px;">
-            <h1 style="color: #0066FF; font-size: 28px; margin: 0;">TempoChat</h1>
-          </div>
-          <div style="background: #f8f9fa; border-radius: 12px; padding: 32px; text-align: center;">
-            <h2 style="color: #1a1a1a; font-size: 20px; margin: 0 0 16px;">Verify your email</h2>
-            <p style="color: #666; font-size: 14px; margin: 0 0 24px;">Enter this code to complete your signup:</p>
-            <div style="background: #fff; border: 2px solid #0066FF; border-radius: 8px; padding: 16px; font-size: 32px; letter-spacing: 8px; font-weight: bold; color: #0066FF;">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
+          <h1 style="color: #000000; font-size: 23px; font-weight: 700; margin: 0 0 24px 0; line-height: 1.3;">
+            Confirm your email address
+          </h1>
+          
+          <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0 0 24px 0;">
+            There's one quick step you need to complete before creating your TempoChat account. Let's make sure this is the right email address for you — please confirm this is the right address to use for your new account.
+          </p>
+          
+          <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0 0 16px 0;">
+            Please enter this verification code to get started on TempoChat:
+          </p>
+          
+          <div style="background: #f7f9f9; border-radius: 4px; padding: 20px; text-align: center; margin: 0 0 24px 0;">
+            <span style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #0f1419;">
               ${code}
-            </div>
-            <p style="color: #999; font-size: 12px; margin: 24px 0 0;">This code expires in 10 minutes</p>
+            </span>
           </div>
-          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 24px;">
-            If you didn't request this code, you can safely ignore this email.
+          
+          <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0 0 24px 0;">
+            Verification codes expire after 10 minutes.
+          </p>
+          
+          <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0;">
+            Thanks,<br>
+            TempoChat
           </p>
         </div>
       `
     });
     
+    console.log('Resend API response:', JSON.stringify(result));
+    
+    if (result.error) {
+      console.error('Resend error:', result.error);
+      return false;
+    }
+    
+    console.log('Email sent successfully with ID:', result.data?.id);
     return true;
   } catch (error) {
     console.error('Failed to send verification email:', error);
