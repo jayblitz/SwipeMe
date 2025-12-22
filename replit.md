@@ -12,26 +12,27 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - Login with proper error handling ("Incorrect email or password")
 - PostgreSQL database with 8 tables: users, verification_codes, wallets, contacts, chats, chat_participants, messages, transactions
 - 4-tab navigation (Chats, Wallet, Discover, Profile)
-- Wallet setup with two options: Create via email or Import existing wallet (seed phrase/private key)
-- Wallet data persisted to server with base64-encoded seed phrases
+- Wallet setup with two options:
+  - "Continue with Email" - Privy wallet creation via embedded WebView (works around Expo Go native SDK limitation)
+  - "Import Wallet" - Real wallet import using viem with seed phrase (12/24 words) or private key validation
+- Wallet import validates against Tempo testnet (chain ID 42429) and derives real addresses using viem
+- Seed phrases and private keys encrypted with AES-256-GCM before database storage (WALLET_ENCRYPTION_KEY required)
 - Recovery phrase export screen with biometric gating
 - Profile settings: biometric authentication, 2FA setup, edit profile, appearance switcher (light/dark/system)
 - Contacts permission handling in Discover tab with FAB popup menu
 - Theme persistence via AsyncStorage
 
 **MVP Limitations (Production Improvements Needed):**
-- Wallet generation uses mock addresses and seed phrases (requires Privy SDK or ethers.js for real blockchain integration)
-- Seed phrase "encryption" uses base64 encoding (production needs AES-GCM encryption with key derivation from password)
+- Privy integration uses WebView workaround since native Privy SDK incompatible with Expo Go
+- Privy wallets store address only (MPC key shares managed by Privy client-side)
 - API endpoints lack session-based authentication (production needs JWT or session tokens)
 - No XMTP integration yet (messages use local mock data)
-- No Tempo testnet integration yet (payments use local mock data)
+- Balance fetching and transaction signing not yet implemented
 
 **Planned Features (Phase 2):**
 - XMTP SDK integration for E2E encrypted messaging
-- Tempo testnet blockchain integration for payments
-- Privy SDK for real wallet generation
+- Balance fetching and transaction signing on Tempo testnet
 - Ramp SDK for fiat on-ramp
-- Proper cryptographic key storage
 - Session-based API authentication
 
 ## Project Architecture
@@ -104,7 +105,8 @@ shared/
 
 **Wallet:**
 - GET /api/wallet/:userId - Get wallet by user
-- POST /api/wallet/create - Create or import wallet
+- POST /api/wallet/privy - Link Privy-created wallet to user account
+- POST /api/wallet/import - Import wallet using seed phrase or private key (validates with viem)
 - GET /api/wallet/:userId/recovery - Get encrypted recovery phrase
 
 ## Design System

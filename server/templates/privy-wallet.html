@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TempoChat Wallet</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #ffffff;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    
+    .logo {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #0066FF 0%, #00D4FF 100%);
+      border-radius: 20px;
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: bold;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      color: #a0a0a0;
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+    
+    #privy-container {
+      width: 100%;
+    }
+    
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: #0066FF;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .error {
+      background: rgba(255, 59, 48, 0.1);
+      border: 1px solid rgba(255, 59, 48, 0.3);
+      padding: 16px;
+      border-radius: 12px;
+      color: #ff6b6b;
+      margin-top: 20px;
+    }
+    
+    .success {
+      background: rgba(52, 199, 89, 0.1);
+      border: 1px solid rgba(52, 199, 89, 0.3);
+      padding: 24px;
+      border-radius: 16px;
+      margin-top: 20px;
+    }
+    
+    .success h2 {
+      color: #34c759;
+      margin-bottom: 12px;
+      font-size: 20px;
+    }
+    
+    .wallet-address {
+      background: rgba(255,255,255,0.05);
+      padding: 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      word-break: break-all;
+      margin-top: 12px;
+    }
+    
+    .btn {
+      background: #0066FF;
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 16px;
+      transition: background 0.2s;
+    }
+    
+    .btn:hover {
+      background: #0052cc;
+    }
+    
+    .btn:disabled {
+      background: #4a4a4a;
+      cursor: not-allowed;
+    }
+    
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    
+    .network-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 102, 255, 0.1);
+      border: 1px solid rgba(0, 102, 255, 0.3);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #0066FF;
+      margin-top: 16px;
+    }
+    
+    .network-dot {
+      width: 8px;
+      height: 8px;
+      background: #34c759;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">T</div>
+    <h1>TempoChat Wallet</h1>
+    <p class="subtitle">Secure wallet powered by Privy</p>
+    
+    <div id="status">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Initializing Privy...</p>
+      </div>
+    </div>
+    
+    <div id="privy-container"></div>
+  </div>
+
+  <script type="module">
+    import Privy from 'https://esm.sh/@privy-io/js-sdk-core@0.45.5';
+    
+    const PRIVY_APP_ID = '{{PRIVY_APP_ID}}';
+    const TEMPO_TESTNET_CHAIN_ID = 42429;
+    
+    let privy = null;
+    let currentUser = null;
+    
+    function postToReactNative(type, data) {
+      const message = JSON.stringify({ type, data });
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(message);
+      }
+      console.log('PostMessage:', type, data);
+    }
+    
+    function updateStatus(html) {
+      document.getElementById('status').innerHTML = html;
+    }
+    
+    async function initPrivy() {
+      try {
+        privy = new Privy({
+          appId: PRIVY_APP_ID,
+          config: {
+            embeddedWallets: {
+              createOnLogin: 'all-users',
+            },
+          },
+        });
+        
+        await privy.init();
+        
+        const user = privy.user;
+        if (user) {
+          currentUser = user;
+          await handleAuthenticatedUser(user);
+        } else {
+          showLoginOptions();
+        }
+        
+        privy.on('login', async (user) => {
+          currentUser = user;
+          await handleAuthenticatedUser(user);
+        });
+        
+        privy.on('logout', () => {
+          currentUser = null;
+          postToReactNative('logout', {});
+          showLoginOptions();
+        });
+        
+      } catch (error) {
+        console.error('Privy init error:', error);
+        updateStatus(`
+          <div class="error">
+            <p>Failed to initialize wallet service</p>
+            <p style="font-size: 12px; margin-top: 8px;">${error.message}</p>
+          </div>
+          <button class="btn" onclick="location.reload()">Try Again</button>
+        `);
+      }
+    }
+    
+    function showLoginOptions() {
+      updateStatus(`
+        <button class="btn" id="email-login-btn">Continue with Email</button>
+        <p style="margin-top: 16px; color: #666; font-size: 12px;">
+          Your wallet will be created automatically
+        </p>
+      `);
+      
+      document.getElementById('email-login-btn').addEventListener('click', async () => {
+        const email = prompt('Enter your email address:');
+        if (email && email.includes('@')) {
+          await loginWithEmail(email);
+        }
+      });
+    }
+    
+    async function loginWithEmail(email) {
+      try {
+        updateStatus(`
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Sending verification code...</p>
+          </div>
+        `);
+        
+        const { loginFlowState } = await privy.auth.email.sendCode({ email });
+        
+        updateStatus(`
+          <p style="margin-bottom: 16px;">Enter the code sent to <strong>${email}</strong></p>
+          <input type="text" id="code-input" placeholder="Enter 6-digit code" 
+                 style="width: 100%; padding: 14px; font-size: 18; text-align: center; 
+                        background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+                        border-radius: 12px; color: white; letter-spacing: 8px;"
+                 maxlength="6" inputmode="numeric">
+          <button class="btn" id="verify-btn">Verify Code</button>
+          <button class="btn btn-secondary" id="resend-btn">Resend Code</button>
+        `);
+        
+        document.getElementById('verify-btn').addEventListener('click', async () => {
+          const code = document.getElementById('code-input').value;
+          if (code.length === 6) {
+            await verifyEmailCode(code, loginFlowState);
+          }
+        });
+        
+        document.getElementById('resend-btn').addEventListener('click', () => {
+          loginWithEmail(email);
+        });
+        
+      } catch (error) {
+        console.error('Email login error:', error);
+        updateStatus(`
+          <div class="error">
+            <p>Failed to send verification code</p>
+            <p style="font-size: 12px; margin-top: 8px;">${error.message}</p>
+          </div>
+          <button class="btn" onclick="showLoginOptions()">Try Again</button>
+        `);
+      }
+    }
+    
+    async function verifyEmailCode(code, loginFlowState) {
+      try {
+        updateStatus(`
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Verifying code and creating wallet...</p>
+          </div>
+        `);
+        
+        await privy.auth.email.loginWithCode({ 
+          code, 
+          loginFlowState 
+        });
+        
+      } catch (error) {
+        console.error('Verify code error:', error);
+        updateStatus(`
+          <div class="error">
+            <p>Invalid verification code</p>
+          </div>
+          <button class="btn" onclick="location.reload()">Try Again</button>
+        `);
+      }
+    }
+    
+    async function handleAuthenticatedUser(user) {
+      try {
+        updateStatus(`
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Setting up your wallet...</p>
+          </div>
+        `);
+        
+        let wallet = user.wallet;
+        
+        if (!wallet) {
+          const wallets = await privy.embeddedWallet.getWallets();
+          if (wallets && wallets.length > 0) {
+            wallet = wallets[0];
+          }
+        }
+        
+        if (!wallet) {
+          await privy.embeddedWallet.create();
+          const wallets = await privy.embeddedWallet.getWallets();
+          wallet = wallets[0];
+        }
+        
+        const accessToken = await privy.getAccessToken();
+        
+        const userData = {
+          userId: user.id,
+          email: user.email?.address || null,
+          walletAddress: wallet?.address || null,
+          accessToken: accessToken,
+          chainId: TEMPO_TESTNET_CHAIN_ID,
+        };
+        
+        postToReactNative('authenticated', userData);
+        
+        updateStatus(`
+          <div class="success">
+            <h2>Wallet Ready</h2>
+            <p>Connected to Tempo Testnet</p>
+            <div class="wallet-address">${wallet?.address || 'No wallet'}</div>
+            <div class="network-badge">
+              <span class="network-dot"></span>
+              Tempo Testnet
+            </div>
+          </div>
+          <button class="btn" id="done-btn">Continue to App</button>
+          <button class="btn btn-secondary" id="logout-btn">Disconnect</button>
+        `);
+        
+        document.getElementById('done-btn').addEventListener('click', () => {
+          postToReactNative('complete', userData);
+        });
+        
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+          await privy.logout();
+        });
+        
+      } catch (error) {
+        console.error('Handle user error:', error);
+        updateStatus(`
+          <div class="error">
+            <p>Failed to set up wallet</p>
+            <p style="font-size: 12px; margin-top: 8px;">${error.message}</p>
+          </div>
+          <button class="btn" onclick="location.reload()">Try Again</button>
+        `);
+      }
+    }
+    
+    window.showLoginOptions = showLoginOptions;
+    
+    initPrivy();
+  </script>
+</body>
+</html>

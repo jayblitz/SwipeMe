@@ -1,40 +1,20 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, ScrollView } from "react-native";
+import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import * as SecureStore from "expo-secure-store";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import PrivyWalletWebView from "@/components/PrivyWalletWebView";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 
-type SetupStep = "choose" | "import" | "creating";
-
-function generateMockWalletAddress(): string {
-  const chars = "0123456789abcdef";
-  let address = "0x";
-  for (let i = 0; i < 40; i++) {
-    address += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return address;
-}
-
-function generateMockSeedPhrase(): string {
-  const words = [
-    "abandon", "ability", "able", "about", "above", "absent", "absorb", "abstract",
-    "absurd", "abuse", "access", "accident", "account", "accuse", "achieve", "acid",
-    "acoustic", "acquire", "across", "act", "action", "actor", "actress", "actual"
-  ];
-  const phrase = [];
-  for (let i = 0; i < 12; i++) {
-    phrase.push(words[Math.floor(Math.random() * words.length)]);
-  }
-  return phrase.join(" ");
-}
+type SetupStep = "choose" | "privy" | "import" | "creating";
 
 interface WalletSetupScreenProps {
   onWalletCreated: (wallet: { address: string }) => void;
@@ -52,37 +32,71 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
   const [error, setError] = useState("");
   const [importType, setImportType] = useState<"seed" | "private">("seed");
 
-  const handleCreateWithEmail = async () => {
-    if (!user) return;
+  const handlePrivyAuthenticated = async (data: {
+    userId: string;
+    email: string | null;
+    walletAddress: string | null;
+    accessToken: string;
+    chainId: number;
+  }) => {
+    console.log("Privy authenticated:", data);
     
-    setStep("creating");
+    if (Platform.OS !== "web") {
+      try {
+        await SecureStore.setItemAsync("privy_access_token", data.accessToken);
+        await SecureStore.setItemAsync("privy_user_id", data.userId);
+      } catch (err) {
+        console.error("Failed to store Privy credentials:", err);
+      }
+    }
+  };
+
+  const handlePrivyComplete = async (data: {
+    userId: string;
+    email: string | null;
+    walletAddress: string | null;
+    accessToken: string;
+    chainId: number;
+  }) => {
+    if (!user || !data.walletAddress) {
+      Alert.alert("Error", "Failed to get wallet address");
+      setStep("choose");
+      return;
+    }
+
     setIsLoading(true);
-    
+
     try {
-      const address = generateMockWalletAddress();
-      const encryptedSeedPhrase = btoa(generateMockSeedPhrase());
-      
-      const response = await apiRequest("POST", "/api/wallet/create", {
+      const response = await apiRequest("POST", "/api/wallet/privy", {
         userId: user.id,
-        address,
-        encryptedSeedPhrase,
-        isImported: false,
+        privyUserId: data.userId,
+        walletAddress: data.walletAddress,
+        accessToken: data.accessToken,
       });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        onWalletCreated(data.wallet);
+
+      const result = await response.json();
+
+      if (result.success) {
+        onWalletCreated(result.wallet);
       } else {
-        throw new Error(data.error || "Failed to create wallet");
+        throw new Error(result.error || "Failed to link wallet");
       }
     } catch (err: any) {
-      console.error("Create wallet failed:", err);
-      Alert.alert("Error", err.message || "Failed to create wallet");
+      console.error("Link wallet failed:", err);
+      Alert.alert("Error", err.message || "Failed to link wallet to your account");
       setStep("choose");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePrivyLogout = () => {
+    setStep("choose");
+  };
+
+  const handlePrivyError = (errorMessage: string) => {
+    Alert.alert("Wallet Error", errorMessage);
+    setStep("choose");
   };
 
   const handleImportWallet = async () => {
@@ -97,8 +111,10 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
         return;
       }
     } else {
-      if (!privateKey.trim().startsWith("0x") || privateKey.trim().length !== 66) {
-        setError("Please enter a valid private key (0x followed by 64 hex characters)");
+      const key = privateKey.trim();
+      const normalizedKey = key.startsWith("0x") ? key : `0x${key}`;
+      if (normalizedKey.length !== 66) {
+        setError("Please enter a valid private key (64 hex characters, optionally with 0x prefix)");
         return;
       }
     }
@@ -106,16 +122,13 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
     setIsLoading(true);
     
     try {
-      const address = generateMockWalletAddress();
-      const encryptedData = importType === "seed" 
-        ? { encryptedSeedPhrase: btoa(seedPhrase.trim()) }
-        : { encryptedPrivateKey: btoa(privateKey.trim()) };
+      const importData = importType === "seed" 
+        ? { seedPhrase: seedPhrase.trim() }
+        : { privateKey: privateKey.trim() };
       
-      const response = await apiRequest("POST", "/api/wallet/create", {
+      const response = await apiRequest("POST", "/api/wallet/import", {
         userId: user.id,
-        address,
-        ...encryptedData,
-        isImported: true,
+        ...importData,
       });
       
       const data = await response.json();
@@ -127,7 +140,12 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
       }
     } catch (err: any) {
       console.error("Import wallet failed:", err);
-      Alert.alert("Error", err.message || "Failed to import wallet");
+      const errorMsg = err.message || "Failed to import wallet";
+      if (errorMsg.includes("Invalid")) {
+        setError(errorMsg);
+      } else {
+        Alert.alert("Error", errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +159,7 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
         </View>
         <ThemedText type="h2" style={styles.title}>Set Up Your Wallet</ThemedText>
         <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Create a new wallet or import an existing one to start sending and receiving payments
+          Create a new wallet or import an existing one to start sending and receiving payments on Tempo
         </ThemedText>
       </View>
 
@@ -149,7 +167,7 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
         <Card style={styles.optionCard} elevation={1}>
           <Pressable 
             style={styles.optionButton}
-            onPress={handleCreateWithEmail}
+            onPress={() => setStep("privy")}
           >
             <View style={[styles.optionIcon, { backgroundColor: Colors.light.primaryLight }]}>
               <Feather name="mail" size={24} color={Colors.light.primary} />
@@ -157,7 +175,7 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
             <View style={styles.optionContent}>
               <ThemedText style={styles.optionTitle}>Continue with Email</ThemedText>
               <ThemedText style={[styles.optionDescription, { color: theme.textSecondary }]}>
-                We'll create a secure wallet linked to your account
+                Create a secure wallet linked to your email via Privy
               </ThemedText>
             </View>
             <Feather name="chevron-right" size={24} color={theme.textSecondary} />
@@ -197,6 +215,39 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
           <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>You own your keys</ThemedText>
         </View>
       </View>
+
+      <View style={styles.networkBadge}>
+        <View style={styles.networkDot} />
+        <ThemedText style={[styles.networkText, { color: theme.textSecondary }]}>
+          Tempo Testnet
+        </ThemedText>
+      </View>
+    </View>
+  );
+
+  const renderPrivyStep = () => (
+    <View style={styles.privyContainer}>
+      <View style={styles.privyHeader}>
+        <Pressable onPress={() => setStep("choose")} style={styles.backButton}>
+          <Feather name="x" size={24} color={theme.text} />
+        </Pressable>
+        <ThemedText type="h3">Create Wallet</ThemedText>
+        <View style={{ width: 40 }} />
+      </View>
+      
+      {isLoading ? (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={Colors.light.primary} />
+          <ThemedText style={styles.loadingText}>Linking wallet to your account...</ThemedText>
+        </View>
+      ) : (
+        <PrivyWalletWebView
+          onAuthenticated={handlePrivyAuthenticated}
+          onComplete={handlePrivyComplete}
+          onLogout={handlePrivyLogout}
+          onError={handlePrivyError}
+        />
+      )}
     </View>
   );
 
@@ -266,7 +317,7 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
           <View style={[styles.textAreaContainer, { backgroundColor: theme.backgroundDefault, borderColor: error ? Colors.light.error : theme.border }]}>
             <TextInput
               style={[styles.textArea, { color: theme.text }]}
-              placeholder="0x..."
+              placeholder="0x... or paste without 0x prefix"
               placeholderTextColor={theme.textSecondary}
               value={privateKey}
               onChangeText={(text) => { setPrivateKey(text); setError(""); }}
@@ -293,6 +344,12 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
         </ThemedText>
       </View>
 
+      <View style={styles.networkInfo}>
+        <ThemedText style={[styles.networkInfoText, { color: theme.textSecondary }]}>
+          Your wallet will be connected to Tempo Testnet (Chain ID: 42429)
+        </ThemedText>
+      </View>
+
       <Button 
         onPress={handleImportWallet} 
         disabled={isLoading || (importType === "seed" ? !seedPhrase.trim() : !privateKey.trim())} 
@@ -303,21 +360,11 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
     </KeyboardAwareScrollViewCompat>
   );
 
-  const renderCreatingStep = () => (
-    <View style={styles.creatingContainer}>
-      <ActivityIndicator size="large" color={Colors.light.primary} />
-      <ThemedText type="h3" style={styles.creatingTitle}>Creating Your Wallet</ThemedText>
-      <ThemedText style={[styles.creatingSubtitle, { color: theme.textSecondary }]}>
-        Setting up your secure wallet...
-      </ThemedText>
-    </View>
-  );
-
   return (
-    <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.xl }]}>
+    <ThemedView style={[styles.container, { paddingTop: step === "privy" ? 0 : insets.top + Spacing.xl }]}>
       {step === "choose" ? renderChooseStep() : null}
+      {step === "privy" ? renderPrivyStep() : null}
       {step === "import" ? renderImportStep() : null}
-      {step === "creating" ? renderCreatingStep() : null}
     </ThemedView>
   );
 }
@@ -396,6 +443,46 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 13,
   },
+  networkBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.xl,
+  },
+  networkDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.light.success,
+  },
+  networkText: {
+    fontSize: 13,
+  },
+  privyContainer: {
+    flex: 1,
+  },
+  privyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.md,
+  },
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: Spacing.lg,
+    fontSize: 14,
+  },
+  backButton: {
+    padding: Spacing.sm,
+    marginLeft: -Spacing.sm,
+  },
   importContainer: {
     paddingHorizontal: Spacing.lg,
   },
@@ -403,11 +490,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: Spacing.xl,
-  },
-  backButton: {
-    padding: Spacing.sm,
-    marginLeft: -Spacing.sm,
-    marginRight: Spacing.md,
   },
   importTypeSelector: {
     flexDirection: "row",
@@ -453,27 +535,21 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     backgroundColor: Colors.light.warningLight,
     borderRadius: BorderRadius.sm,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.md,
   },
   warningText: {
     flex: 1,
     fontSize: 13,
     lineHeight: 20,
   },
+  networkInfo: {
+    marginBottom: Spacing.xl,
+  },
+  networkInfoText: {
+    fontSize: 13,
+    textAlign: "center",
+  },
   importButton: {
     marginTop: Spacing.md,
-  },
-  creatingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: Spacing.lg,
-  },
-  creatingTitle: {
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.sm,
-  },
-  creatingSubtitle: {
-    textAlign: "center",
   },
 });
