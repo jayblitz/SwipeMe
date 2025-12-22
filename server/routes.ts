@@ -4,6 +4,8 @@ import { storage, verifyPassword } from "./storage";
 import { sendVerificationEmail } from "./email";
 import { signupSchema, verifyCodeSchema, setPasswordSchema, loginSchema } from "@shared/schema";
 import { z } from "zod";
+import * as OTPAuth from "otpauth";
+import QRCode from "qrcode";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup/start", async (req: Request, res: Response) => {
@@ -254,6 +256,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Get recovery phrase error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/2fa/setup", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const secret = new OTPAuth.Secret({ size: 20 });
+      
+      const totp = new OTPAuth.TOTP({
+        issuer: "TempoChat",
+        label: user.email,
+        algorithm: "SHA1",
+        digits: 6,
+        period: 30,
+        secret: secret,
+      });
+      
+      const otpauthUrl = totp.toString();
+      
+      const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+      
+      res.json({ 
+        success: true,
+        secret: secret.base32,
+        qrCode: qrCodeDataUrl,
+        otpauthUrl: otpauthUrl,
+      });
+    } catch (error) {
+      console.error("2FA setup error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/2fa/verify", async (req: Request, res: Response) => {
+    try {
+      const { userId, secret, code } = req.body;
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const totp = new OTPAuth.TOTP({
+        issuer: "TempoChat",
+        label: user.email,
+        algorithm: "SHA1",
+        digits: 6,
+        period: 30,
+        secret: OTPAuth.Secret.fromBase32(secret),
+      });
+      
+      const delta = totp.validate({ token: code, window: 1 });
+      
+      if (delta === null) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+      
+      await storage.updateUser(userId, { 
+        twoFactorEnabled: true,
+        twoFactorSecret: secret,
+      });
+      
+      res.json({ success: true, message: "2FA enabled successfully" });
+    } catch (error) {
+      console.error("2FA verify error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/2fa/disable", async (req: Request, res: Response) => {
+    try {
+      const { userId, code } = req.body;
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      if (!user.twoFactorSecret) {
+        return res.status(400).json({ error: "2FA is not enabled" });
+      }
+      
+      const totp = new OTPAuth.TOTP({
+        issuer: "TempoChat",
+        label: user.email,
+        algorithm: "SHA1",
+        digits: 6,
+        period: 30,
+        secret: OTPAuth.Secret.fromBase32(user.twoFactorSecret),
+      });
+      
+      const delta = totp.validate({ token: code, window: 1 });
+      
+      if (delta === null) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+      
+      await storage.updateUser(userId, { 
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+      });
+      
+      res.json({ success: true, message: "2FA disabled successfully" });
+    } catch (error) {
+      console.error("2FA disable error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

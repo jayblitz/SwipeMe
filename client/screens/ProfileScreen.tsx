@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, Switch, Modal, TextInput, Platform } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Alert, Switch, Modal, TextInput, Platform, Image } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +18,8 @@ import { useTheme, ThemeMode } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { clearAllData } from "@/lib/storage";
+import { apiRequest } from "@/lib/query-client";
+import * as Linking from "expo-linking";
 import { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 
 interface MenuItemProps {
@@ -70,19 +72,103 @@ interface EditProfileModalProps {
   onPickImage: () => void;
 }
 
-function EditProfileModal({ visible, onClose, onSave, initialData, onPickImage }: EditProfileModalProps) {
+function EditProfileModal({ visible, onClose, onSave, initialData }: Omit<EditProfileModalProps, 'onPickImage'>) {
   const { theme } = useTheme();
   const [displayName, setDisplayName] = useState(initialData.displayName || "");
   const [status, setStatus] = useState(initialData.status || "");
   const [twitterLink, setTwitterLink] = useState(initialData.twitterLink || "");
   const [telegramLink, setTelegramLink] = useState(initialData.telegramLink || "");
+  const [pendingProfileImage, setPendingProfileImage] = useState<string | null | undefined>(initialData.profileImage);
 
   useEffect(() => {
     setDisplayName(initialData.displayName || "");
     setStatus(initialData.status || "");
     setTwitterLink(initialData.twitterLink || "");
     setTelegramLink(initialData.telegramLink || "");
+    setPendingProfileImage(initialData.profileImage);
   }, [initialData, visible]);
+
+  const handlePickImage = async () => {
+    const options = [
+      { text: "Take Photo", onPress: () => pickImage("camera") },
+      { text: "Choose from Library", onPress: () => pickImage("library") },
+      { text: "Cancel", style: "cancel" as const },
+    ];
+    
+    if (pendingProfileImage) {
+      options.splice(2, 0, { 
+        text: "Remove Photo", 
+        onPress: () => setPendingProfileImage(null),
+        style: "destructive" as const,
+      } as any);
+    }
+    
+    Alert.alert("Change Profile Photo", undefined, options);
+  };
+
+  const pickImage = async (source: "camera" | "library") => {
+    if (Platform.OS === "web" && source === "camera") {
+      Alert.alert("Not Available", "Run in Expo Go to use the camera");
+      return;
+    }
+
+    let result;
+    
+    if (source === "camera") {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        if (permission.status === "denied" && !permission.canAskAgain && Platform.OS !== "web") {
+          Alert.alert(
+            "Camera Permission Required",
+            "Camera access is needed to take a photo. Please enable it in Settings.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Open Settings", onPress: async () => {
+                try { await Linking.openSettings(); } catch (e) {}
+              }},
+            ]
+          );
+        } else {
+          Alert.alert("Permission Required", "Camera access is needed to take a photo");
+        }
+        return;
+      }
+      result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+    } else {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        if (permission.status === "denied" && !permission.canAskAgain && Platform.OS !== "web") {
+          Alert.alert(
+            "Photo Library Permission Required",
+            "Photo library access is needed to select a photo. Please enable it in Settings.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Open Settings", onPress: async () => {
+                try { await Linking.openSettings(); } catch (e) {}
+              }},
+            ]
+          );
+        } else {
+          Alert.alert("Permission Required", "Photo library access is needed to select a photo");
+        }
+        return;
+      }
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+    }
+
+    if (!result.canceled && result.assets[0]) {
+      setPendingProfileImage(result.assets[0].uri);
+    }
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -96,8 +182,8 @@ function EditProfileModal({ visible, onClose, onSave, initialData, onPickImage }
         </View>
         
         <KeyboardAwareScrollViewCompat contentContainerStyle={styles.modalContent}>
-          <Pressable onPress={onPickImage} style={styles.avatarEditContainer}>
-            <Avatar imageUri={initialData.profileImage} size={100} />
+          <Pressable onPress={handlePickImage} style={styles.avatarEditContainer}>
+            <Avatar imageUri={pendingProfileImage} size={100} />
             <View style={[styles.changeAvatarButton, { backgroundColor: theme.primary }]}>
               <Feather name="camera" size={16} color="#FFFFFF" />
             </View>
@@ -160,7 +246,7 @@ function EditProfileModal({ visible, onClose, onSave, initialData, onPickImage }
           </View>
 
           <Button 
-            onPress={() => onSave({ displayName, status, twitterLink, telegramLink })} 
+            onPress={() => onSave({ displayName, status, twitterLink, telegramLink, profileImage: pendingProfileImage })} 
             style={styles.saveButton}
           >
             Save Changes
@@ -226,70 +312,269 @@ interface TwoFAModalProps {
   onClose: () => void;
   isEnabled: boolean;
   onToggle: (enabled: boolean) => void;
+  userId?: string;
 }
 
-function TwoFAModal({ visible, onClose, isEnabled, onToggle }: TwoFAModalProps) {
+function TwoFAModal({ visible, onClose, isEnabled, onToggle, userId }: TwoFAModalProps) {
   const { theme } = useTheme();
+  const [step, setStep] = useState<"initial" | "setup" | "verify" | "disable">("initial");
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleEnable = () => {
-    Alert.alert(
-      "Enable 2FA",
-      "To enable Two-Factor Authentication, you would typically:\n\n1. Scan a QR code with Google Authenticator or similar app\n2. Enter the 6-digit code to verify\n\nThis feature would connect to your authenticator app.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Enable", onPress: () => { onToggle(true); onClose(); } },
-      ]
-    );
+  useEffect(() => {
+    if (visible) {
+      setStep("initial");
+      setQrCode(null);
+      setSecret(null);
+      setVerificationCode("");
+      setError(null);
+    }
+  }, [visible]);
+
+  const handleStartSetup = async () => {
+    if (!userId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiRequest("POST", "/api/2fa/setup", { userId });
+      const data = await response.json();
+      
+      setQrCode(data.qrCode);
+      setSecret(data.secret);
+      setStep("setup");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to setup 2FA");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDisable = () => {
-    Alert.alert(
-      "Disable 2FA",
-      "Are you sure you want to disable Two-Factor Authentication? Your account will be less secure.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Disable", style: "destructive", onPress: () => { onToggle(false); onClose(); } },
-      ]
-    );
+  const parseApiError = (err: unknown): string => {
+    if (err instanceof Error) {
+      const msg = err.message;
+      try {
+        const jsonMatch = msg.match(/\{.*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.error) return parsed.error;
+        }
+      } catch {}
+      if (msg.includes("Invalid")) return "Invalid verification code";
+    }
+    return "Something went wrong";
   };
+
+  const handleVerifyAndEnable = async () => {
+    if (!userId || !secret || verificationCode.length !== 6) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await apiRequest("POST", "/api/2fa/verify", { userId, secret, code: verificationCode });
+      
+      onToggle(true);
+      Alert.alert("Success", "Two-factor authentication has been enabled");
+      onClose();
+    } catch (err) {
+      setError(parseApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartDisable = () => {
+    setStep("disable");
+    setVerificationCode("");
+    setError(null);
+  };
+
+  const handleDisable = async () => {
+    if (!userId || verificationCode.length !== 6) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await apiRequest("POST", "/api/2fa/disable", { userId, code: verificationCode });
+      
+      onToggle(false);
+      Alert.alert("Success", "Two-factor authentication has been disabled");
+      onClose();
+    } catch (err) {
+      setError(parseApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderInitialStep = () => (
+    <>
+      <View style={styles.twoFAHeader}>
+        <View style={[styles.twoFAIcon, { backgroundColor: Colors.light.primaryLight }]}>
+          <Feather name="shield" size={32} color={Colors.light.primary} />
+        </View>
+        <ThemedText type="h4" style={styles.twoFATitle}>Two-Factor Authentication</ThemedText>
+        <ThemedText style={[styles.twoFADescription, { color: theme.textSecondary }]}>
+          Add an extra layer of security using Google Authenticator, Authy, or similar apps.
+        </ThemedText>
+      </View>
+      
+      <View style={styles.twoFAStatus}>
+        <ThemedText style={{ color: theme.textSecondary }}>Current status: </ThemedText>
+        <ThemedText style={{ color: isEnabled ? theme.success : theme.error, fontWeight: "600" }}>
+          {isEnabled ? "Enabled" : "Disabled"}
+        </ThemedText>
+      </View>
+
+      <View style={styles.twoFAButtons}>
+        {isEnabled ? (
+          <Button onPress={handleStartDisable} style={[styles.twoFAButton, { backgroundColor: theme.error }]}>
+            Disable 2FA
+          </Button>
+        ) : (
+          <Button onPress={handleStartSetup} disabled={loading} style={styles.twoFAButton}>
+            {loading ? "Loading..." : "Enable 2FA"}
+          </Button>
+        )}
+        <Pressable onPress={onClose} style={styles.twoFACancelButton}>
+          <ThemedText style={{ color: theme.textSecondary }}>Cancel</ThemedText>
+        </Pressable>
+      </View>
+    </>
+  );
+
+  const renderSetupStep = () => (
+    <>
+      <View style={styles.twoFAHeader}>
+        <ThemedText type="h4" style={styles.twoFATitle}>Scan QR Code</ThemedText>
+        <ThemedText style={[styles.twoFADescription, { color: theme.textSecondary }]}>
+          Scan this QR code with Google Authenticator, Authy, or any TOTP-compatible app.
+        </ThemedText>
+      </View>
+      
+      {qrCode ? (
+        <View style={styles.qrCodeContainer}>
+          <Image 
+            source={{ uri: qrCode }} 
+            style={styles.qrCode} 
+            resizeMode="contain"
+          />
+        </View>
+      ) : null}
+
+      {secret ? (
+        <View style={styles.secretContainer}>
+          <ThemedText style={[styles.secretLabel, { color: theme.textSecondary }]}>
+            Or enter this code manually:
+          </ThemedText>
+          <ThemedText style={styles.secretCode}>{secret}</ThemedText>
+        </View>
+      ) : null}
+
+      <View style={styles.inputGroup}>
+        <ThemedText style={[styles.inputLabel, { color: theme.textSecondary }]}>
+          Enter the 6-digit code from your app
+        </ThemedText>
+        <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <TextInput
+            style={[styles.input, { color: theme.text, textAlign: "center", letterSpacing: 8 }]}
+            placeholder="000000"
+            placeholderTextColor={theme.textSecondary}
+            value={verificationCode}
+            onChangeText={(text) => setVerificationCode(text.replace(/[^0-9]/g, "").slice(0, 6))}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+        </View>
+      </View>
+
+      {error ? (
+        <ThemedText style={[styles.errorText, { color: theme.error }]}>{error}</ThemedText>
+      ) : null}
+
+      <View style={styles.twoFAButtons}>
+        <Button 
+          onPress={handleVerifyAndEnable} 
+          disabled={loading || verificationCode.length !== 6} 
+          style={styles.twoFAButton}
+        >
+          {loading ? "Verifying..." : "Verify and Enable"}
+        </Button>
+        <Pressable onPress={() => setStep("initial")} style={styles.twoFACancelButton}>
+          <ThemedText style={{ color: theme.textSecondary }}>Back</ThemedText>
+        </Pressable>
+      </View>
+    </>
+  );
+
+  const renderDisableStep = () => (
+    <>
+      <View style={styles.twoFAHeader}>
+        <View style={[styles.twoFAIcon, { backgroundColor: "rgba(239, 68, 68, 0.1)" }]}>
+          <Feather name="shield-off" size={32} color={theme.error} />
+        </View>
+        <ThemedText type="h4" style={styles.twoFATitle}>Disable 2FA</ThemedText>
+        <ThemedText style={[styles.twoFADescription, { color: theme.textSecondary }]}>
+          Enter the 6-digit code from your authenticator app to confirm.
+        </ThemedText>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <TextInput
+            style={[styles.input, { color: theme.text, textAlign: "center", letterSpacing: 8 }]}
+            placeholder="000000"
+            placeholderTextColor={theme.textSecondary}
+            value={verificationCode}
+            onChangeText={(text) => setVerificationCode(text.replace(/[^0-9]/g, "").slice(0, 6))}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+        </View>
+      </View>
+
+      {error ? (
+        <ThemedText style={[styles.errorText, { color: theme.error }]}>{error}</ThemedText>
+      ) : null}
+
+      <View style={styles.twoFAButtons}>
+        <Button 
+          onPress={handleDisable} 
+          disabled={loading || verificationCode.length !== 6} 
+          style={[styles.twoFAButton, { backgroundColor: theme.error }]}
+        >
+          {loading ? "Disabling..." : "Disable 2FA"}
+        </Button>
+        <Pressable onPress={() => setStep("initial")} style={styles.twoFACancelButton}>
+          <ThemedText style={{ color: theme.textSecondary }}>Back</ThemedText>
+        </Pressable>
+      </View>
+    </>
+  );
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <View style={[styles.twoFAContainer, { backgroundColor: theme.backgroundRoot }]}>
-          <View style={styles.twoFAHeader}>
-            <View style={[styles.twoFAIcon, { backgroundColor: Colors.light.primaryLight }]}>
-              <Feather name="shield" size={32} color={Colors.light.primary} />
-            </View>
-            <ThemedText type="h4" style={styles.twoFATitle}>Two-Factor Authentication</ThemedText>
-            <ThemedText style={[styles.twoFADescription, { color: theme.textSecondary }]}>
-              Add an extra layer of security using Google Authenticator, Authy, or similar apps.
-            </ThemedText>
-          </View>
-          
-          <View style={styles.twoFAStatus}>
-            <ThemedText style={{ color: theme.textSecondary }}>Current status: </ThemedText>
-            <ThemedText style={{ color: isEnabled ? theme.success : theme.error, fontWeight: "600" }}>
-              {isEnabled ? "Enabled" : "Disabled"}
-            </ThemedText>
-          </View>
-
-          <View style={styles.twoFAButtons}>
-            {isEnabled ? (
-              <Button onPress={handleDisable} style={[styles.twoFAButton, { backgroundColor: theme.error }]}>
-                Disable 2FA
-              </Button>
-            ) : (
-              <Button onPress={handleEnable} style={styles.twoFAButton}>
-                Enable 2FA
-              </Button>
-            )}
-            <Pressable onPress={onClose} style={styles.twoFACancelButton}>
-              <ThemedText style={{ color: theme.textSecondary }}>Cancel</ThemedText>
-            </Pressable>
-          </View>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <ThemedView style={styles.twoFAFullContainer}>
+        <View style={styles.modalHeader}>
+          <Pressable onPress={onClose} style={styles.modalCloseButton}>
+            <Feather name="x" size={24} color={theme.text} />
+          </Pressable>
+          <ThemedText type="h4">Security</ThemedText>
+          <View style={{ width: 40 }} />
         </View>
-      </Pressable>
+        
+        <KeyboardAwareScrollViewCompat contentContainerStyle={styles.twoFAScrollContent}>
+          {step === "initial" ? renderInitialStep() : null}
+          {step === "setup" ? renderSetupStep() : null}
+          {step === "disable" ? renderDisableStep() : null}
+        </KeyboardAwareScrollViewCompat>
+      </ThemedView>
     </Modal>
   );
 }
@@ -354,7 +639,7 @@ export default function ProfileScreen() {
     await updateUser({ twoFactorEnabled: enabled });
   };
 
-  const handleSaveProfile = async (data: { displayName: string; status: string; twitterLink: string; telegramLink: string }) => {
+  const handleSaveProfile = async (data: { displayName: string; status: string; twitterLink: string; telegramLink: string; profileImage?: string | null }) => {
     try {
       await updateUser(data);
       setShowEditProfile(false);
@@ -384,64 +669,6 @@ export default function ProfileScreen() {
 
   const handleViewRecoveryPhrase = () => {
     navigation.navigate("RecoveryPhrase" as any);
-  };
-
-  const handlePickImage = async () => {
-    const options = [
-      { text: "Take Photo", onPress: () => pickImage("camera") },
-      { text: "Choose from Library", onPress: () => pickImage("library") },
-      { text: "Cancel", style: "cancel" as const },
-    ];
-    
-    if (user?.profileImage) {
-      options.splice(2, 0, { 
-        text: "Remove Photo", 
-        onPress: async () => {
-          await updateUser({ profileImage: null });
-        },
-        style: "destructive" as const,
-      } as any);
-    }
-    
-    Alert.alert("Change Profile Photo", undefined, options);
-  };
-
-  const pickImage = async (source: "camera" | "library") => {
-    if (Platform.OS === "web" && source === "camera") {
-      Alert.alert("Not Available", "Run in Expo Go to use the camera");
-      return;
-    }
-
-    let result;
-    
-    if (source === "camera") {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission Required", "Camera access is needed to take a photo");
-        return;
-      }
-      result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-    } else {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission Required", "Photo library access is needed to select a photo");
-        return;
-      }
-      result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-    }
-
-    if (!result.canceled && result.assets[0]) {
-      await updateUser({ profileImage: result.assets[0].uri });
-    }
   };
 
   const handleDeleteAccount = () => {
@@ -483,12 +710,9 @@ export default function ProfileScreen() {
         scrollIndicatorInsets={{ bottom: insets.bottom }}
       >
         <View style={styles.profileHeader}>
-          <Pressable onPress={handlePickImage} style={styles.avatarContainer}>
+          <View style={styles.avatarContainer}>
             <Avatar imageUri={user?.profileImage} size={100} />
-            <View style={[styles.cameraOverlay, { backgroundColor: theme.primary, borderColor: theme.backgroundRoot }]}>
-              <Feather name="camera" size={16} color="#FFFFFF" />
-            </View>
-          </Pressable>
+          </View>
           <ThemedText type="h3" style={styles.profileName}>
             {user?.displayName || user?.email?.split("@")[0] || "User"}
           </ThemedText>
@@ -614,7 +838,6 @@ export default function ProfileScreen() {
         visible={showEditProfile}
         onClose={() => setShowEditProfile(false)}
         onSave={handleSaveProfile}
-        onPickImage={handlePickImage}
         initialData={{
           displayName: user?.displayName,
           status: user?.status,
@@ -636,6 +859,7 @@ export default function ProfileScreen() {
         onClose={() => setShow2FA(false)}
         isEnabled={twoFAEnabled}
         onToggle={handle2FAToggle}
+        userId={user?.id}
       />
     </ThemedView>
   );
@@ -877,5 +1101,44 @@ const styles = StyleSheet.create({
   twoFACancelButton: {
     alignItems: "center",
     paddingVertical: Spacing.md,
+  },
+  twoFAFullContainer: {
+    flex: 1,
+  },
+  twoFAScrollContent: {
+    padding: Spacing.lg,
+  },
+  qrCodeContainer: {
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+    backgroundColor: "#FFFFFF",
+    borderRadius: BorderRadius.md,
+    alignSelf: "center",
+  },
+  qrCode: {
+    width: 200,
+    height: 200,
+  },
+  secretContainer: {
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+  },
+  secretLabel: {
+    fontSize: 12,
+    marginBottom: Spacing.xs,
+  },
+  secretCode: {
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 2,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  errorText: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: Spacing.md,
   },
 });
