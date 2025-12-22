@@ -7,6 +7,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
+import * as ImagePicker from "expo-image-picker";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
@@ -64,11 +65,12 @@ function MenuItem({ icon, title, subtitle, onPress, showArrow = true, danger = f
 interface EditProfileModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (data: { displayName: string; status: string; twitterLink: string; telegramLink: string }) => void;
-  initialData: { displayName?: string | null; status?: string | null; twitterLink?: string | null; telegramLink?: string | null };
+  onSave: (data: { displayName: string; status: string; twitterLink: string; telegramLink: string; profileImage?: string | null }) => void;
+  initialData: { displayName?: string | null; status?: string | null; twitterLink?: string | null; telegramLink?: string | null; profileImage?: string | null };
+  onPickImage: () => void;
 }
 
-function EditProfileModal({ visible, onClose, onSave, initialData }: EditProfileModalProps) {
+function EditProfileModal({ visible, onClose, onSave, initialData, onPickImage }: EditProfileModalProps) {
   const { theme } = useTheme();
   const [displayName, setDisplayName] = useState(initialData.displayName || "");
   const [status, setStatus] = useState(initialData.status || "");
@@ -94,12 +96,12 @@ function EditProfileModal({ visible, onClose, onSave, initialData }: EditProfile
         </View>
         
         <KeyboardAwareScrollViewCompat contentContainerStyle={styles.modalContent}>
-          <View style={styles.avatarEditContainer}>
-            <Avatar avatarId="coral" size={100} />
-            <Pressable style={[styles.changeAvatarButton, { backgroundColor: theme.primary }]}>
+          <Pressable onPress={onPickImage} style={styles.avatarEditContainer}>
+            <Avatar imageUri={initialData.profileImage} size={100} />
+            <View style={[styles.changeAvatarButton, { backgroundColor: theme.primary }]}>
               <Feather name="camera" size={16} color="#FFFFFF" />
-            </Pressable>
-          </View>
+            </View>
+          </Pressable>
 
           <View style={styles.inputGroup}>
             <ThemedText style={[styles.inputLabel, { color: theme.textSecondary }]}>Display Name</ThemedText>
@@ -384,6 +386,64 @@ export default function ProfileScreen() {
     navigation.navigate("RecoveryPhrase" as any);
   };
 
+  const handlePickImage = async () => {
+    const options = [
+      { text: "Take Photo", onPress: () => pickImage("camera") },
+      { text: "Choose from Library", onPress: () => pickImage("library") },
+      { text: "Cancel", style: "cancel" as const },
+    ];
+    
+    if (user?.profileImage) {
+      options.splice(2, 0, { 
+        text: "Remove Photo", 
+        onPress: async () => {
+          await updateUser({ profileImage: null });
+        },
+        style: "destructive" as const,
+      } as any);
+    }
+    
+    Alert.alert("Change Profile Photo", undefined, options);
+  };
+
+  const pickImage = async (source: "camera" | "library") => {
+    if (Platform.OS === "web" && source === "camera") {
+      Alert.alert("Not Available", "Run in Expo Go to use the camera");
+      return;
+    }
+
+    let result;
+    
+    if (source === "camera") {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Required", "Camera access is needed to take a photo");
+        return;
+      }
+      result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Required", "Photo library access is needed to select a photo");
+        return;
+      }
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+    }
+
+    if (!result.canceled && result.assets[0]) {
+      await updateUser({ profileImage: result.assets[0].uri });
+    }
+  };
+
   const handleDeleteAccount = () => {
     Alert.alert(
       "Delete Account",
@@ -423,7 +483,12 @@ export default function ProfileScreen() {
         scrollIndicatorInsets={{ bottom: insets.bottom }}
       >
         <View style={styles.profileHeader}>
-          <Avatar avatarId="coral" size={100} />
+          <Pressable onPress={handlePickImage} style={styles.avatarContainer}>
+            <Avatar imageUri={user?.profileImage} size={100} />
+            <View style={[styles.cameraOverlay, { backgroundColor: theme.primary, borderColor: theme.backgroundRoot }]}>
+              <Feather name="camera" size={16} color="#FFFFFF" />
+            </View>
+          </Pressable>
           <ThemedText type="h3" style={styles.profileName}>
             {user?.displayName || user?.email?.split("@")[0] || "User"}
           </ThemedText>
@@ -549,11 +614,13 @@ export default function ProfileScreen() {
         visible={showEditProfile}
         onClose={() => setShowEditProfile(false)}
         onSave={handleSaveProfile}
+        onPickImage={handlePickImage}
         initialData={{
           displayName: user?.displayName,
           status: user?.status,
           twitterLink: user?.twitterLink,
           telegramLink: user?.telegramLink,
+          profileImage: user?.profileImage,
         }}
       />
 
@@ -585,6 +652,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: Spacing.xl,
     paddingTop: Spacing.md,
+  },
+  avatarContainer: {
+    position: "relative",
+  },
+  cameraOverlay: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#000000",
   },
   profileName: {
     marginTop: Spacing.md,

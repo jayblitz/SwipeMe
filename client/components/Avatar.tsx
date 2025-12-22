@@ -14,12 +14,15 @@ const avatarImages: Record<string, any> = {
 };
 
 interface AvatarProps {
-  avatarId: string;
+  avatarId?: string;
+  imageUri?: string | null;
   size?: number;
 }
 
-export function Avatar({ avatarId, size = 48 }: AvatarProps) {
-  const imageSource = avatarImages[avatarId] || avatarImages.coral;
+export function Avatar({ avatarId = "coral", imageUri, size = 48 }: AvatarProps) {
+  const imageSource = imageUri 
+    ? { uri: imageUri } 
+    : (avatarImages[avatarId] || avatarImages.coral);
   
   return (
     <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }]}>
