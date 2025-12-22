@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, FlatList, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform, ActivityIndicator } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { Transaction } from "@/lib/storage";
 import { getApiUrl, apiRequest } from "@/lib/query-client";
+import { fetchTokenBalances, getTotalBalance, TokenBalance } from "@/lib/tempo-tokens";
 import WalletSetupScreen from "./WalletSetupScreen";
 
 interface Wallet {
@@ -121,10 +122,12 @@ export default function WalletScreen() {
   const { user } = useAuth();
   
   const [wallet, setWallet] = useState<Wallet | null | undefined>(undefined);
-  const [balance, setBalance] = useState(0);
+  const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
+  const [totalBalance, setTotalBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoadingWallet, setIsLoadingWallet] = useState(true);
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
 
   const loadWallet = useCallback(async () => {
     if (!user) return;
@@ -136,32 +139,55 @@ export default function WalletScreen() {
       });
       const data = await response.json();
       setWallet(data.wallet);
+      return data.wallet;
     } catch (error) {
       console.error("Failed to load wallet:", error);
       setWallet(null);
+      return null;
     } finally {
       setIsLoadingWallet(false);
     }
   }, [user]);
 
+  const loadBalances = useCallback(async (walletAddress: string) => {
+    if (!walletAddress) return;
+    
+    setIsLoadingBalances(true);
+    try {
+      const balances = await fetchTokenBalances(walletAddress);
+      setTokenBalances(balances);
+      setTotalBalance(getTotalBalance(balances));
+    } catch (error) {
+      console.error("Failed to load balances:", error);
+    } finally {
+      setIsLoadingBalances(false);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
-    // For MVP, balance starts at 0 and will be fetched from blockchain in Phase 2
-    // Transactions will also come from blockchain in Phase 2
-    // For now, show empty state for fresh wallets
-    setBalance(0);
     setTransactions([]);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadWallet();
-      loadData();
-    }, [loadWallet, loadData])
+      const init = async () => {
+        const loadedWallet = await loadWallet();
+        if (loadedWallet?.address) {
+          loadBalances(loadedWallet.address);
+        }
+        loadData();
+      };
+      init();
+    }, [loadWallet, loadData, loadBalances])
   );
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadWallet(), loadData()]);
+    const loadedWallet = await loadWallet();
+    if (loadedWallet?.address) {
+      await loadBalances(loadedWallet.address);
+    }
+    await loadData();
     setRefreshing(false);
   };
 
@@ -308,37 +334,89 @@ export default function WalletScreen() {
           transactions.length === 0 && styles.emptyListContent,
         ]}
         ListHeaderComponent={
-          <Card style={styles.balanceCard} elevation={1}>
-            <View style={styles.balanceHeader}>
-              <ThemedText style={[styles.balanceLabel, { color: theme.textSecondary }]}>
-                Available Balance
-              </ThemedText>
-              <View style={styles.headerActions}>
-                <View style={[styles.currencyBadge, { backgroundColor: theme.primary }]}>
-                  <ThemedText style={styles.currencyText}>USDC</ThemedText>
+          <>
+            <Card style={styles.balanceCard} elevation={1}>
+              <View style={styles.balanceHeader}>
+                <ThemedText style={[styles.balanceLabel, { color: theme.textSecondary }]}>
+                  Total Balance
+                </ThemedText>
+                <View style={styles.headerActions}>
+                  <Pressable onPress={handleManageWallet} style={styles.manageButton}>
+                    <Feather name="more-horizontal" size={20} color={theme.textSecondary} />
+                  </Pressable>
                 </View>
-                <Pressable onPress={handleManageWallet} style={styles.manageButton}>
-                  <Feather name="more-horizontal" size={20} color={theme.textSecondary} />
-                </Pressable>
               </View>
-            </View>
-            <ThemedText style={styles.balanceAmount}>
-              ${balance.toFixed(2)}
+              {isLoadingBalances ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={theme.primary} />
+                  <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
+                    Loading balances...
+                  </ThemedText>
+                </View>
+              ) : (
+                <ThemedText style={styles.balanceAmount}>
+                  ${totalBalance.toFixed(2)}
+                </ThemedText>
+              )}
+              <Pressable onPress={handleCopyAddress} style={styles.walletInfo}>
+                <Feather name="credit-card" size={14} color={theme.textSecondary} />
+                <ThemedText style={[styles.walletAddress, { color: theme.textSecondary }]}>
+                  {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
+                </ThemedText>
+                <Feather name="copy" size={12} color={theme.textSecondary} />
+              </Pressable>
+              <View style={[styles.networkIndicator, { backgroundColor: theme.backgroundSecondary }]}>
+                <View style={styles.networkDot} />
+                <ThemedText style={[styles.networkText, { color: theme.textSecondary }]}>
+                  Tempo Testnet
+                </ThemedText>
+              </View>
+            </Card>
+            
+            <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>
+              Assets
             </ThemedText>
-            <Pressable onPress={handleCopyAddress} style={styles.walletInfo}>
-              <Feather name="credit-card" size={14} color={theme.textSecondary} />
-              <ThemedText style={[styles.walletAddress, { color: theme.textSecondary }]}>
-                {wallet.address?.slice(0, 6)}...{wallet.address?.slice(-4)}
-              </ThemedText>
-              <Feather name="copy" size={12} color={theme.textSecondary} />
-            </Pressable>
-            <View style={[styles.networkIndicator, { backgroundColor: theme.backgroundSecondary }]}>
-              <View style={styles.networkDot} />
-              <ThemedText style={[styles.networkText, { color: theme.textSecondary }]}>
-                Tempo Testnet
-              </ThemedText>
-            </View>
-          </Card>
+            <Card style={styles.assetsCard} elevation={1}>
+              {isLoadingBalances ? (
+                <View style={styles.assetsLoadingContainer}>
+                  <ActivityIndicator size="small" color={theme.primary} />
+                </View>
+              ) : (
+                tokenBalances.map((item, index) => (
+                  <View 
+                    key={item.token.symbol}
+                    style={[
+                      styles.assetItem,
+                      index < tokenBalances.length - 1 && { 
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                        borderBottomColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.assetIcon, { backgroundColor: item.token.color }]}>
+                      <ThemedText style={styles.assetIconText}>
+                        {item.token.symbol.charAt(0)}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.assetInfo}>
+                      <ThemedText style={styles.assetSymbol}>{item.token.symbol}</ThemedText>
+                      <ThemedText style={[styles.assetName, { color: theme.textSecondary }]}>
+                        {item.token.name}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.assetBalance}>
+                      <ThemedText style={styles.assetAmount}>
+                        ${item.balanceUsd.toFixed(2)}
+                      </ThemedText>
+                      <ThemedText style={[styles.assetTokens, { color: theme.textSecondary }]}>
+                        {parseFloat(item.balanceFormatted).toLocaleString()} {item.token.symbol}
+                      </ThemedText>
+                    </View>
+                  </View>
+                ))
+              )}
+            </Card>
+          </>
         }
         ListEmptyComponent={EmptyState}
         refreshControl={
@@ -519,5 +597,69 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  loadingText: {
+    fontSize: 14,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: Spacing.sm,
+  },
+  assetsCard: {
+    marginBottom: Spacing.lg,
+    padding: 0,
+    overflow: "hidden",
+  },
+  assetsLoadingContainer: {
+    padding: Spacing.xl,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  assetItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+  },
+  assetIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  assetIconText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  assetInfo: {
+    flex: 1,
+    marginLeft: Spacing.md,
+  },
+  assetSymbol: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  assetName: {
+    fontSize: 13,
+  },
+  assetBalance: {
+    alignItems: "flex-end",
+  },
+  assetAmount: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  assetTokens: {
+    fontSize: 12,
   },
 });
