@@ -207,7 +207,10 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
   }, [isPlaying, status.currentTime, status.duration]);
   
   const handlePlayPause = async () => {
-    if (!player || !audioUri) return;
+    if (!player || !audioUri) {
+      console.log("No player or audio URI");
+      return;
+    }
     
     try {
       await AudioModule.setAudioModeAsync({
@@ -218,10 +221,6 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
       if (isPlaying) {
         player.pause();
       } else {
-        if (!status.isLoaded) {
-          console.log("Audio not loaded yet, waiting...");
-          return;
-        }
         if (!hasPlayed) {
           setHasPlayed(true);
         }
@@ -1405,12 +1404,20 @@ export default function ChatScreen() {
 
   const participant = chat?.participants[0];
 
-  const backgroundStyle = chatBackground?.value && chatBackground.value !== "transparent" 
+  const isImageBackground = chatBackground?.type === "image";
+  const backgroundStyle = chatBackground?.value && chatBackground.value !== "transparent" && !isImageBackground
     ? { backgroundColor: chatBackground.value }
     : {};
 
   return (
     <ThemedView style={styles.container}>
+      {isImageBackground ? (
+        <Image
+          source={{ uri: chatBackground.value }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+        />
+      ) : null}
       <View style={[styles.chatBackground, backgroundStyle]}>
         <KeyboardAvoidingView 
           style={styles.keyboardAvoidingView}
@@ -1480,9 +1487,7 @@ export default function ChatScreen() {
               >
                 <Feather name="trash-2" size={24} color={theme.textSecondary} />
               </Pressable>
-              <View style={styles.recordingIndicatorWrapper}>
-                <View style={[styles.recordingDot, { backgroundColor: "#FF3B30" }]} />
-              </View>
+              <View style={styles.recordingIndicatorWrapper} />
               <Pressable 
                 onPress={handleSendRecording}
                 style={[styles.recordingSendButton, { backgroundColor: "#25D366" }]}
@@ -1613,6 +1618,37 @@ export default function ChatScreen() {
                 </Pressable>
               ))}
             </View>
+            
+            <Pressable
+              style={[styles.backgroundGalleryButton, { backgroundColor: theme.backgroundSecondary }]}
+              onPress={async () => {
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ["images"],
+                  allowsEditing: true,
+                  quality: 0.8,
+                });
+                if (!result.canceled && result.assets[0]) {
+                  handleSelectBackground({ type: "image", value: result.assets[0].uri });
+                }
+              }}
+            >
+              <Feather name="image" size={20} color={theme.text} />
+              <ThemedText style={styles.backgroundGalleryText}>Choose from Gallery</ThemedText>
+            </Pressable>
+            
+            {chatBackground?.type === "image" ? (
+              <View style={styles.currentImagePreview}>
+                <Image
+                  source={{ uri: chatBackground.value }}
+                  style={styles.currentImageThumbnail}
+                  contentFit="cover"
+                />
+                <ThemedText style={[styles.currentImageLabel, { color: theme.textSecondary }]}>
+                  Current background
+                </ThemedText>
+              </View>
+            ) : null}
+            
             <ThemedText style={[styles.backgroundPickerHint, { color: theme.textSecondary }]}>
               Each chat can have its own unique background
             </ThemedText>
@@ -1681,6 +1717,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: Spacing.lg,
     textAlign: "center",
+  },
+  backgroundGalleryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    marginTop: Spacing.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: 12,
+  },
+  backgroundGalleryText: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  currentImagePreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+  },
+  currentImageThumbnail: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+  },
+  currentImageLabel: {
+    fontSize: 13,
   },
   dateSeparatorContainer: {
     alignItems: "center",
