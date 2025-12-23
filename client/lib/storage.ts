@@ -24,16 +24,47 @@ export interface Chat {
   name?: string;
 }
 
+export type MessageType = "text" | "payment" | "image" | "location" | "contact" | "document";
+
+export interface ImageAttachment {
+  uri: string;
+  width?: number;
+  height?: number;
+}
+
+export interface LocationAttachment {
+  latitude: number;
+  longitude: number;
+  address?: string;
+}
+
+export interface ContactAttachment {
+  name: string;
+  phoneNumber?: string;
+  email?: string;
+}
+
+export interface DocumentAttachment {
+  uri: string;
+  name: string;
+  mimeType?: string;
+  size?: number;
+}
+
 export interface Message {
   id: string;
   chatId: string;
   senderId: string;
   content: string;
   timestamp: number;
-  type: "text" | "payment";
+  type: MessageType;
   paymentAmount?: number;
   paymentMemo?: string;
   paymentStatus?: "pending" | "completed" | "failed";
+  imageAttachment?: ImageAttachment;
+  locationAttachment?: LocationAttachment;
+  contactAttachment?: ContactAttachment;
+  documentAttachment?: DocumentAttachment;
 }
 
 export interface Transaction {
@@ -173,6 +204,77 @@ export async function sendMessage(chatId: string, content: string, senderId: str
     }
   } catch (error) {
     console.error("Failed to send message:", error);
+  }
+  
+  return newMessage;
+}
+
+export interface AttachmentOptions {
+  image?: ImageAttachment;
+  location?: LocationAttachment;
+  contact?: ContactAttachment;
+  document?: DocumentAttachment;
+}
+
+export async function sendAttachmentMessage(
+  chatId: string,
+  type: "image" | "location" | "contact" | "document",
+  attachment: AttachmentOptions,
+  senderId: string = "me"
+): Promise<Message> {
+  let content = "";
+  let lastMessagePreview = "";
+  
+  switch (type) {
+    case "image":
+      content = "Photo";
+      lastMessagePreview = "Sent a photo";
+      break;
+    case "location":
+      content = attachment.location?.address || "Shared location";
+      lastMessagePreview = "Shared a location";
+      break;
+    case "contact":
+      content = attachment.contact?.name || "Shared contact";
+      lastMessagePreview = `Shared contact: ${attachment.contact?.name}`;
+      break;
+    case "document":
+      content = attachment.document?.name || "Document";
+      lastMessagePreview = `Sent a document: ${attachment.document?.name}`;
+      break;
+  }
+  
+  const newMessage: Message = {
+    id: `m${Date.now()}`,
+    chatId,
+    senderId,
+    content,
+    timestamp: Date.now(),
+    type,
+    imageAttachment: attachment.image,
+    locationAttachment: attachment.location,
+    contactAttachment: attachment.contact,
+    documentAttachment: attachment.document,
+  };
+  
+  try {
+    const messages = await AsyncStorage.getItem(MESSAGES_KEY);
+    const allMessages = messages ? JSON.parse(messages) : {};
+    if (!allMessages[chatId]) {
+      allMessages[chatId] = [];
+    }
+    allMessages[chatId].push(newMessage);
+    await AsyncStorage.setItem(MESSAGES_KEY, JSON.stringify(allMessages));
+    
+    const chats = await getChats();
+    const chatIndex = chats.findIndex(c => c.id === chatId);
+    if (chatIndex !== -1) {
+      chats[chatIndex].lastMessage = lastMessagePreview;
+      chats[chatIndex].lastMessageTime = Date.now();
+      await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+    }
+  } catch (error) {
+    console.error("Failed to send attachment message:", error);
   }
   
   return newMessage;
