@@ -43,8 +43,11 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - User-friendly error messages for common payment failures (gas, auth, network)
 - Voice message recording and playback using expo-audio
 - WhatsApp-style send/mic button toggle (mic when empty, send when typing)
-- AudioMessageBubble component with progress tracking and playback controls
+- WhatsApp-style AudioMessageBubble with waveform visualization, duration, timestamp, playback speed (1x/1.5x/2x)
+- Green dot indicator for unplayed voice messages
 - Microphone permission handling with Settings redirect for denied permissions
+- Per-chat custom backgrounds (8 preset colors, stored per chatId in AsyncStorage)
+- Date separators between message groups (Today, Yesterday, weekday, or full date)
 
 **MVP Limitations (Production Improvements Needed):**
 - No XMTP integration yet (messages use local mock data) - deferred due to native SDK requirements

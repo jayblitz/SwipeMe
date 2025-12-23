@@ -509,3 +509,51 @@ export async function clearAllData(): Promise<void> {
     console.error("Failed to clear data:", error);
   }
 }
+
+const CHAT_BACKGROUNDS_KEY = "@tempochat_chat_backgrounds";
+
+export interface ChatBackground {
+  type: "color" | "image" | "preset";
+  value: string;
+}
+
+export const PRESET_BACKGROUNDS = [
+  { id: "default", type: "color" as const, value: "transparent", label: "Default" },
+  { id: "dark-gradient", type: "color" as const, value: "#0B141A", label: "Dark" },
+  { id: "light-pattern", type: "color" as const, value: "#ECE5DD", label: "Light" },
+  { id: "teal", type: "color" as const, value: "#075E54", label: "Teal" },
+  { id: "navy", type: "color" as const, value: "#1A2238", label: "Navy" },
+  { id: "forest", type: "color" as const, value: "#1D3C34", label: "Forest" },
+  { id: "burgundy", type: "color" as const, value: "#3D1C2A", label: "Burgundy" },
+  { id: "slate", type: "color" as const, value: "#2F3640", label: "Slate" },
+];
+
+export async function getChatBackground(chatId: string): Promise<ChatBackground | null> {
+  try {
+    const data = await AsyncStorage.getItem(CHAT_BACKGROUNDS_KEY);
+    if (data) {
+      const backgrounds: Record<string, ChatBackground> = JSON.parse(data);
+      return backgrounds[chatId] || null;
+    }
+  } catch (error) {
+    console.error("Failed to get chat background:", error);
+  }
+  return null;
+}
+
+export async function setChatBackground(chatId: string, background: ChatBackground | null): Promise<void> {
+  try {
+    const data = await AsyncStorage.getItem(CHAT_BACKGROUNDS_KEY);
+    const backgrounds: Record<string, ChatBackground> = data ? JSON.parse(data) : {};
+    
+    if (background === null || background.value === "transparent") {
+      delete backgrounds[chatId];
+    } else {
+      backgrounds[chatId] = background;
+    }
+    
+    await AsyncStorage.setItem(CHAT_BACKGROUNDS_KEY, JSON.stringify(backgrounds));
+  } catch (error) {
+    console.error("Failed to set chat background:", error);
+  }
+}

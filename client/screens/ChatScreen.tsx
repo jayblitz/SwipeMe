@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from "react";
 import { View, StyleSheet, FlatList, TextInput, Pressable, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Linking, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -19,7 +19,7 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, sendAudioMessage, getChats, Message, Chat, getContactWalletAddress } from "@/lib/storage";
+import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, sendAudioMessage, getChats, Message, Chat, getContactWalletAddress, getChatBackground, setChatBackground, PRESET_BACKGROUNDS, ChatBackground } from "@/lib/storage";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
 import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
@@ -102,14 +102,74 @@ function formatTime(timestamp: number): string {
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+function formatDateSeparator(timestamp: number): string {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  if (date.toDateString() === today.toDateString()) {
+    return "Today";
+  }
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  }
+  
+  const daysDiff = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysDiff < 7) {
+    return date.toLocaleDateString("en-US", { weekday: "long" });
+  }
+  
+  return date.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function isSameDay(timestamp1: number, timestamp2: number): boolean {
+  const date1 = new Date(timestamp1);
+  const date2 = new Date(timestamp2);
+  return date1.toDateString() === date2.toDateString();
+}
+
+interface DateSeparatorProps {
+  timestamp: number;
+}
+
+function DateSeparator({ timestamp }: DateSeparatorProps) {
+  const { theme } = useTheme();
+  
+  return (
+    <View style={styles.dateSeparatorContainer}>
+      <View style={[styles.dateSeparatorBubble, { backgroundColor: theme.backgroundSecondary }]}>
+        <ThemedText style={[styles.dateSeparatorText, { color: theme.textSecondary }]}>
+          {formatDateSeparator(timestamp)}
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
 interface AudioMessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
 }
 
+const WAVEFORM_BARS = 25;
+const PLAYBACK_SPEEDS = [1, 1.5, 2] as const;
+
+function generateWaveformHeights(seed: number): number[] {
+  const heights: number[] = [];
+  let val = seed;
+  for (let i = 0; i < WAVEFORM_BARS; i++) {
+    val = (val * 9301 + 49297) % 233280;
+    heights.push(0.2 + (val / 233280) * 0.8);
+  }
+  return heights;
+}
+
 function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) {
   const { theme } = useTheme();
   const [progress, setProgress] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState<1 | 1.5 | 2>(1);
+  const [hasPlayed, setHasPlayed] = useState(false);
   
   const audioUri = message.audioAttachment?.uri || null;
   const player = useAudioPlayer(audioUri);
@@ -117,10 +177,19 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
   
   const duration = message.audioAttachment?.duration || 0;
   const durationSeconds = Math.round(duration);
-  const durationFormatted = `${Math.floor(durationSeconds / 60)}:${(durationSeconds % 60).toString().padStart(2, '0')}`;
+  const currentTimeDisplay = Math.round((status.currentTime || 0) / playbackSpeed);
+  const displayTime = status.playing ? currentTimeDisplay : durationSeconds;
+  const timeFormatted = `${Math.floor(displayTime / 60)}:${(displayTime % 60).toString().padStart(2, '0')}`;
   
   const isPlaying = status.playing;
-  const isLoaded = status.isLoaded;
+  const waveformHeights = useMemo(() => {
+    let hash = 0;
+    for (let i = 0; i < message.id.length; i++) {
+      hash = ((hash << 5) - hash) + message.id.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return generateWaveformHeights(Math.abs(hash));
+  }, [message.id]);
   
   useEffect(() => {
     if (!isPlaying) return;
@@ -132,7 +201,7 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
           setProgress(0);
         }
       }
-    }, 100);
+    }, 50);
     
     return () => clearInterval(interval);
   }, [isPlaying, status.currentTime, status.duration]);
@@ -149,6 +218,9 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
       if (isPlaying) {
         player.pause();
       } else {
+        if (!hasPlayed) {
+          setHasPlayed(true);
+        }
         if (progress >= 0.99) {
           player.seekTo(0);
           setProgress(0);
@@ -160,59 +232,106 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
     }
   };
   
+  const cyclePlaybackSpeed = () => {
+    const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackSpeed);
+    const nextIndex = (currentIndex + 1) % PLAYBACK_SPEEDS.length;
+    const newSpeed = PLAYBACK_SPEEDS[nextIndex];
+    setPlaybackSpeed(newSpeed);
+    if (player && typeof player.setPlaybackRate === "function") {
+      player.setPlaybackRate(newSpeed);
+    }
+  };
+  
+  const playedBars = Math.floor(progress * WAVEFORM_BARS);
+  
   return (
     <View style={[
       styles.audioBubble,
       { 
-        backgroundColor: isOwnMessage ? theme.sentMessage : theme.receivedMessage,
+        backgroundColor: isOwnMessage ? "#128C7E" : theme.receivedMessage,
         alignSelf: isOwnMessage ? "flex-end" : "flex-start",
       }
     ]}>
-      <View style={styles.audioContent}>
+      <View style={styles.audioMainRow}>
+        {!isOwnMessage ? (
+          <View style={styles.audioAvatarContainer}>
+            <View style={[styles.audioAvatar, { backgroundColor: "#00A884" }]}>
+              <Feather name="mic" size={16} color="#FFFFFF" />
+            </View>
+            {!hasPlayed ? (
+              <View style={styles.unplayedDot} />
+            ) : null}
+          </View>
+        ) : null}
+        
         <Pressable 
           onPress={handlePlayPause}
-          style={[styles.audioPlayButton, { backgroundColor: isOwnMessage ? "rgba(255,255,255,0.2)" : theme.backgroundSecondary }]}
+          style={styles.audioPlayButtonWhatsApp}
         >
           <Feather 
             name={isPlaying ? "pause" : "play"} 
-            size={20} 
-            color={isOwnMessage ? "#FFFFFF" : theme.primary} 
+            size={24} 
+            color={isOwnMessage ? "#FFFFFF" : "#54656F"} 
           />
         </Pressable>
-        <View style={styles.audioWaveform}>
-          <View style={styles.audioProgressContainer}>
-            <View 
-              style={[
-                styles.audioProgressBar, 
-                { 
-                  backgroundColor: isOwnMessage ? "rgba(255,255,255,0.3)" : theme.border 
-                }
-              ]} 
-            />
-            <View 
-              style={[
-                styles.audioProgressFill, 
-                { 
-                  width: `${progress * 100}%`,
-                  backgroundColor: isOwnMessage ? "#FFFFFF" : theme.primary 
-                }
-              ]} 
-            />
+        
+        <View style={styles.audioWaveformContainer}>
+          <View style={styles.audioWaveformBars}>
+            {waveformHeights.map((height, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.audioWaveformBar,
+                  {
+                    height: height * 24,
+                    backgroundColor: index < playedBars
+                      ? (isOwnMessage ? "#FFFFFF" : "#00A884")
+                      : (isOwnMessage ? "rgba(255,255,255,0.4)" : "#A0AEB4"),
+                  },
+                ]}
+              />
+            ))}
           </View>
-          <ThemedText style={[
-            styles.audioDuration,
-            { color: isOwnMessage ? "rgba(255,255,255,0.8)" : theme.textSecondary }
-          ]}>
-            {durationFormatted}
-          </ThemedText>
+          <View style={styles.audioMetaRow}>
+            <ThemedText style={[
+              styles.audioTimeDisplay,
+              { color: isOwnMessage ? "rgba(255,255,255,0.8)" : "#667781" }
+            ]}>
+              {timeFormatted}
+            </ThemedText>
+            <View style={styles.audioMetaRight}>
+              <ThemedText style={[
+                styles.audioTimestamp,
+                { color: isOwnMessage ? "rgba(255,255,255,0.7)" : "#667781" }
+              ]}>
+                {formatTime(message.timestamp)}
+              </ThemedText>
+              {isOwnMessage ? (
+                <Feather name="check" size={14} color="rgba(255,255,255,0.7)" style={{ marginLeft: 2 }} />
+              ) : null}
+            </View>
+          </View>
         </View>
+        
+        {isOwnMessage ? (
+          <View style={styles.audioAvatarContainer}>
+            <View style={[styles.audioAvatar, { backgroundColor: "#128C7E" }]}>
+              <Feather name="mic" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        ) : null}
       </View>
-      <ThemedText style={[
-        styles.messageTime,
-        { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
-      ]}>
-        {formatTime(message.timestamp)}
-      </ThemedText>
+      
+      {hasPlayed || isPlaying ? (
+        <Pressable onPress={cyclePlaybackSpeed} style={styles.playbackSpeedButton}>
+          <ThemedText style={[
+            styles.playbackSpeedText,
+            { color: isOwnMessage ? "#FFFFFF" : "#00A884" }
+          ]}>
+            {playbackSpeed}x
+          </ThemedText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -746,6 +865,8 @@ export default function ChatScreen() {
   const [showPayment, setShowPayment] = useState(false);
   const [showAttachments, setShowAttachments] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
+  const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
+  const [chatBackground, setChatBackgroundState] = useState<ChatBackground | null>(null);
   const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [sending, setSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -762,21 +883,28 @@ export default function ChatScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <HeaderButton onPress={() => setShowPayment(true)}>
-          <Feather name="dollar-sign" size={20} color={theme.primary} />
-        </HeaderButton>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <HeaderButton onPress={() => setShowBackgroundPicker(true)}>
+            <Feather name="image" size={20} color={theme.primary} />
+          </HeaderButton>
+          <HeaderButton onPress={() => setShowPayment(true)}>
+            <Feather name="dollar-sign" size={20} color={theme.primary} />
+          </HeaderButton>
+        </View>
       ),
     });
   }, [navigation, theme]);
 
   const loadData = useCallback(async () => {
-    const [loadedMessages, loadedChats] = await Promise.all([
+    const [loadedMessages, loadedChats, loadedBackground] = await Promise.all([
       getMessages(chatId),
       getChats(),
+      getChatBackground(chatId),
     ]);
     setMessages(loadedMessages.sort((a, b) => b.timestamp - a.timestamp));
     const currentChat = loadedChats.find(c => c.id === chatId);
     if (currentChat) setChat(currentChat);
+    if (loadedBackground) setChatBackgroundState(loadedBackground);
     
     // Fetch wallet and token balances
     if (user?.id) {
@@ -1265,27 +1393,46 @@ export default function ChatScreen() {
     setMessages(prev => [message, ...prev]);
   };
 
+  const handleSelectBackground = async (background: ChatBackground) => {
+    setChatBackgroundState(background);
+    await setChatBackground(chatId, background);
+    setShowBackgroundPicker(false);
+  };
+
   const participant = chat?.participants[0];
+
+  const backgroundStyle = chatBackground?.value && chatBackground.value !== "transparent" 
+    ? { backgroundColor: chatBackground.value }
+    : {};
 
   return (
     <ThemedView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={headerHeight}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MessageBubble message={item} isOwnMessage={item.senderId === "me"} />
-          )}
-          inverted
-          contentContainerStyle={styles.messagesList}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
+      <View style={[styles.chatBackground, backgroundStyle]}>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={headerHeight}
+        >
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => {
+              const prevMessage = index > 0 ? messages[index - 1] : null;
+              const showDateSeparator = !prevMessage || !isSameDay(item.timestamp, prevMessage.timestamp);
+              
+              return (
+                <>
+                  {showDateSeparator ? <DateSeparator timestamp={item.timestamp} /> : null}
+                  <MessageBubble message={item} isOwnMessage={item.senderId === "me"} />
+                </>
+              );
+            }}
+            inverted
+            contentContainerStyle={styles.messagesList}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          />
         
         {isRecording ? (
           <View style={[
@@ -1392,7 +1539,8 @@ export default function ChatScreen() {
             </Pressable>
           </View>
         )}
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
 
       {participant ? (
         <PaymentModal
@@ -1418,6 +1566,55 @@ export default function ChatScreen() {
         onSelectContact={handleSelectContact}
         contacts={deviceContacts}
       />
+
+      <Modal
+        visible={showBackgroundPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowBackgroundPicker(false)}
+      >
+        <Pressable 
+          style={styles.attachmentOverlay} 
+          onPress={() => setShowBackgroundPicker(false)}
+        >
+          <Pressable 
+            style={[styles.backgroundPickerContainer, { backgroundColor: theme.backgroundRoot }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.backgroundPickerHeader}>
+              <ThemedText style={styles.backgroundPickerTitle}>Chat Background</ThemedText>
+              <Pressable onPress={() => setShowBackgroundPicker(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            <View style={styles.backgroundPickerGrid}>
+              {PRESET_BACKGROUNDS.map((bg) => (
+                <Pressable
+                  key={bg.id}
+                  style={[
+                    styles.backgroundPickerItem,
+                    { backgroundColor: bg.value === "transparent" ? theme.backgroundRoot : bg.value },
+                    chatBackground?.value === bg.value && styles.backgroundPickerItemSelected,
+                  ]}
+                  onPress={() => handleSelectBackground({ type: bg.type, value: bg.value })}
+                >
+                  {bg.value === "transparent" ? (
+                    <Feather name="x-circle" size={24} color={theme.textSecondary} />
+                  ) : null}
+                  {chatBackground?.value === bg.value ? (
+                    <View style={styles.backgroundPickerCheck}>
+                      <Feather name="check" size={16} color="#FFFFFF" />
+                    </View>
+                  ) : null}
+                </Pressable>
+              ))}
+            </View>
+            <ThemedText style={[styles.backgroundPickerHint, { color: theme.textSecondary }]}>
+              Each chat can have its own unique background
+            </ThemedText>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ThemedView>
   );
 }
@@ -1426,8 +1623,73 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  chatBackground: {
+    flex: 1,
+  },
   keyboardAvoidingView: {
     flex: 1,
+  },
+  backgroundPickerContainer: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xl,
+  },
+  backgroundPickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  backgroundPickerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  backgroundPickerGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.md,
+  },
+  backgroundPickerItem: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backgroundPickerItemSelected: {
+    borderColor: "#00A884",
+  },
+  backgroundPickerCheck: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#00A884",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backgroundPickerHint: {
+    fontSize: 13,
+    marginTop: Spacing.lg,
+    textAlign: "center",
+  },
+  dateSeparatorContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+  },
+  dateSeparatorBubble: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: 8,
+  },
+  dateSeparatorText: {
+    fontSize: 12,
+    fontWeight: "500",
   },
   messagesList: {
     paddingHorizontal: Spacing.md,
@@ -1923,51 +2185,86 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   audioBubble: {
-    maxWidth: "75%",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.card,
+    maxWidth: "80%",
+    minWidth: 240,
+    padding: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: 12,
     marginBottom: Spacing.sm,
   },
-  audioContent: {
+  audioMainRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
+    gap: 8,
   },
-  audioPlayButton: {
+  audioAvatarContainer: {
+    position: "relative",
+  },
+  audioAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  audioWaveform: {
+  unplayedDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#00A884",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  audioPlayButtonWhatsApp: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  audioWaveformContainer: {
     flex: 1,
     gap: 4,
   },
-  audioProgressContainer: {
-    height: 4,
-    borderRadius: 2,
-    overflow: "hidden",
-    position: "relative",
+  audioWaveformBars: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    height: 28,
   },
-  audioProgressBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
+  audioWaveformBar: {
+    width: 3,
+    borderRadius: 1.5,
   },
-  audioProgressFill: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    bottom: 0,
-    borderRadius: 2,
+  audioMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  audioDuration: {
+  audioTimeDisplay: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  audioMetaRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  audioTimestamp: {
+    fontSize: 11,
+  },
+  playbackSpeedButton: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.1)",
+  },
+  playbackSpeedText: {
     fontSize: 12,
-    marginTop: 2,
+    fontWeight: "600",
   },
   recordingBar: {
     paddingHorizontal: Spacing.md,
