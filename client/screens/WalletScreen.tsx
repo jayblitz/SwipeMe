@@ -6,7 +6,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 
-const TEMPO_FAUCET_URL = "https://faucet.tempo.world";
+const TEMPO_FAUCET_URL = "https://docs.tempo.xyz/quickstart/faucet?tab=Fund+an+address#faucet";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";

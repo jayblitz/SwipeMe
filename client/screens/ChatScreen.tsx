@@ -346,6 +346,7 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [selectedTokenIndex, setSelectedTokenIndex] = useState(0);
+  const [showAssetSelector, setShowAssetSelector] = useState(false);
   
   const selectedBalance = tokenBalances[selectedTokenIndex] || { token: TEMPO_TOKENS[0], balanceUsd: 0 };
   const totalBalance = getTotalBalance(tokenBalances);
@@ -409,37 +410,90 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
             </View>
           </View>
 
-          <ThemedText style={[styles.tokenSelectorLabel, { color: theme.textSecondary }]}>
-            Select Token
-          </ThemedText>
-          <View style={styles.tokenSelector}>
-            {tokenBalances.map((tb, index) => (
-              <Pressable
-                key={tb.token.symbol}
-                style={[
-                  styles.tokenOption,
-                  { 
-                    backgroundColor: selectedTokenIndex === index ? tb.token.color : theme.backgroundDefault,
-                    borderColor: tb.token.color,
-                  }
-                ]}
-                onPress={() => setSelectedTokenIndex(index)}
+          <Pressable 
+            onPress={() => setShowAssetSelector(true)}
+            style={[
+              styles.assetSelectorButton, 
+              { 
+                backgroundColor: theme.backgroundDefault, 
+                borderColor: selectedBalance.token.color,
+              }
+            ]}
+          >
+            <View style={styles.assetSelectorLeft}>
+              <View style={[styles.assetSelectorIcon, { backgroundColor: selectedBalance.token.color }]}>
+                <ThemedText style={styles.assetSelectorIconText}>
+                  {selectedBalance.token.symbol.charAt(0)}
+                </ThemedText>
+              </View>
+              <View>
+                <ThemedText style={styles.assetSelectorSymbol}>{selectedBalance.token.symbol}</ThemedText>
+                <ThemedText style={[styles.assetSelectorBalance, { color: theme.textSecondary }]}>
+                  Balance: ${selectedBalance.balanceUsd.toFixed(2)}
+                </ThemedText>
+              </View>
+            </View>
+            <Feather name="chevron-down" size={20} color={theme.textSecondary} />
+          </Pressable>
+
+          <Modal
+            visible={showAssetSelector}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowAssetSelector(false)}
+          >
+            <Pressable 
+              style={styles.assetSelectorOverlay} 
+              onPress={() => setShowAssetSelector(false)}
+            >
+              <Pressable 
+                style={[styles.assetSelectorSheet, { backgroundColor: theme.backgroundRoot }]}
+                onPress={(e) => e.stopPropagation()}
               >
-                <ThemedText style={[
-                  styles.tokenOptionText,
-                  { color: selectedTokenIndex === index ? "#FFFFFF" : theme.text }
-                ]}>
-                  {tb.token.symbol}
-                </ThemedText>
-                <ThemedText style={[
-                  styles.tokenBalance,
-                  { color: selectedTokenIndex === index ? "rgba(255,255,255,0.8)" : theme.textSecondary }
-                ]}>
-                  ${tb.balanceUsd.toFixed(2)}
-                </ThemedText>
+                <View style={styles.assetSelectorHeader}>
+                  <ThemedText type="h4">Select Asset</ThemedText>
+                  <Pressable onPress={() => setShowAssetSelector(false)}>
+                    <Feather name="x" size={24} color={theme.text} />
+                  </Pressable>
+                </View>
+                {tokenBalances.map((tb, index) => (
+                  <Pressable
+                    key={tb.token.symbol}
+                    style={[
+                      styles.assetSelectorItem,
+                      selectedTokenIndex === index && { backgroundColor: theme.backgroundSecondary },
+                      index < tokenBalances.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
+                    ]}
+                    onPress={() => {
+                      setSelectedTokenIndex(index);
+                      setShowAssetSelector(false);
+                    }}
+                  >
+                    <View style={[styles.assetSelectorItemIcon, { backgroundColor: tb.token.color }]}>
+                      <ThemedText style={styles.assetSelectorIconText}>
+                        {tb.token.symbol.charAt(0)}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.assetSelectorItemInfo}>
+                      <ThemedText style={styles.assetSelectorItemSymbol}>{tb.token.symbol}</ThemedText>
+                      <ThemedText style={[styles.assetSelectorItemName, { color: theme.textSecondary }]}>
+                        {tb.token.name}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.assetSelectorItemBalance}>
+                      <ThemedText style={styles.assetSelectorItemUsd}>${tb.balanceUsd.toFixed(2)}</ThemedText>
+                      <ThemedText style={[styles.assetSelectorItemTokens, { color: theme.textSecondary }]}>
+                        {parseFloat(tb.balanceFormatted).toLocaleString()}
+                      </ThemedText>
+                    </View>
+                    {selectedTokenIndex === index ? (
+                      <Feather name="check" size={20} color={theme.primary} style={{ marginLeft: Spacing.sm }} />
+                    ) : null}
+                  </Pressable>
+                ))}
               </Pressable>
-            ))}
-          </View>
+            </Pressable>
+          </Modal>
 
           <View style={styles.amountContainer}>
             <ThemedText style={styles.currencySymbol}>$</ThemedText>
@@ -463,15 +517,6 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
               value={memo}
               onChangeText={setMemo}
             />
-          </View>
-
-          <View style={styles.balanceRow}>
-            <ThemedText style={{ color: theme.textSecondary }}>
-              {selectedBalance.token.symbol} balance:
-            </ThemedText>
-            <ThemedText style={{ fontWeight: "600" }}>
-              ${selectedBalance.balanceUsd.toFixed(2)}
-            </ThemedText>
           </View>
 
           <Button 
@@ -635,6 +680,10 @@ export default function ChatScreen() {
     const newMessage = await sendMessage(chatId, inputText.trim());
     setMessages(prev => [newMessage, ...prev]);
     setInputText("");
+  };
+
+  const handleMicrophonePress = () => {
+    Alert.alert("Voice Message", "Voice message recording is coming soon.");
   };
 
   const handleSendPayment = async (amount: number, memo: string, selectedToken: TempoToken) => {
@@ -1021,8 +1070,7 @@ export default function ChatScreen() {
           </View>
           
           <Pressable 
-            onPress={handleSend}
-            disabled={!inputText.trim()}
+            onPress={inputText.trim() ? handleSend : handleMicrophonePress}
             style={[
               styles.sendButton,
               { 
@@ -1031,9 +1079,9 @@ export default function ChatScreen() {
             ]}
           >
             <Feather 
-              name="send" 
-              size={18} 
-              color={inputText.trim() ? "#FFFFFF" : theme.textSecondary} 
+              name={inputText.trim() ? "send" : "mic"} 
+              size={inputText.trim() ? 18 : 20} 
+              color={inputText.trim() ? "#FFFFFF" : theme.text} 
             />
           </Pressable>
         </View>
@@ -1476,6 +1524,95 @@ const styles = StyleSheet.create({
   },
   contactPickerDetail: {
     fontSize: 14,
+    marginTop: 2,
+  },
+  assetSelectorButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 2,
+    marginBottom: Spacing.lg,
+  },
+  assetSelectorLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  assetSelectorIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  assetSelectorIconText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  assetSelectorSymbol: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  assetSelectorBalance: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  assetSelectorOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.lg,
+  },
+  assetSelectorSheet: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+  },
+  assetSelectorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.md,
+  },
+  assetSelectorItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+  },
+  assetSelectorItemIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+  assetSelectorItemInfo: {
+    flex: 1,
+  },
+  assetSelectorItemSymbol: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  assetSelectorItemName: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  assetSelectorItemBalance: {
+    alignItems: "flex-end",
+  },
+  assetSelectorItemUsd: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  assetSelectorItemTokens: {
+    fontSize: 12,
     marginTop: 2,
   },
 });
