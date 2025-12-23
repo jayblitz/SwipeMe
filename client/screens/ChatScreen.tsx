@@ -18,7 +18,7 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, Message, Chat } from "@/lib/storage";
+import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, Message, Chat, getContactWalletAddress } from "@/lib/storage";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
 import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
@@ -626,8 +626,11 @@ export default function ChatScreen() {
     try {
       const participant = chat.participants[0];
       
+      // Get wallet address from source of truth first, fall back to cached data
+      const recipientWalletAddress = getContactWalletAddress(participant.id) || participant.walletAddress;
+      
       // For MVP, we need the recipient's wallet address
-      if (!participant.walletAddress) {
+      if (!recipientWalletAddress) {
         Alert.alert(
           "Recipient Wallet Required",
           "The recipient hasn't set up their wallet yet. They need to create a wallet in the app to receive payments."
@@ -644,7 +647,7 @@ export default function ChatScreen() {
         credentials: "include",
         body: JSON.stringify({
           tokenAddress: selectedToken.address,
-          toAddress: participant.walletAddress,
+          toAddress: recipientWalletAddress,
           amount: amount.toString(),
           decimals: selectedToken.decimals,
         }),

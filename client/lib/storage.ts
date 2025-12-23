@@ -5,6 +5,8 @@ const MESSAGES_KEY = "@tempochat_messages";
 const TRANSACTIONS_KEY = "@tempochat_transactions";
 const BALANCE_KEY = "@tempochat_balance";
 const CONTACTS_KEY = "@tempochat_contacts";
+const STORAGE_VERSION_KEY = "@tempochat_storage_version";
+const CURRENT_STORAGE_VERSION = "2";
 
 export interface Contact {
   id: string;
@@ -140,8 +142,26 @@ const defaultTransactions: Transaction[] = [
   { id: "t3", type: "deposit", amount: 100.00, memo: "Added funds via card", timestamp: Date.now() - 1000 * 60 * 60 * 24, status: "completed" },
 ];
 
+export function getContactWalletAddress(contactId: string): string | null {
+  const contact = defaultContacts.find(c => c.id === contactId);
+  return contact?.walletAddress || null;
+}
+
 export async function initializeStorage(): Promise<void> {
   try {
+    const storedVersion = await AsyncStorage.getItem(STORAGE_VERSION_KEY);
+    
+    if (storedVersion !== CURRENT_STORAGE_VERSION) {
+      await AsyncStorage.multiRemove([
+        CHATS_KEY,
+        MESSAGES_KEY,
+        TRANSACTIONS_KEY,
+        BALANCE_KEY,
+        CONTACTS_KEY,
+      ]);
+      await AsyncStorage.setItem(STORAGE_VERSION_KEY, CURRENT_STORAGE_VERSION);
+    }
+    
     const existingChats = await AsyncStorage.getItem(CHATS_KEY);
     if (!existingChats) {
       await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(defaultChats));
@@ -149,22 +169,6 @@ export async function initializeStorage(): Promise<void> {
       await AsyncStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(defaultTransactions));
       await AsyncStorage.setItem(BALANCE_KEY, JSON.stringify(110.00));
       await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(defaultContacts));
-    } else {
-      const chats: Chat[] = JSON.parse(existingChats);
-      let updated = false;
-      for (const chat of chats) {
-        for (const participant of chat.participants) {
-          const defaultContact = defaultContacts.find(c => c.id === participant.id);
-          if (defaultContact && participant.walletAddress !== defaultContact.walletAddress) {
-            participant.walletAddress = defaultContact.walletAddress;
-            updated = true;
-          }
-        }
-      }
-      if (updated) {
-        await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
-        await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(defaultContacts));
-      }
     }
   } catch (error) {
     console.error("Failed to initialize storage:", error);
