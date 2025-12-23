@@ -50,10 +50,7 @@ function AttachmentsModal({ visible, onClose, onSelectOption }: AttachmentsModal
   const insets = useSafeAreaInsets();
 
   const handleOptionPress = (optionId: string) => {
-    onClose();
-    setTimeout(() => {
-      onSelectOption(optionId);
-    }, 300);
+    onSelectOption(optionId);
   };
 
   return (
@@ -1266,8 +1263,9 @@ export default function ChatScreen() {
   };
 
   const handleAttachmentOption = async (optionId: string) => {
+    setShowAttachments(false);
     switch (optionId) {
-      case "photos":
+      case "photos": {
         const hasMediaPermission = await requestMediaLibraryPermission();
         if (!hasMediaPermission) return;
         
@@ -1287,7 +1285,8 @@ export default function ChatScreen() {
           setMessages(prev => [message, ...prev]);
         }
         break;
-      case "camera":
+      }
+      case "camera": {
         const hasCameraPermission = await requestCameraPermission();
         if (!hasCameraPermission) return;
         
@@ -1306,7 +1305,8 @@ export default function ChatScreen() {
           setMessages(prev => [message, ...prev]);
         }
         break;
-      case "location":
+      }
+      case "location": {
         if (Platform.OS === "web") {
           Alert.alert("Not Available", "Run in Expo Go to use this feature");
           return;
@@ -1337,7 +1337,8 @@ export default function ChatScreen() {
           Alert.alert("Error", "Failed to get your location");
         }
         break;
-      case "contact":
+      }
+      case "contact": {
         if (Platform.OS === "web") {
           Alert.alert("Not Available", "Run in Expo Go to use this feature");
           return;
@@ -1370,7 +1371,8 @@ export default function ChatScreen() {
           Alert.alert("Error", "Failed to access contacts");
         }
         break;
-      case "document":
+      }
+      case "document": {
         try {
           const result = await DocumentPicker.getDocumentAsync({
             type: "*/*",
@@ -1393,6 +1395,7 @@ export default function ChatScreen() {
           Alert.alert("Error", "Failed to select document");
         }
         break;
+      }
     }
   };
 
