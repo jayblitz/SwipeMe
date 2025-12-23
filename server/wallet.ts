@@ -157,6 +157,19 @@ export function createWalletClientForAccount(privateKeyOrMnemonic: string) {
   });
 }
 
+export async function signMessage(privateKeyOrMnemonic: string, message: string): Promise<string> {
+  let account;
+  
+  if (privateKeyOrMnemonic.startsWith("0x")) {
+    account = privateKeyToAccount(privateKeyOrMnemonic as `0x${string}`);
+  } else {
+    account = mnemonicToAccount(privateKeyOrMnemonic);
+  }
+  
+  const signature = await account.signMessage({ message });
+  return signature;
+}
+
 const ERC20_TRANSFER_ABI = [
   {
     inputs: [

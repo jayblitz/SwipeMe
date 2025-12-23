@@ -16,6 +16,7 @@ import {
   tempoTestnet,
   createWalletClientForAccount,
   transferERC20Token,
+  signMessage,
   type TransferParams
 } from "./wallet";
 
@@ -504,6 +505,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: error.message });
       }
       res.status(500).json({ error: "Transaction failed" });
+    }
+  });
+
+  // Sign a message for XMTP authentication (server-side signing keeps private key secure)
+  app.post("/api/wallet/:userId/sign", requireSameUser, async (req: Request, res: Response) => {
+    try {
+      const { message } = req.body;
+      
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "Message is required" });
+      }
+      
+      const wallet = await storage.getWalletByUserId(req.params.userId);
+      if (!wallet) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      
+      // Get the private key or seed phrase to sign the message
+      let signingKey: string;
+      if (wallet.encryptedPrivateKey) {
+        signingKey = decryptSensitiveData(wallet.encryptedPrivateKey);
+      } else if (wallet.encryptedSeedPhrase) {
+        signingKey = decryptSensitiveData(wallet.encryptedSeedPhrase);
+      } else {
+        return res.status(400).json({ error: "No signing key available for this wallet" });
+      }
+      
+      const signature = await signMessage(signingKey, message);
+      
+      res.json({
+        success: true,
+        signature,
+      });
+    } catch (error) {
+      console.error("Sign message error:", error);
+      if (error instanceof Error) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to sign message" });
     }
   });
 

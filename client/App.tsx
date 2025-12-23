@@ -12,6 +12,7 @@ import { queryClient } from "@/lib/query-client";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { XMTPProvider } from "@/contexts/XMTPContext";
 import { ThemeProvider } from "@/hooks/useTheme";
 
 export default function App() {
@@ -19,18 +20,20 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <ThemeProvider>
-            <SafeAreaProvider>
-              <GestureHandlerRootView style={styles.root}>
-                <KeyboardProvider>
-                  <NavigationContainer>
-                    <RootStackNavigator />
-                  </NavigationContainer>
-                  <StatusBar style="auto" />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </SafeAreaProvider>
-          </ThemeProvider>
+          <XMTPProvider>
+            <ThemeProvider>
+              <SafeAreaProvider>
+                <GestureHandlerRootView style={styles.root}>
+                  <KeyboardProvider>
+                    <NavigationContainer>
+                      <RootStackNavigator />
+                    </NavigationContainer>
+                    <StatusBar style="auto" />
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </SafeAreaProvider>
+            </ThemeProvider>
+          </XMTPProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
