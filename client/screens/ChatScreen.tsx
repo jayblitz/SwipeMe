@@ -792,6 +792,18 @@ export default function ChatScreen() {
     }, [loadData])
   );
 
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (audioRecorder.isRecording) {
+        audioRecorder.stop();
+      }
+    };
+  }, []);
+
   const handleSend = async () => {
     if (!inputText.trim()) return;
     
@@ -815,7 +827,18 @@ export default function ChatScreen() {
             "Please enable microphone access in your device settings to record voice messages.",
             [
               { text: "Cancel", style: "cancel" },
-              { text: "Open Settings", onPress: () => Linking.openSettings() }
+              { 
+                text: "Open Settings", 
+                onPress: async () => {
+                  if (Platform.OS !== "web") {
+                    try {
+                      await Linking.openSettings();
+                    } catch (e) {
+                      // Settings not available
+                    }
+                  }
+                }
+              }
             ]
           );
         } else {
@@ -858,7 +881,8 @@ export default function ChatScreen() {
     setRecordingTime(0);
     
     try {
-      audioRecorder.stop();
+      await audioRecorder.stop();
+      await new Promise(resolve => setTimeout(resolve, 100));
       const uri = audioRecorder.uri;
       if (uri) {
         const newMessage = await sendAudioMessage(chatId, uri, duration);
