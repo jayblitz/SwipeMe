@@ -82,7 +82,7 @@ export interface Transaction {
 
 const defaultContacts: Contact[] = [
   { id: "c1", name: "Alex Chen", avatarId: "teal", walletAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f5bE21", phone: "+1 555-0101" },
-  { id: "c2", name: "Sarah Kim", avatarId: "coral", walletAddress: "0x8ba1f109551bD432803012645Ac136ddd64DBA72", phone: "+1 555-0102" },
+  { id: "c2", name: "Sarah Kim", avatarId: "coral", walletAddress: "0x7Af7924ff5f418DB293A4452062757BB4510A9dc", phone: "+1 555-0102" },
   { id: "c3", name: "Mike Johnson", avatarId: "purple", walletAddress: "0x2932b7A2355D6fecc4b5c0B6BD44cC31df247a2e", phone: "+1 555-0103" },
   { id: "c4", name: "Emma Davis", avatarId: "amber", walletAddress: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", phone: "+1 555-0104" },
   { id: "c5", name: "James Wilson", avatarId: "ocean", walletAddress: "0xFABB0ac9d68B0B445fB7357272Ff202C5651694a", phone: "+1 555-0105" },
@@ -149,6 +149,22 @@ export async function initializeStorage(): Promise<void> {
       await AsyncStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(defaultTransactions));
       await AsyncStorage.setItem(BALANCE_KEY, JSON.stringify(110.00));
       await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(defaultContacts));
+    } else {
+      const chats: Chat[] = JSON.parse(existingChats);
+      let updated = false;
+      for (const chat of chats) {
+        for (const participant of chat.participants) {
+          const defaultContact = defaultContacts.find(c => c.id === participant.id);
+          if (defaultContact && participant.walletAddress !== defaultContact.walletAddress) {
+            participant.walletAddress = defaultContact.walletAddress;
+            updated = true;
+          }
+        }
+      }
+      if (updated) {
+        await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+        await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(defaultContacts));
+      }
     }
   } catch (error) {
     console.error("Failed to initialize storage:", error);
