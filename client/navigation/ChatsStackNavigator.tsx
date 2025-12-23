@@ -10,7 +10,7 @@ import { useTheme } from "@/hooks/useTheme";
 
 export type ChatsStackParamList = {
   ChatsList: undefined;
-  Chat: { chatId: string; name: string };
+  Chat: { chatId: string; name: string; peerAddress?: string };
 };
 
 const Stack = createNativeStackNavigator<ChatsStackParamList>();

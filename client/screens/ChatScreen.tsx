@@ -23,6 +23,8 @@ import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, sendAudio
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
 import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
+import { useXMTP } from "@/contexts/XMTPContext";
+import { findOrCreateDm, sendXMTPMessage, getMessages as getXMTPMessages, type XMTPConversation } from "@/lib/xmtp";
 
 interface AttachmentOption {
   id: string;
@@ -861,7 +863,10 @@ export default function ChatScreen() {
   const { user } = useAuth();
   const route = useRoute<RouteProp<ChatsStackParamList, "Chat">>();
   const navigation = useNavigation<NativeStackNavigationProp<ChatsStackParamList>>();
-  const { chatId, name } = route.params;
+  const { chatId, name, peerAddress } = route.params;
+  const { client, isSupported } = useXMTP();
+  const [xmtpDm, setXmtpDm] = useState<XMTPConversation | null>(null);
+  const useXMTPMode = Platform.OS !== "web" && isSupported && client && peerAddress;
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
@@ -899,17 +904,41 @@ export default function ChatScreen() {
   }, [navigation, theme]);
 
   const loadData = useCallback(async () => {
-    const [loadedMessages, loadedChats, loadedBackground] = await Promise.all([
-      getMessages(chatId),
-      getChats(),
-      getChatBackground(chatId),
-    ]);
-    setMessages(loadedMessages.sort((a, b) => b.timestamp - a.timestamp));
-    const currentChat = loadedChats.find(c => c.id === chatId);
-    if (currentChat) setChat(currentChat);
+    const loadedBackground = await getChatBackground(chatId);
     if (loadedBackground) setChatBackgroundState(loadedBackground);
     
-    // Fetch wallet and token balances
+    if (useXMTPMode && peerAddress) {
+      try {
+        const convInfo = await findOrCreateDm(peerAddress);
+        setXmtpDm(convInfo.dm);
+        
+        const xmtpMessages = await getXMTPMessages(convInfo.dm);
+        const convertedMessages: Message[] = xmtpMessages.map((msg, index) => {
+          const content = msg.content;
+          const contentStr = typeof content === "string" ? content : String(content || "");
+          return {
+            id: msg.id || `xmtp-${index}`,
+            chatId: chatId,
+            senderId: msg.senderInboxId === client?.inboxId ? "me" : (msg.senderInboxId || "unknown"),
+            content: contentStr,
+            timestamp: msg.sentNs ? Number(msg.sentNs) / 1000000 : Date.now(),
+            type: "text" as const,
+          };
+        });
+        setMessages(convertedMessages.sort((a, b) => b.timestamp - a.timestamp));
+      } catch (error) {
+        console.error("Failed to load XMTP messages:", error);
+      }
+    } else {
+      const [loadedMessages, loadedChats] = await Promise.all([
+        getMessages(chatId),
+        getChats(),
+      ]);
+      setMessages(loadedMessages.sort((a, b) => b.timestamp - a.timestamp));
+      const currentChat = loadedChats.find(c => c.id === chatId);
+      if (currentChat) setChat(currentChat);
+    }
+    
     if (user?.id) {
       try {
         const baseUrl = getApiUrl();
@@ -926,7 +955,7 @@ export default function ChatScreen() {
         console.error("Failed to fetch wallet/balances:", error);
       }
     }
-  }, [chatId, user?.id]);
+  }, [chatId, user?.id, useXMTPMode, peerAddress, client?.inboxId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -959,9 +988,30 @@ export default function ChatScreen() {
   const handleSend = async () => {
     if (!inputText.trim()) return;
     
-    const newMessage = await sendMessage(chatId, inputText.trim());
-    setMessages(prev => [newMessage, ...prev]);
+    const messageText = inputText.trim();
     setInputText("");
+    
+    if (useXMTPMode && xmtpDm) {
+      try {
+        await sendXMTPMessage(xmtpDm, messageText);
+        const newMessage: Message = {
+          id: `xmtp-${Date.now()}`,
+          chatId: chatId,
+          senderId: "me",
+          content: messageText,
+          timestamp: Date.now(),
+          type: "text",
+        };
+        setMessages(prev => [newMessage, ...prev]);
+      } catch (error) {
+        console.error("Failed to send XMTP message:", error);
+        Alert.alert("Error", "Failed to send message. Please try again.");
+        setInputText(messageText);
+      }
+    } else {
+      const newMessage = await sendMessage(chatId, messageText);
+      setMessages(prev => [newMessage, ...prev]);
+    }
   };
 
   const handleMicrophonePress = async () => {

@@ -1,10 +1,10 @@
-import { Client, Conversation, DecodedMessage, PublicIdentity, type Signer } from "@xmtp/react-native-sdk";
+import { Client, Dm, DecodedMessage, PublicIdentity, type Signer } from "@xmtp/react-native-sdk";
 import { Platform } from "react-native";
 import { apiRequest } from "./query-client";
 import * as SecureStore from "expo-secure-store";
 
 export type XMTPClient = Client;
-export type XMTPConversation = Conversation;
+export type XMTPConversation = Dm;
 export type XMTPMessage = DecodedMessage;
 
 const XMTP_DB_KEY_STORAGE = "xmtp_db_encryption_key";
@@ -82,30 +82,64 @@ export async function disconnectXMTP(): Promise<void> {
   xmtpClient = null;
 }
 
-export async function getConversations(): Promise<Conversation[]> {
+export interface ConversationInfo {
+  id: string;
+  peerInboxId: string;
+  peerAddress: string;
+  dm: Dm;
+}
+
+export async function getConversations(): Promise<ConversationInfo[]> {
   if (!xmtpClient) {
     throw new Error("XMTP client not initialized");
   }
 
-  const conversations = await xmtpClient.conversations.list();
-  return conversations;
+  const dms = await xmtpClient.conversations.listDms();
+  const conversationInfos: ConversationInfo[] = [];
+  
+  for (const dm of dms) {
+    const members = await dm.members();
+    const peerMember = members.find(m => m.inboxId !== xmtpClient?.inboxId);
+    
+    conversationInfos.push({
+      id: dm.id,
+      peerInboxId: peerMember?.inboxId || "",
+      peerAddress: peerMember?.addresses[0] || "",
+      dm,
+    });
+  }
+  
+  return conversationInfos;
 }
 
-export async function getOrCreateConversation(peerAddress: string): Promise<Conversation> {
+export async function findOrCreateDm(peerAddress: string): Promise<ConversationInfo> {
   if (!xmtpClient) {
     throw new Error("XMTP client not initialized");
   }
 
-  const conversation = await xmtpClient.conversations.newConversation(peerAddress);
-  return conversation;
+  const peerIdentity = new PublicIdentity(peerAddress as `0x${string}`, "ETHEREUM");
+  const peerInboxId = await xmtpClient.findInboxIdByIdentifier(peerIdentity);
+  
+  if (!peerInboxId) {
+    throw new Error("This address is not registered with XMTP");
+  }
+
+  const dm = await xmtpClient.conversations.findOrCreateDm(peerInboxId);
+  
+  return {
+    id: dm.id,
+    peerInboxId,
+    peerAddress,
+    dm,
+  };
 }
 
-export async function sendXMTPMessage(conversation: Conversation, content: string): Promise<void> {
-  await conversation.send(content);
+export async function sendXMTPMessage(dm: Dm, content: string): Promise<void> {
+  await dm.send(content);
 }
 
-export async function getMessages(conversation: Conversation): Promise<DecodedMessage[]> {
-  const messages = await conversation.messages();
+export async function getMessages(dm: Dm): Promise<DecodedMessage[]> {
+  const messages = await dm.messages();
   return messages;
 }
 

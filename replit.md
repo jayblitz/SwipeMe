@@ -49,17 +49,31 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - Per-chat custom backgrounds (8 preset colors, stored per chatId in AsyncStorage)
 - Date separators between message groups (Today, Yesterday, weekday, or full date)
 
+**MVP Phase 4 Complete (XMTP Integration):**
+- XMTP React Native SDK v3 integration for end-to-end encrypted messaging
+- Secure remote signing architecture - private keys remain encrypted on server
+- Server-side signing endpoint (/api/wallet/:userId/sign) for XMTP authentication
+- XMTPContext provider for client state management
+- ChatsScreen lists real XMTP DM conversations on native platforms
+- ChatScreen sends/receives XMTP messages on native platforms
+- Web platform gracefully falls back to mock data (XMTP requires native modules)
+- Android development build configured via EAS (APK downloadable from Expo dashboard)
+- XMTP dev environment with dbEncryptionKey stored securely in SecureStore
+
 **MVP Limitations (Production Improvements Needed):**
-- No XMTP integration yet (messages use local mock data) - deferred due to native SDK requirements
+- XMTP messaging only works on native (Android/iOS development builds), web uses mock data
+- No real-time message streaming yet (requires manual refresh to see new messages)
+- Voice messages and attachments not yet integrated with XMTP (text messages only)
 - Gas sponsored transactions not yet implemented (users need TEMPO for gas, but can use faucet)
-- Voice message playback works on native devices (Expo Go) but has issues on web - requires native audio handling
+- Voice message playback works on native devices but has issues on web
 
 **Planned Features (Future):**
-- XMTP SDK integration for E2E encrypted messaging (requires development build, not Expo Go)
+- XMTP message streaming for real-time updates
+- XMTP content types for payments, voice messages, and attachments
 - Gas-sponsored meta-transactions
 - Ramp SDK for fiat on-ramp
 
-**Note:** Privy integration was removed due to SDK incompatibility with Expo Go (native SDK requires development build, JS SDK Core has "Invalid nativeAppID" errors in WebView context). Wallet creation now uses local viem-based wallet generation.
+**Note:** Privy integration was removed due to SDK incompatibility with Expo Go. Wallet creation now uses local viem-based wallet generation.
 
 ## Project Architecture
 
@@ -67,7 +81,8 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 client/                     # Expo/React Native frontend
 ├── App.tsx                 # Root app component with providers
 ├── contexts/
-│   └── AuthContext.tsx     # Authentication state management (signup, login, user updates)
+│   ├── AuthContext.tsx     # Authentication state management (signup, login, user updates)
+│   └── XMTPContext.tsx     # XMTP client state management and initialization
 ├── screens/
 │   ├── AuthScreen.tsx      # Multi-step login/signup with email verification
 │   ├── ChatsScreen.tsx     # Chat list with search
@@ -88,7 +103,8 @@ client/                     # Expo/React Native frontend
 ├── lib/
 │   ├── storage.ts          # AsyncStorage data layer (mock data for chats/transactions)
 │   ├── query-client.ts     # React Query setup + API helpers
-│   └── tempo-tokens.ts     # Tempo testnet token configs + balance fetching via viem
+│   ├── tempo-tokens.ts     # Tempo testnet token configs + balance fetching via viem
+│   └── xmtp.ts             # XMTP client utilities with remote signer and DM management
 ├── constants/
 │   └── theme.ts            # Design tokens, colors, shadows
 ├── hooks/
@@ -139,6 +155,7 @@ shared/
 - DELETE /api/wallet/:userId - Delete wallet (can be recovered via import)
 - GET /api/wallet/:userId/recovery - Get encrypted recovery phrase
 - POST /api/wallet/:userId/transfer - Execute ERC20 token transfer (server-side signing)
+- POST /api/wallet/:userId/sign - Sign message for XMTP authentication (server-side signing)
 
 ## Design System
 
