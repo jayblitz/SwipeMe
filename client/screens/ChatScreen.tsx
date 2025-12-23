@@ -16,8 +16,11 @@ import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, getBalance, Message, Chat } from "@/lib/storage";
+import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, Message, Chat } from "@/lib/storage";
+import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
+import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 
 interface AttachmentOption {
@@ -326,18 +329,22 @@ function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
 interface PaymentModalProps {
   visible: boolean;
   onClose: () => void;
-  onSend: (amount: number, memo: string) => void;
+  onSend: (amount: number, memo: string, selectedToken: TempoToken) => void;
   recipientName: string;
   recipientAvatar: string;
-  balance: number;
+  tokenBalances: TokenBalance[];
   sending: boolean;
 }
 
-function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar, balance, sending }: PaymentModalProps) {
+function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar, tokenBalances, sending }: PaymentModalProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
+  const [selectedTokenIndex, setSelectedTokenIndex] = useState(0);
+  
+  const selectedBalance = tokenBalances[selectedTokenIndex] || { token: TEMPO_TOKENS[0], balanceUsd: 0 };
+  const totalBalance = getTotalBalance(tokenBalances);
 
   const handleSend = () => {
     const numAmount = parseFloat(amount);
@@ -345,11 +352,11 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
       Alert.alert("Error", "Please enter a valid amount");
       return;
     }
-    if (numAmount > balance) {
-      Alert.alert("Error", "Insufficient balance");
+    if (numAmount > selectedBalance.balanceUsd) {
+      Alert.alert("Error", `Insufficient ${selectedBalance.token.symbol} balance`);
       return;
     }
-    onSend(numAmount, memo);
+    onSend(numAmount, memo, selectedBalance.token);
     setAmount("");
     setMemo("");
   };
@@ -384,6 +391,38 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
             </View>
           </View>
 
+          <ThemedText style={[styles.tokenSelectorLabel, { color: theme.textSecondary }]}>
+            Select Token
+          </ThemedText>
+          <View style={styles.tokenSelector}>
+            {tokenBalances.map((tb, index) => (
+              <Pressable
+                key={tb.token.symbol}
+                style={[
+                  styles.tokenOption,
+                  { 
+                    backgroundColor: selectedTokenIndex === index ? tb.token.color : theme.backgroundDefault,
+                    borderColor: tb.token.color,
+                  }
+                ]}
+                onPress={() => setSelectedTokenIndex(index)}
+              >
+                <ThemedText style={[
+                  styles.tokenOptionText,
+                  { color: selectedTokenIndex === index ? "#FFFFFF" : theme.text }
+                ]}>
+                  {tb.token.symbol}
+                </ThemedText>
+                <ThemedText style={[
+                  styles.tokenBalance,
+                  { color: selectedTokenIndex === index ? "rgba(255,255,255,0.8)" : theme.textSecondary }
+                ]}>
+                  ${tb.balanceUsd.toFixed(2)}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+
           <View style={styles.amountContainer}>
             <ThemedText style={styles.currencySymbol}>$</ThemedText>
             <TextInput
@@ -409,8 +448,12 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
           </View>
 
           <View style={styles.balanceRow}>
-            <ThemedText style={{ color: theme.textSecondary }}>Available balance:</ThemedText>
-            <ThemedText style={{ fontWeight: "600" }}>${balance.toFixed(2)}</ThemedText>
+            <ThemedText style={{ color: theme.textSecondary }}>
+              {selectedBalance.token.symbol} balance:
+            </ThemedText>
+            <ThemedText style={{ fontWeight: "600" }}>
+              ${selectedBalance.balanceUsd.toFixed(2)}
+            </ThemedText>
           </View>
 
           <Button 
@@ -421,7 +464,7 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
             {sending ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              `Send ${amount ? `$${parseFloat(amount || "0").toFixed(2)}` : ""}`
+              `Send ${amount ? `$${parseFloat(amount || "0").toFixed(2)}` : ""} ${selectedBalance.token.symbol}`
             )}
           </Button>
         </KeyboardAwareScrollViewCompat>
@@ -505,6 +548,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { user } = useAuth();
   const route = useRoute<RouteProp<ChatsStackParamList, "Chat">>();
   const navigation = useNavigation<NativeStackNavigationProp<ChatsStackParamList>>();
   const { chatId, name } = route.params;
@@ -516,7 +560,10 @@ export default function ChatScreen() {
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [sending, setSending] = useState(false);
-  const [balance, setBalance] = useState(0);
+  const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>(
+    TEMPO_TOKENS.map(token => ({ token, balance: "0", balanceFormatted: "0", balanceUsd: 0 }))
+  );
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [chat, setChat] = useState<Chat | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
@@ -531,16 +578,32 @@ export default function ChatScreen() {
   }, [navigation, theme]);
 
   const loadData = useCallback(async () => {
-    const [loadedMessages, loadedBalance, loadedChats] = await Promise.all([
+    const [loadedMessages, loadedChats] = await Promise.all([
       getMessages(chatId),
-      getBalance(),
       getChats(),
     ]);
     setMessages(loadedMessages.sort((a, b) => b.timestamp - a.timestamp));
-    setBalance(loadedBalance);
     const currentChat = loadedChats.find(c => c.id === chatId);
     if (currentChat) setChat(currentChat);
-  }, [chatId]);
+    
+    // Fetch wallet and token balances
+    if (user?.id) {
+      try {
+        const baseUrl = getApiUrl();
+        const walletRes = await fetch(new URL(`/api/wallet/${user.id}`, baseUrl));
+        if (walletRes.ok) {
+          const walletData = await walletRes.json();
+          if (walletData.wallet?.address) {
+            setWalletAddress(walletData.wallet.address);
+            const balances = await fetchTokenBalances(walletData.wallet.address);
+            setTokenBalances(balances);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch wallet/balances:", error);
+      }
+    }
+  }, [chatId, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -556,25 +619,65 @@ export default function ChatScreen() {
     setInputText("");
   };
 
-  const handleSendPayment = async (amount: number, memo: string) => {
-    if (!chat) return;
+  const handleSendPayment = async (amount: number, memo: string, selectedToken: TempoToken) => {
+    if (!chat || !user?.id) return;
     setSending(true);
     
     try {
       const participant = chat.participants[0];
+      
+      // For MVP, we need the recipient's wallet address
+      if (!participant.walletAddress) {
+        Alert.alert(
+          "Recipient Wallet Required",
+          "The recipient hasn't set up their wallet yet. They need to create a wallet in the app to receive payments."
+        );
+        setSending(false);
+        return;
+      }
+      
+      // Call the transfer API using fetch directly for better error handling
+      const baseUrl = getApiUrl();
+      const response = await fetch(new URL(`/api/wallet/${user.id}/transfer`, baseUrl), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          tokenAddress: selectedToken.address,
+          toAddress: participant.walletAddress,
+          amount: amount.toString(),
+          decimals: selectedToken.decimals,
+        }),
+      });
+      
+      const txData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(txData.error || "Transfer failed");
+      }
+      
+      // Record the payment in chat
       const { message } = await sendPayment(
         chatId,
         amount,
-        memo || "Payment",
+        `${memo || "Payment"} (${selectedToken.symbol}) - TX: ${txData.txHash?.slice(0, 10)}...`,
         participant.id,
         participant.name,
         participant.avatarId
       );
       setMessages(prev => [message, ...prev]);
-      setBalance(prev => prev - amount);
+      
+      // Refresh balances
+      if (walletAddress) {
+        const balances = await fetchTokenBalances(walletAddress);
+        setTokenBalances(balances);
+      }
+      
       setShowPayment(false);
+      Alert.alert("Success", `Payment sent! View on explorer: ${txData.explorer}`);
     } catch (error) {
-      Alert.alert("Error", "Failed to send payment");
+      console.error("Payment error:", error);
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to send payment");
     } finally {
       setSending(false);
     }
@@ -900,7 +1003,7 @@ export default function ChatScreen() {
           onSend={handleSendPayment}
           recipientName={participant.name}
           recipientAvatar={participant.avatarId}
-          balance={balance}
+          tokenBalances={tokenBalances}
           sending={sending}
         />
       ) : null}
@@ -1160,6 +1263,34 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xl,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
+  },
+  tokenSelectorLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.lg,
+  },
+  tokenSelector: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  tokenOption: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  tokenOptionText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  tokenBalance: {
+    fontSize: 11,
+    marginTop: 2,
   },
   imageBubble: {
     maxWidth: "80%",

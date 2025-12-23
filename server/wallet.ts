@@ -4,6 +4,8 @@ import {
   http, 
   formatEther,
   parseEther,
+  parseUnits,
+  encodeFunctionData,
   type Chain,
   type Address
 } from "viem";
@@ -153,4 +155,46 @@ export function createWalletClientForAccount(privateKeyOrMnemonic: string) {
     chain: tempoTestnet,
     transport: http(),
   });
+}
+
+const ERC20_TRANSFER_ABI = [
+  {
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    name: "transfer",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+export interface TransferParams {
+  tokenAddress: Address;
+  toAddress: Address;
+  amount: string;
+  decimals: number;
+}
+
+export async function transferERC20Token(
+  walletClient: ReturnType<typeof createWalletClientForAccount>,
+  params: TransferParams
+): Promise<string> {
+  const { tokenAddress, toAddress, amount, decimals } = params;
+  
+  const amountInUnits = parseUnits(amount, decimals);
+  
+  const data = encodeFunctionData({
+    abi: ERC20_TRANSFER_ABI,
+    functionName: "transfer",
+    args: [toAddress, amountInUnits],
+  });
+  
+  const hash = await walletClient.sendTransaction({
+    to: tokenAddress,
+    data,
+  });
+  
+  return hash;
 }

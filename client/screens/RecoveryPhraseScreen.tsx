@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, Pressable, Alert, Platform, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Pressable, Alert, Platform, ActivityIndicator, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import * as LocalAuthentication from "expo-local-authentication";
@@ -139,7 +139,11 @@ export default function RecoveryPhraseScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={[styles.content, { paddingBottom: insets.bottom + Spacing.xl }]}>
+      <ScrollView 
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl }]}
+        showsVerticalScrollIndicator={true}
+        scrollIndicatorInsets={{ bottom: insets.bottom }}
+      >
         <View style={styles.header}>
           <View style={[styles.iconContainer, { backgroundColor: Colors.light.warningLight }]}>
             <Feather name="alert-triangle" size={32} color={Colors.light.warning} />
@@ -241,7 +245,7 @@ export default function RecoveryPhraseScreen() {
             </ThemedText>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -255,7 +259,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     padding: Spacing.lg,
   },
   loadingText: {

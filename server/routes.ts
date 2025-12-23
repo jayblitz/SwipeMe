@@ -13,7 +13,10 @@ import {
   encryptSensitiveData,
   decryptSensitiveData,
   getBalance,
-  tempoTestnet
+  tempoTestnet,
+  createWalletClientForAccount,
+  transferERC20Token,
+  type TransferParams
 } from "./wallet";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -407,6 +410,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get recovery phrase error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/wallet/:userId/transfer", async (req: Request, res: Response) => {
+    try {
+      const { tokenAddress, toAddress, amount, decimals } = req.body;
+      
+      if (!tokenAddress || !toAddress || !amount || decimals === undefined) {
+        return res.status(400).json({ error: "Missing required fields: tokenAddress, toAddress, amount, decimals" });
+      }
+      
+      const wallet = await storage.getWalletByUserId(req.params.userId);
+      if (!wallet) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      
+      // Get the private key or seed phrase to sign the transaction
+      let signingKey: string;
+      if (wallet.encryptedPrivateKey) {
+        signingKey = decryptSensitiveData(wallet.encryptedPrivateKey);
+      } else if (wallet.encryptedSeedPhrase) {
+        signingKey = decryptSensitiveData(wallet.encryptedSeedPhrase);
+      } else {
+        return res.status(400).json({ error: "No signing key available for this wallet" });
+      }
+      
+      // Create wallet client and send transaction
+      const walletClient = createWalletClientForAccount(signingKey);
+      
+      const txHash = await transferERC20Token(walletClient, {
+        tokenAddress,
+        toAddress,
+        amount,
+        decimals,
+      } as TransferParams);
+      
+      res.json({
+        success: true,
+        txHash,
+        explorer: `${tempoTestnet.blockExplorers?.default.url || "https://explorer.testnet.tempo.xyz"}/tx/${txHash}`,
+      });
+    } catch (error) {
+      console.error("Transfer error:", error);
+      if (error instanceof Error) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Transaction failed" });
     }
   });
 
