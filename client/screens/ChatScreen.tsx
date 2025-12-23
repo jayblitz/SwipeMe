@@ -9,6 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as Contacts from "expo-contacts";
 import * as DocumentPicker from "expo-document-picker";
+import { useAudioRecorder, AudioModule, RecordingPresets, useAudioPlayer } from "expo-audio";
 import { Image } from "expo-image";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -18,7 +19,7 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, Message, Chat, getContactWalletAddress } from "@/lib/storage";
+import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, sendAudioMessage, getChats, Message, Chat, getContactWalletAddress } from "@/lib/storage";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
 import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
@@ -99,6 +100,110 @@ function AttachmentsModal({ visible, onClose, onSelectOption }: AttachmentsModal
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp);
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+interface AudioMessageBubbleProps {
+  message: Message;
+  isOwnMessage: boolean;
+}
+
+function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) {
+  const { theme } = useTheme();
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const player = useAudioPlayer(message.audioAttachment?.uri || "");
+  
+  const duration = message.audioAttachment?.duration || 0;
+  const durationSeconds = Math.round(duration);
+  const durationFormatted = `${Math.floor(durationSeconds / 60)}:${(durationSeconds % 60).toString().padStart(2, '0')}`;
+  
+  useEffect(() => {
+    if (!player || !isPlaying) return;
+    
+    const interval = setInterval(() => {
+      if (player.currentTime !== undefined && player.duration) {
+        setProgress(player.currentTime / player.duration);
+        if (player.currentTime >= player.duration) {
+          setIsPlaying(false);
+          setProgress(0);
+        }
+      }
+    }, 100);
+    
+    return () => clearInterval(interval);
+  }, [player, isPlaying]);
+  
+  const handlePlayPause = async () => {
+    if (!player) return;
+    
+    if (isPlaying) {
+      player.pause();
+      setIsPlaying(false);
+    } else {
+      if (progress >= 0.99) {
+        player.seekTo(0);
+        setProgress(0);
+      }
+      player.play();
+      setIsPlaying(true);
+    }
+  };
+  
+  return (
+    <View style={[
+      styles.audioBubble,
+      { 
+        backgroundColor: isOwnMessage ? theme.sentMessage : theme.receivedMessage,
+        alignSelf: isOwnMessage ? "flex-end" : "flex-start",
+      }
+    ]}>
+      <View style={styles.audioContent}>
+        <Pressable 
+          onPress={handlePlayPause}
+          style={[styles.audioPlayButton, { backgroundColor: isOwnMessage ? "rgba(255,255,255,0.2)" : theme.backgroundSecondary }]}
+        >
+          <Feather 
+            name={isPlaying ? "pause" : "play"} 
+            size={20} 
+            color={isOwnMessage ? "#FFFFFF" : theme.primary} 
+          />
+        </Pressable>
+        <View style={styles.audioWaveform}>
+          <View style={styles.audioProgressContainer}>
+            <View 
+              style={[
+                styles.audioProgressBar, 
+                { 
+                  backgroundColor: isOwnMessage ? "rgba(255,255,255,0.3)" : theme.border 
+                }
+              ]} 
+            />
+            <View 
+              style={[
+                styles.audioProgressFill, 
+                { 
+                  width: `${progress * 100}%`,
+                  backgroundColor: isOwnMessage ? "#FFFFFF" : theme.primary 
+                }
+              ]} 
+            />
+          </View>
+          <ThemedText style={[
+            styles.audioDuration,
+            { color: isOwnMessage ? "rgba(255,255,255,0.8)" : theme.textSecondary }
+          ]}>
+            {durationFormatted}
+          </ThemedText>
+        </View>
+      </View>
+      <ThemedText style={[
+        styles.messageTime,
+        { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
+      ]}>
+        {formatTime(message.timestamp)}
+      </ThemedText>
+    </View>
+  );
 }
 
 interface MessageBubbleProps {
@@ -305,6 +410,15 @@ function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
           {formatTime(message.timestamp)}
         </ThemedText>
       </View>
+    );
+  }
+
+  if (message.type === "audio" && message.audioAttachment) {
+    return (
+      <AudioMessageBubble 
+        message={message} 
+        isOwnMessage={isOwnMessage} 
+      />
     );
   }
 
@@ -623,6 +737,10 @@ export default function ChatScreen() {
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [sending, setSending] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>(
     TEMPO_TOKENS.map(token => ({ token, balance: "0", balanceFormatted: "0", balanceUsd: 0 }))
   );
@@ -682,8 +800,80 @@ export default function ChatScreen() {
     setInputText("");
   };
 
-  const handleMicrophonePress = () => {
-    Alert.alert("Voice Message", "Voice message recording is coming soon.");
+  const handleMicrophonePress = async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Voice Messages", "Voice messages work best in the mobile app. Try using Expo Go to test this feature.");
+      return;
+    }
+    
+    try {
+      const hasPermission = await AudioModule.requestRecordingPermissionsAsync();
+      if (!hasPermission.granted) {
+        if (!hasPermission.canAskAgain) {
+          Alert.alert(
+            "Microphone Access Required",
+            "Please enable microphone access in your device settings to record voice messages.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Open Settings", onPress: () => Linking.openSettings() }
+            ]
+          );
+        } else {
+          Alert.alert("Permission Denied", "Microphone permission is required to record voice messages.");
+        }
+        return;
+      }
+      
+      setIsRecording(true);
+      setRecordingTime(0);
+      audioRecorder.record();
+      
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error("Recording error:", error);
+      Alert.alert("Error", "Failed to start recording. Please try again.");
+    }
+  };
+  
+  const handleCancelRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    audioRecorder.stop();
+    setIsRecording(false);
+    setRecordingTime(0);
+  };
+  
+  const handleSendRecording = async () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    
+    const duration = recordingTime;
+    setIsRecording(false);
+    setRecordingTime(0);
+    
+    try {
+      audioRecorder.stop();
+      const uri = audioRecorder.uri;
+      if (uri) {
+        const newMessage = await sendAudioMessage(chatId, uri, duration);
+        setMessages(prev => [newMessage, ...prev]);
+      }
+    } catch (error) {
+      console.error("Failed to save recording:", error);
+      Alert.alert("Error", "Failed to save voice message.");
+    }
+  };
+  
+  const formatRecordingTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleSendPayment = async (amount: number, memo: string, selectedToken: TempoToken) => {
@@ -1111,6 +1301,41 @@ export default function ChatScreen() {
         onSelectContact={handleSelectContact}
         contacts={deviceContacts}
       />
+
+      <Modal
+        visible={isRecording}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCancelRecording}
+      >
+        <View style={[styles.recordingOverlay, { backgroundColor: "rgba(0,0,0,0.7)" }]}>
+          <View style={[styles.recordingContainer, { backgroundColor: theme.backgroundRoot }]}>
+            <View style={[styles.recordingIndicator, { backgroundColor: "#FF3B30" }]}>
+              <Feather name="mic" size={36} color="#FFFFFF" />
+            </View>
+            <ThemedText style={styles.recordingTime}>
+              {formatRecordingTime(recordingTime)}
+            </ThemedText>
+            <ThemedText style={[styles.recordingLabel, { color: theme.textSecondary }]}>
+              Recording...
+            </ThemedText>
+            <View style={styles.recordingButtons}>
+              <Pressable 
+                onPress={handleCancelRecording}
+                style={[styles.recordingButton, { backgroundColor: theme.backgroundSecondary }]}
+              >
+                <Feather name="x" size={24} color={theme.error} />
+              </Pressable>
+              <Pressable 
+                onPress={handleSendRecording}
+                style={[styles.recordingButton, { backgroundColor: theme.primary }]}
+              >
+                <Feather name="send" size={24} color="#FFFFFF" />
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -1614,5 +1839,93 @@ const styles = StyleSheet.create({
   assetSelectorItemTokens: {
     fontSize: 12,
     marginTop: 2,
+  },
+  audioBubble: {
+    maxWidth: "75%",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.card,
+    marginBottom: Spacing.sm,
+  },
+  audioContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  audioPlayButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  audioWaveform: {
+    flex: 1,
+    gap: 4,
+  },
+  audioProgressContainer: {
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
+    position: "relative",
+  },
+  audioProgressBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
+  audioProgressFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
+  audioDuration: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  recordingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  recordingContainer: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  recordingIndicator: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recordingTime: {
+    fontSize: 24,
+    fontWeight: "600",
+  },
+  recordingLabel: {
+    fontSize: 14,
+  },
+  recordingButtons: {
+    flexDirection: "row",
+    gap: Spacing.lg,
+    marginTop: Spacing.md,
+  },
+  recordingButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

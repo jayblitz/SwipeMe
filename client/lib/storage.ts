@@ -26,7 +26,7 @@ export interface Chat {
   name?: string;
 }
 
-export type MessageType = "text" | "payment" | "image" | "location" | "contact" | "document";
+export type MessageType = "text" | "payment" | "image" | "location" | "contact" | "document" | "audio";
 
 export interface ImageAttachment {
   uri: string;
@@ -53,6 +53,11 @@ export interface DocumentAttachment {
   size?: number;
 }
 
+export interface AudioAttachment {
+  uri: string;
+  duration: number;
+}
+
 export interface Message {
   id: string;
   chatId: string;
@@ -67,6 +72,7 @@ export interface Message {
   locationAttachment?: LocationAttachment;
   contactAttachment?: ContactAttachment;
   documentAttachment?: DocumentAttachment;
+  audioAttachment?: AudioAttachment;
 }
 
 export interface Transaction {
@@ -295,6 +301,51 @@ export async function sendAttachmentMessage(
     }
   } catch (error) {
     console.error("Failed to send attachment message:", error);
+  }
+  
+  return newMessage;
+}
+
+export async function sendAudioMessage(
+  chatId: string,
+  audioUri: string,
+  duration: number,
+  senderId: string = "me"
+): Promise<Message> {
+  const durationSeconds = Math.round(duration);
+  const durationFormatted = `${Math.floor(durationSeconds / 60)}:${(durationSeconds % 60).toString().padStart(2, '0')}`;
+  
+  const newMessage: Message = {
+    id: `m${Date.now()}`,
+    chatId,
+    senderId,
+    content: `Voice message (${durationFormatted})`,
+    timestamp: Date.now(),
+    type: "audio",
+    audioAttachment: {
+      uri: audioUri,
+      duration,
+    },
+  };
+  
+  try {
+    const messages = await AsyncStorage.getItem(MESSAGES_KEY);
+    const allMessages = messages ? JSON.parse(messages) : {};
+    if (!allMessages[chatId]) {
+      allMessages[chatId] = [];
+    }
+    allMessages[chatId].push(newMessage);
+    await AsyncStorage.setItem(MESSAGES_KEY, JSON.stringify(allMessages));
+    
+    const chats = await getChats();
+    const chatIndex = chats.findIndex(c => c.id === chatId);
+    if (chatIndex !== -1) {
+      chats[chatIndex].lastMessage = "Sent a voice message";
+      chats[chatIndex].lastMessageTime = Date.now();
+      await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+    }
+  } catch (error) {
+    console.error("Failed to send audio message:", error);
   }
   
   return newMessage;
