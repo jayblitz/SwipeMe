@@ -677,7 +677,17 @@ export default function ChatScreen() {
       }
       
       setShowPayment(false);
-      Alert.alert("Success", `Payment sent! View on explorer: ${txData.explorer}`);
+      Alert.alert(
+        "Success",
+        "Payment sent successfully!",
+        [
+          { text: "OK", style: "cancel" },
+          { 
+            text: "View on Explorer", 
+            onPress: () => Linking.openURL(txData.explorer) 
+          },
+        ]
+      );
     } catch (error) {
       console.error("Payment error:", error);
       Alert.alert("Error", error instanceof Error ? error.message : "Failed to send payment");
