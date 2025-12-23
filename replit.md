@@ -32,16 +32,24 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - Full attachment system: photos, camera, location, contacts, documents
 - Chat input with attachment button (+) and header payment button ($)
 
-**MVP Limitations (Production Improvements Needed):**
-- API endpoints lack session-based authentication (production needs JWT or session tokens)
-- No XMTP integration yet (messages use local mock data)
-- Gas sponsored transactions not yet implemented (transfers require TEMPO for gas)
+**MVP Phase 3 Complete:**
+- Session-based API authentication using express-session with secure cookies
+- All sensitive routes (wallet, user, 2FA) protected by authentication middleware
+- requireAuth and requireSameUser middleware ensure users can only access their own data
+- Logout endpoint to destroy session
+- Session status check endpoint (/api/auth/session)
+- "Get Free TEMPO" faucet button in Wallet screen for easy gas top-up
+- Payment confirmation dialog before sending tokens
+- User-friendly error messages for common payment failures (gas, auth, network)
 
-**Planned Features (Phase 3):**
-- XMTP SDK integration for E2E encrypted messaging
+**MVP Limitations (Production Improvements Needed):**
+- No XMTP integration yet (messages use local mock data) - deferred due to native SDK requirements
+- Gas sponsored transactions not yet implemented (users need TEMPO for gas, but can use faucet)
+
+**Planned Features (Future):**
+- XMTP SDK integration for E2E encrypted messaging (requires development build, not Expo Go)
 - Gas-sponsored meta-transactions
 - Ramp SDK for fiat on-ramp
-- Session-based API authentication
 
 **Note:** Privy integration was removed due to SDK incompatibility with Expo Go (native SDK requires development build, JS SDK Core has "Invalid nativeAppID" errors in WebView context). Wallet creation now uses local viem-based wallet generation.
 
@@ -107,10 +115,12 @@ shared/
 **Auth:**
 - POST /api/auth/signup/start - Send verification email
 - POST /api/auth/signup/verify - Verify email code
-- POST /api/auth/signup/complete - Set password and create account
-- POST /api/auth/login - Login with email/password
+- POST /api/auth/signup/complete - Set password and create account (sets session)
+- POST /api/auth/login - Login with email/password (sets session)
+- POST /api/auth/logout - Destroy session and clear cookie
+- GET /api/auth/session - Check authentication status
 
-**User:**
+**User (protected - requireSameUser):**
 - GET /api/user/:id - Get user profile
 - PUT /api/user/:id - Update user profile/settings
 

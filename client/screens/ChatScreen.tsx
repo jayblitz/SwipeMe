@@ -356,9 +356,23 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
       Alert.alert("Error", `Insufficient ${selectedBalance.token.symbol} balance`);
       return;
     }
-    onSend(numAmount, memo, selectedBalance.token);
-    setAmount("");
-    setMemo("");
+    
+    Alert.alert(
+      "Confirm Payment",
+      `Send $${numAmount.toFixed(2)} ${selectedBalance.token.symbol} to ${recipientName}?${memo ? `\n\nNote: ${memo}` : ""}`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Send", 
+          style: "default",
+          onPress: () => {
+            onSend(numAmount, memo, selectedBalance.token);
+            setAmount("");
+            setMemo("");
+          }
+        },
+      ]
+    );
   };
 
   return (
@@ -691,7 +705,18 @@ export default function ChatScreen() {
       );
     } catch (error) {
       console.error("Payment error:", error);
-      Alert.alert("Error", error instanceof Error ? error.message : "Failed to send payment");
+      const errorMessage = error instanceof Error ? error.message : "Failed to send payment";
+      
+      let userFriendlyMessage = errorMessage;
+      if (errorMessage.includes("insufficient funds") || errorMessage.includes("gas")) {
+        userFriendlyMessage = "You need TEMPO tokens for gas fees. Tap 'Get Free TEMPO' in your wallet to top up.";
+      } else if (errorMessage.includes("Authentication required") || errorMessage.includes("401")) {
+        userFriendlyMessage = "Session expired. Please log in again.";
+      } else if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
+        userFriendlyMessage = "Network error. Please check your connection and try again.";
+      }
+      
+      Alert.alert("Payment Failed", userFriendlyMessage);
     } finally {
       setSending(false);
     }

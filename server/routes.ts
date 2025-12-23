@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
 import { storage, verifyPassword } from "./storage";
 import { sendVerificationEmail } from "./email";
@@ -18,6 +18,24 @@ import {
   transferERC20Token,
   type TransferParams
 } from "./wallet";
+
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  next();
+}
+
+function requireSameUser(req: Request, res: Response, next: NextFunction) {
+  const paramUserId = req.params.userId || req.params.id;
+  if (!req.session?.userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  if (req.session.userId !== paramUserId) {
+    return res.status(403).json({ error: "Access denied" });
+  }
+  next();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup/start", async (req: Request, res: Response) => {
@@ -82,6 +100,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = await storage.createUser(email, password);
       
+      req.session.userId = user.id;
+      req.session.email = user.email;
+      
       res.json({ 
         success: true, 
         user: { 
@@ -115,6 +136,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Incorrect email or password" });
       }
       
+      req.session.userId = user.id;
+      req.session.email = user.email;
+      
       res.json({ 
         success: true, 
         user: { 
@@ -136,7 +160,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/user/:id", async (req: Request, res: Response) => {
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).json({ error: "Failed to logout" });
+      }
+      res.clearCookie("tempochat.sid");
+      res.json({ success: true, message: "Logged out successfully" });
+    });
+  });
+
+  app.get("/api/auth/session", (req: Request, res: Response) => {
+    if (req.session?.userId) {
+      res.json({ 
+        authenticated: true, 
+        userId: req.session.userId,
+        email: req.session.email 
+      });
+    } else {
+      res.json({ authenticated: false });
+    }
+  });
+
+  app.get("/api/user/:id", requireSameUser, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUserById(req.params.id);
       if (!user) {
@@ -163,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/user/:id", async (req: Request, res: Response) => {
+  app.put("/api/user/:id", requireSameUser, async (req: Request, res: Response) => {
     try {
       const { displayName, profileImage, status, twitterLink, telegramLink, themePreference, biometricEnabled, twoFactorEnabled, twoFactorSecret } = req.body;
       
@@ -204,7 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/wallet/:userId", async (req: Request, res: Response) => {
+  app.get("/api/wallet/:userId", requireSameUser, async (req: Request, res: Response) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);
       if (!wallet) {
@@ -225,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallet/create", async (req: Request, res: Response) => {
+  app.post("/api/wallet/create", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId } = req.body;
       
@@ -269,7 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallet/privy", async (req: Request, res: Response) => {
+  app.post("/api/wallet/privy", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId, privyUserId, walletAddress, accessToken } = req.body;
       
@@ -309,7 +356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallet/import", async (req: Request, res: Response) => {
+  app.post("/api/wallet/import", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId, seedPhrase, privateKey } = req.body;
       
@@ -370,7 +417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/wallet/:userId", async (req: Request, res: Response) => {
+  app.delete("/api/wallet/:userId", requireSameUser, async (req: Request, res: Response) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);
       if (!wallet) {
@@ -389,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/wallet/:userId/recovery", async (req: Request, res: Response) => {
+  app.get("/api/wallet/:userId/recovery", requireSameUser, async (req: Request, res: Response) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);
       if (!wallet) {
@@ -413,7 +460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallet/:userId/transfer", async (req: Request, res: Response) => {
+  app.post("/api/wallet/:userId/transfer", requireSameUser, async (req: Request, res: Response) => {
     try {
       const { tokenAddress, toAddress, amount, decimals } = req.body;
       
@@ -484,7 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/2fa/setup", async (req: Request, res: Response) => {
+  app.post("/api/2fa/setup", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId } = req.body;
       
@@ -520,7 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/2fa/verify", async (req: Request, res: Response) => {
+  app.post("/api/2fa/verify", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId, secret, code } = req.body;
       
@@ -556,7 +603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/2fa/disable", async (req: Request, res: Response) => {
+  app.post("/api/2fa/disable", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId, code } = req.body;
       

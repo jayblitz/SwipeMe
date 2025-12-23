@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform, ActivityIndicator, Modal, ScrollView, Image } from "react-native";
+import { View, StyleSheet, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform, ActivityIndicator, Modal, ScrollView, Image, Linking } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
+
+const TEMPO_FAUCET_URL = "https://faucet.tempo.world";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
@@ -522,11 +524,25 @@ export default function WalletScreen() {
             </ThemedText>
             <Feather name="copy" size={12} color={theme.textSecondary} />
           </Pressable>
-          <View style={[styles.networkIndicator, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={styles.networkDot} />
-            <ThemedText style={[styles.networkText, { color: theme.textSecondary }]}>
-              Tempo Testnet
-            </ThemedText>
+          <View style={styles.networkRow}>
+            <View style={[styles.networkIndicator, { backgroundColor: theme.backgroundSecondary }]}>
+              <View style={styles.networkDot} />
+              <ThemedText style={[styles.networkText, { color: theme.textSecondary }]}>
+                Tempo Testnet
+              </ThemedText>
+            </View>
+            <Pressable
+              onPress={() => Linking.openURL(TEMPO_FAUCET_URL)}
+              style={({ pressed }) => [
+                styles.faucetButton,
+                { backgroundColor: theme.backgroundSecondary, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Feather name="droplet" size={14} color={theme.primary} />
+              <ThemedText style={[styles.faucetButtonText, { color: theme.primary }]}>
+                Get Free TEMPO
+              </ThemedText>
+            </Pressable>
           </View>
         </Card>
 
@@ -697,11 +713,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
-    marginTop: Spacing.md,
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
     borderRadius: BorderRadius.xs,
-    alignSelf: "flex-start",
   },
   networkDot: {
     width: 8,
@@ -711,6 +725,24 @@ const styles = StyleSheet.create({
   },
   networkText: {
     fontSize: 12,
+  },
+  networkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: Spacing.md,
+  },
+  faucetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+  },
+  faucetButtonText: {
+    fontSize: 12,
+    fontWeight: "500",
   },
   sectionHeader: {
     fontSize: 13,

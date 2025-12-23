@@ -1,11 +1,19 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
 
 const app = express();
 const log = console.log;
+
+declare module "express-session" {
+  interface SessionData {
+    userId: string;
+    email: string;
+  }
+}
 
 declare module "http" {
   interface IncomingMessage {
@@ -45,6 +53,28 @@ function setupCors(app: express.Application) {
 
     next();
   });
+}
+
+function setupSession(app: express.Application) {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    throw new Error("SESSION_SECRET environment variable is required");
+  }
+
+  app.use(
+    session({
+      secret: sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      name: "tempochat.sid",
+      cookie: {
+        secure: process.env.NODE_ENV === "production" || process.env.REPLIT_DEV_DOMAIN ? true : false,
+        httpOnly: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: "none",
+      },
+    })
+  );
 }
 
 function setupBodyParsing(app: express.Application) {
@@ -232,7 +262,10 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
+  app.set("trust proxy", 1);
+  
   setupCors(app);
+  setupSession(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
 
