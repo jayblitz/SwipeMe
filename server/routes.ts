@@ -460,6 +460,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/qrcode/:address", async (req: Request, res: Response) => {
+    try {
+      const { address } = req.params;
+      
+      if (!address || !address.startsWith("0x") || address.length !== 42) {
+        return res.status(400).json({ error: "Invalid wallet address" });
+      }
+      
+      const qrCodeDataUrl = await QRCode.toDataURL(address, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: "#000000",
+          light: "#FFFFFF",
+        },
+      });
+      
+      res.json({ qrCode: qrCodeDataUrl });
+    } catch (error) {
+      console.error("QR code generation error:", error);
+      res.status(500).json({ error: "Failed to generate QR code" });
+    }
+  });
+
   app.post("/api/2fa/setup", async (req: Request, res: Response) => {
     try {
       const { userId } = req.body;

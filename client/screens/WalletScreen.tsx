@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform, ActivityIndicator, Modal, ScrollView, Image } from "react-native";
-import QRCode from "qrcode";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
@@ -165,19 +164,21 @@ function ReceiveModal({ visible, onClose, address }: ReceiveModalProps) {
   const { theme } = useTheme();
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (visible && address) {
-      QRCode.toDataURL(address, {
-        width: 200,
-        margin: 2,
-        color: {
-          dark: "#000000",
-          light: "#FFFFFF",
-        },
-      })
-        .then((url: string) => setQrDataUrl(url))
-        .catch((err: Error) => console.error("QR generation error:", err));
+      setIsLoading(true);
+      const baseUrl = getApiUrl();
+      fetch(new URL(`/api/qrcode/${address}`, baseUrl))
+        .then(res => res.json())
+        .then(data => {
+          if (data.qrCode) {
+            setQrDataUrl(data.qrCode);
+          }
+        })
+        .catch((err: Error) => console.error("QR fetch error:", err))
+        .finally(() => setIsLoading(false));
     }
   }, [visible, address]);
 
@@ -200,7 +201,9 @@ function ReceiveModal({ visible, onClose, address }: ReceiveModalProps) {
           
           <View style={styles.qrContainer}>
             <View style={[styles.qrPlaceholder, { backgroundColor: "#FFFFFF", borderColor: theme.border }]}>
-              {qrDataUrl ? (
+              {isLoading ? (
+                <ActivityIndicator size="large" color={theme.primary} />
+              ) : qrDataUrl ? (
                 <Image source={{ uri: qrDataUrl }} style={styles.qrImage} resizeMode="contain" />
               ) : (
                 <ActivityIndicator size="large" color={theme.primary} />
