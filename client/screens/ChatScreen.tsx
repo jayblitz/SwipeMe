@@ -300,7 +300,7 @@ export default function ChatScreen() {
           styles.inputContainer, 
           { 
             backgroundColor: theme.backgroundRoot,
-            paddingBottom: Math.max(insets.bottom, Spacing.sm),
+            paddingBottom: Math.max(insets.bottom, Spacing.md),
             borderTopColor: theme.border,
           }
         ]}>
@@ -311,7 +311,14 @@ export default function ChatScreen() {
             <Feather name="dollar-sign" size={20} color="#FFFFFF" />
           </Pressable>
           
-          <View style={[styles.textInputContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <View style={[
+            styles.textInputContainer, 
+            { 
+              backgroundColor: theme.backgroundSecondary, 
+              borderColor: theme.textSecondary,
+              borderWidth: 1.5,
+            }
+          ]}>
             <TextInput
               style={[styles.textInput, { color: theme.text }]}
               placeholder="Type a message..."
@@ -447,7 +454,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     minHeight: 44,
     maxHeight: 120,
-    borderWidth: 1,
   },
   textInput: {
     fontSize: 16,
