@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from "react";
-import { View, StyleSheet, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform, ActivityIndicator, Modal, ScrollView } from "react-native";
+import React, { useState, useCallback, useEffect } from "react";
+import { View, StyleSheet, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform, ActivityIndicator, Modal, ScrollView, Image } from "react-native";
+import QRCode from "qrcode";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
@@ -163,6 +164,22 @@ interface ReceiveModalProps {
 function ReceiveModal({ visible, onClose, address }: ReceiveModalProps) {
   const { theme } = useTheme();
   const [copied, setCopied] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible && address) {
+      QRCode.toDataURL(address, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: "#000000",
+          light: "#FFFFFF",
+        },
+      })
+        .then((url: string) => setQrDataUrl(url))
+        .catch((err: Error) => console.error("QR generation error:", err));
+    }
+  }, [visible, address]);
 
   const handleCopy = async () => {
     await Clipboard.setStringAsync(address);
@@ -182,13 +199,12 @@ function ReceiveModal({ visible, onClose, address }: ReceiveModalProps) {
           </View>
           
           <View style={styles.qrContainer}>
-            <View style={[styles.qrPlaceholder, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-              <View style={styles.qrGrid}>
-                {Array(9).fill(0).map((_, i) => (
-                  <View key={i} style={[styles.qrCell, { backgroundColor: i % 2 === 0 ? theme.text : "transparent" }]} />
-                ))}
-              </View>
-              <ThemedText style={[styles.qrText, { color: theme.textSecondary }]}>QR Code</ThemedText>
+            <View style={[styles.qrPlaceholder, { backgroundColor: "#FFFFFF", borderColor: theme.border }]}>
+              {qrDataUrl ? (
+                <Image source={{ uri: qrDataUrl }} style={styles.qrImage} resizeMode="contain" />
+              ) : (
+                <ActivityIndicator size="large" color={theme.primary} />
+              )}
             </View>
           </View>
 
@@ -932,26 +948,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   qrPlaceholder: {
-    width: 180,
-    height: 180,
+    width: 200,
+    height: 200,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
-  qrGrid: {
-    width: 60,
-    height: 60,
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  qrCell: {
-    width: 20,
-    height: 20,
-  },
-  qrText: {
-    marginTop: Spacing.sm,
-    fontSize: 12,
+  qrImage: {
+    width: 180,
+    height: 180,
   },
   addressContainer: {
     width: "100%",
