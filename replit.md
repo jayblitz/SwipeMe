@@ -41,6 +41,10 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - "Get Free TEMPO" faucet button in Wallet screen for easy gas top-up
 - Payment confirmation dialog before sending tokens
 - User-friendly error messages for common payment failures (gas, auth, network)
+- Voice message recording and playback using expo-audio
+- WhatsApp-style send/mic button toggle (mic when empty, send when typing)
+- AudioMessageBubble component with progress tracking and playback controls
+- Microphone permission handling with Settings redirect for denied permissions
 
 **MVP Limitations (Production Improvements Needed):**
 - No XMTP integration yet (messages use local mock data) - deferred due to native SDK requirements
