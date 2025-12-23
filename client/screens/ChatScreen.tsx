@@ -111,11 +111,18 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
   const { theme } = useTheme();
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isReady, setIsReady] = useState(false);
   const player = useAudioPlayer(message.audioAttachment?.uri || "");
   
   const duration = message.audioAttachment?.duration || 0;
   const durationSeconds = Math.round(duration);
   const durationFormatted = `${Math.floor(durationSeconds / 60)}:${(durationSeconds % 60).toString().padStart(2, '0')}`;
+  
+  useEffect(() => {
+    if (player && message.audioAttachment?.uri) {
+      setIsReady(true);
+    }
+  }, [player, message.audioAttachment?.uri]);
   
   useEffect(() => {
     if (!player || !isPlaying) return;
@@ -134,18 +141,27 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
   }, [player, isPlaying]);
   
   const handlePlayPause = async () => {
-    if (!player) return;
+    if (!player || !isReady) return;
     
-    if (isPlaying) {
-      player.pause();
-      setIsPlaying(false);
-    } else {
-      if (progress >= 0.99) {
-        player.seekTo(0);
-        setProgress(0);
+    try {
+      await AudioModule.setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
+      
+      if (isPlaying) {
+        player.pause();
+        setIsPlaying(false);
+      } else {
+        if (progress >= 0.99) {
+          player.seekTo(0);
+          setProgress(0);
+        }
+        player.play();
+        setIsPlaying(true);
       }
-      player.play();
-      setIsPlaying(true);
+    } catch (error) {
+      console.error("Playback error:", error);
     }
   };
   
@@ -792,14 +808,24 @@ export default function ChatScreen() {
     }, [loadData])
   );
 
+  const isRecordingRef = useRef(false);
+  
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+  
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
       }
-      if (audioRecorder.isRecording) {
-        audioRecorder.stop();
+      if (isRecordingRef.current) {
+        try {
+          audioRecorder.stop();
+        } catch (e) {
+          // Recorder may already be stopped
+        }
       }
     };
   }, []);
@@ -1266,56 +1292,111 @@ export default function ChatScreen() {
           keyboardShouldPersistTaps="handled"
         />
         
-        <View style={[
-          styles.inputContainer, 
-          { 
-            backgroundColor: theme.backgroundRoot,
-            paddingBottom: Math.max(insets.bottom, Spacing.md),
-            borderTopColor: theme.border,
-          }
-        ]}>
-          <Pressable 
-            onPress={() => setShowAttachments(true)}
-            style={[styles.attachButton, { backgroundColor: theme.backgroundSecondary }]}
-          >
-            <Feather name="plus" size={22} color={theme.text} />
-          </Pressable>
-          
+        {isRecording ? (
           <View style={[
-            styles.textInputContainer, 
+            styles.recordingBar, 
             { 
-              backgroundColor: theme.backgroundSecondary, 
-              borderColor: theme.textSecondary,
-              borderWidth: 1.5,
+              backgroundColor: theme.backgroundRoot,
+              paddingBottom: Math.max(insets.bottom, Spacing.md),
+              borderTopColor: theme.border,
             }
           ]}>
-            <TextInput
-              style={[styles.textInput, { color: theme.text }]}
-              placeholder="Type a message..."
-              placeholderTextColor={theme.textSecondary}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={1000}
-            />
+            <View style={styles.recordingTopRow}>
+              <ThemedText style={styles.recordingTimer}>
+                {formatRecordingTime(recordingTime)}
+              </ThemedText>
+              <View style={styles.waveformContainer}>
+                {Array.from({ length: 20 }).map((_, i) => (
+                  <View 
+                    key={i} 
+                    style={[
+                      styles.waveformBar,
+                      { 
+                        backgroundColor: theme.textSecondary,
+                        height: 4 + Math.random() * 20,
+                        opacity: i < recordingTime % 20 ? 1 : 0.3,
+                      }
+                    ]} 
+                  />
+                ))}
+              </View>
+              <View style={styles.recordingSpeed}>
+                <Feather name="clock" size={14} color={theme.textSecondary} />
+                <ThemedText style={[styles.recordingSpeedText, { color: theme.textSecondary }]}>
+                  1x
+                </ThemedText>
+              </View>
+            </View>
+            <View style={styles.recordingBottomRow}>
+              <Pressable 
+                onPress={handleCancelRecording}
+                style={[styles.recordingActionButton, { backgroundColor: "transparent" }]}
+              >
+                <Feather name="trash-2" size={24} color={theme.textSecondary} />
+              </Pressable>
+              <View style={styles.recordingIndicatorWrapper}>
+                <View style={[styles.recordingDot, { backgroundColor: "#FF3B30" }]} />
+              </View>
+              <Pressable 
+                onPress={handleSendRecording}
+                style={[styles.recordingSendButton, { backgroundColor: "#25D366" }]}
+              >
+                <Feather name="send" size={20} color="#FFFFFF" />
+              </Pressable>
+            </View>
           </View>
-          
-          <Pressable 
-            onPress={inputText.trim() ? handleSend : handleMicrophonePress}
-            style={[
-              styles.sendButton,
+        ) : (
+          <View style={[
+            styles.inputContainer, 
+            { 
+              backgroundColor: theme.backgroundRoot,
+              paddingBottom: Math.max(insets.bottom, Spacing.md),
+              borderTopColor: theme.border,
+            }
+          ]}>
+            <Pressable 
+              onPress={() => setShowAttachments(true)}
+              style={[styles.attachButton, { backgroundColor: theme.backgroundSecondary }]}
+            >
+              <Feather name="plus" size={22} color={theme.text} />
+            </Pressable>
+            
+            <View style={[
+              styles.textInputContainer, 
               { 
-                backgroundColor: inputText.trim() ? theme.primary : theme.backgroundSecondary,
+                backgroundColor: theme.backgroundSecondary, 
+                borderColor: theme.textSecondary,
+                borderWidth: 1.5,
               }
-            ]}
-          >
-            <Feather 
-              name={inputText.trim() ? "send" : "mic"} 
-              size={inputText.trim() ? 18 : 20} 
-              color={inputText.trim() ? "#FFFFFF" : theme.text} 
-            />
-          </Pressable>
-        </View>
+            ]}>
+              <TextInput
+                style={[styles.textInput, { color: theme.text }]}
+                placeholder="Type a message..."
+                placeholderTextColor={theme.textSecondary}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={1000}
+              />
+            </View>
+            
+            <Pressable 
+              onPress={inputText.trim() ? handleSend : handleMicrophonePress}
+              style={[
+                styles.sendButton,
+                { 
+                  backgroundColor: inputText.trim() ? theme.primary : theme.backgroundSecondary,
+                }
+              ]}
+            >
+              <Feather 
+                name={inputText.trim() ? "send" : "mic"} 
+                size={inputText.trim() ? 18 : 20} 
+                color={inputText.trim() ? "#FFFFFF" : theme.text} 
+              />
+            </Pressable>
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       {participant ? (
@@ -1342,41 +1423,6 @@ export default function ChatScreen() {
         onSelectContact={handleSelectContact}
         contacts={deviceContacts}
       />
-
-      <Modal
-        visible={isRecording}
-        transparent
-        animationType="fade"
-        onRequestClose={handleCancelRecording}
-      >
-        <View style={[styles.recordingOverlay, { backgroundColor: "rgba(0,0,0,0.7)" }]}>
-          <View style={[styles.recordingContainer, { backgroundColor: theme.backgroundRoot }]}>
-            <View style={[styles.recordingIndicator, { backgroundColor: "#FF3B30" }]}>
-              <Feather name="mic" size={36} color="#FFFFFF" />
-            </View>
-            <ThemedText style={styles.recordingTime}>
-              {formatRecordingTime(recordingTime)}
-            </ThemedText>
-            <ThemedText style={[styles.recordingLabel, { color: theme.textSecondary }]}>
-              Recording...
-            </ThemedText>
-            <View style={styles.recordingButtons}>
-              <Pressable 
-                onPress={handleCancelRecording}
-                style={[styles.recordingButton, { backgroundColor: theme.backgroundSecondary }]}
-              >
-                <Feather name="x" size={24} color={theme.error} />
-              </Pressable>
-              <Pressable 
-                onPress={handleSendRecording}
-                style={[styles.recordingButton, { backgroundColor: theme.primary }]}
-              >
-                <Feather name="send" size={24} color="#FFFFFF" />
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </ThemedView>
   );
 }
@@ -1928,44 +1974,68 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  recordingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
+  recordingBar: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
   },
-  recordingContainer: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.lg,
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  recordingIndicator: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recordingTime: {
-    fontSize: 24,
-    fontWeight: "600",
-  },
-  recordingLabel: {
-    fontSize: 14,
-  },
-  recordingButtons: {
+  recordingTopRow: {
     flexDirection: "row",
-    gap: Spacing.lg,
-    marginTop: Spacing.md,
+    alignItems: "center",
+    marginBottom: Spacing.md,
   },
-  recordingButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  recordingTimer: {
+    fontSize: 16,
+    fontWeight: "500",
+    minWidth: 50,
+  },
+  waveformContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    height: 32,
+    marginHorizontal: Spacing.md,
+  },
+  waveformBar: {
+    width: 3,
+    borderRadius: 2,
+  },
+  recordingSpeed: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  recordingSpeedText: {
+    fontSize: 12,
+  },
+  recordingBottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: Spacing.sm,
+  },
+  recordingActionButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recordingIndicatorWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recordingDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  recordingSendButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
