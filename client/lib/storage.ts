@@ -81,11 +81,11 @@ export interface Transaction {
 }
 
 const defaultContacts: Contact[] = [
-  { id: "c1", name: "Alex Chen", avatarId: "teal", walletAddress: "0x1234...5678", phone: "+1 555-0101" },
-  { id: "c2", name: "Sarah Kim", avatarId: "coral", walletAddress: "0x2345...6789", phone: "+1 555-0102" },
-  { id: "c3", name: "Mike Johnson", avatarId: "purple", walletAddress: "0x3456...7890", phone: "+1 555-0103" },
-  { id: "c4", name: "Emma Davis", avatarId: "amber", walletAddress: "0x4567...8901", phone: "+1 555-0104" },
-  { id: "c5", name: "James Wilson", avatarId: "ocean", walletAddress: "0x5678...9012", phone: "+1 555-0105" },
+  { id: "c1", name: "Alex Chen", avatarId: "teal", walletAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f5bE21", phone: "+1 555-0101" },
+  { id: "c2", name: "Sarah Kim", avatarId: "coral", walletAddress: "0x8ba1f109551bD432803012645Ac136ddd64DBA72", phone: "+1 555-0102" },
+  { id: "c3", name: "Mike Johnson", avatarId: "purple", walletAddress: "0x2932b7A2355D6fecc4b5c0B6BD44cC31df247a2e", phone: "+1 555-0103" },
+  { id: "c4", name: "Emma Davis", avatarId: "amber", walletAddress: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", phone: "+1 555-0104" },
+  { id: "c5", name: "James Wilson", avatarId: "ocean", walletAddress: "0xFABB0ac9d68B0B445fB7357272Ff202C5651694a", phone: "+1 555-0105" },
 ];
 
 const defaultChats: Chat[] = [
