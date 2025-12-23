@@ -9,7 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as Contacts from "expo-contacts";
 import * as DocumentPicker from "expo-document-picker";
-import { useAudioRecorder, AudioModule, RecordingPresets, useAudioPlayer } from "expo-audio";
+import { useAudioRecorder, AudioModule, RecordingPresets, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -109,39 +109,36 @@ interface AudioMessageBubbleProps {
 
 function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) {
   const { theme } = useTheme();
-  const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [isReady, setIsReady] = useState(false);
-  const player = useAudioPlayer(message.audioAttachment?.uri || "");
+  
+  const audioUri = message.audioAttachment?.uri || null;
+  const player = useAudioPlayer(audioUri);
+  const status = useAudioPlayerStatus(player);
   
   const duration = message.audioAttachment?.duration || 0;
   const durationSeconds = Math.round(duration);
   const durationFormatted = `${Math.floor(durationSeconds / 60)}:${(durationSeconds % 60).toString().padStart(2, '0')}`;
   
-  useEffect(() => {
-    if (player && message.audioAttachment?.uri) {
-      setIsReady(true);
-    }
-  }, [player, message.audioAttachment?.uri]);
+  const isPlaying = status.playing;
+  const isLoaded = status.isLoaded;
   
   useEffect(() => {
-    if (!player || !isPlaying) return;
+    if (!isPlaying) return;
     
     const interval = setInterval(() => {
-      if (player.currentTime !== undefined && player.duration) {
-        setProgress(player.currentTime / player.duration);
-        if (player.currentTime >= player.duration) {
-          setIsPlaying(false);
+      if (status.currentTime !== undefined && status.duration) {
+        setProgress(status.currentTime / status.duration);
+        if (status.currentTime >= status.duration) {
           setProgress(0);
         }
       }
     }, 100);
     
     return () => clearInterval(interval);
-  }, [player, isPlaying]);
+  }, [isPlaying, status.currentTime, status.duration]);
   
   const handlePlayPause = async () => {
-    if (!player || !isReady) return;
+    if (!player || !audioUri) return;
     
     try {
       await AudioModule.setAudioModeAsync({
@@ -151,14 +148,12 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
       
       if (isPlaying) {
         player.pause();
-        setIsPlaying(false);
       } else {
         if (progress >= 0.99) {
           player.seekTo(0);
           setProgress(0);
         }
         player.play();
-        setIsPlaying(true);
       }
     } catch (error) {
       console.error("Playback error:", error);
