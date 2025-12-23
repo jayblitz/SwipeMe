@@ -847,6 +847,11 @@ export default function ChatScreen() {
         return;
       }
       
+      await AudioModule.setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+      
       setIsRecording(true);
       setRecordingTime(0);
       audioRecorder.record();
@@ -856,16 +861,24 @@ export default function ChatScreen() {
       }, 1000);
     } catch (error) {
       console.error("Recording error:", error);
+      await AudioModule.setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
       Alert.alert("Error", "Failed to start recording. Please try again.");
     }
   };
   
-  const handleCancelRecording = () => {
+  const handleCancelRecording = async () => {
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
     audioRecorder.stop();
+    await AudioModule.setAudioModeAsync({
+      allowsRecording: false,
+      playsInSilentMode: true,
+    });
     setIsRecording(false);
     setRecordingTime(0);
   };
@@ -882,6 +895,10 @@ export default function ChatScreen() {
     
     try {
       await audioRecorder.stop();
+      await AudioModule.setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
       await new Promise(resolve => setTimeout(resolve, 100));
       const uri = audioRecorder.uri;
       if (uri) {
