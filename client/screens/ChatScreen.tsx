@@ -218,6 +218,10 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
       if (isPlaying) {
         player.pause();
       } else {
+        if (!status.isLoaded) {
+          console.log("Audio not loaded yet, waiting...");
+          return;
+        }
         if (!hasPlayed) {
           setHasPlayed(true);
         }
@@ -248,7 +252,7 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
     <View style={[
       styles.audioBubble,
       { 
-        backgroundColor: isOwnMessage ? "#128C7E" : theme.receivedMessage,
+        backgroundColor: isOwnMessage ? theme.sentMessage : theme.receivedMessage,
         alignSelf: isOwnMessage ? "flex-end" : "flex-start",
       }
     ]}>
@@ -1418,13 +1422,13 @@ export default function ChatScreen() {
             data={messages}
             keyExtractor={(item) => item.id}
             renderItem={({ item, index }) => {
-              const prevMessage = index > 0 ? messages[index - 1] : null;
-              const showDateSeparator = !prevMessage || !isSameDay(item.timestamp, prevMessage.timestamp);
+              const nextMessage = messages[index + 1];
+              const showDateSeparator = !nextMessage || !isSameDay(item.timestamp, nextMessage.timestamp);
               
               return (
                 <>
-                  {showDateSeparator ? <DateSeparator timestamp={item.timestamp} /> : null}
                   <MessageBubble message={item} isOwnMessage={item.senderId === "me"} />
+                  {showDateSeparator ? <DateSeparator timestamp={item.timestamp} /> : null}
                 </>
               );
             }}
