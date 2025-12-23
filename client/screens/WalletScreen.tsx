@@ -12,7 +12,7 @@ import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { Transaction } from "@/lib/storage";
+import { Transaction, getTransactions } from "@/lib/storage";
 import { getApiUrl, apiRequest } from "@/lib/query-client";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS } from "@/lib/tempo-tokens";
 import WalletSetupScreen from "./WalletSetupScreen";
@@ -290,7 +290,13 @@ export default function WalletScreen() {
   }, []);
 
   const loadData = useCallback(async () => {
-    setTransactions([]);
+    try {
+      const txs = await getTransactions();
+      setTransactions(txs);
+    } catch (error) {
+      console.error("Failed to load transactions:", error);
+      setTransactions([]);
+    }
   }, []);
 
   useFocusEffect(

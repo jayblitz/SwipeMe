@@ -306,7 +306,8 @@ export async function sendPayment(
   memo: string,
   recipientId: string,
   recipientName: string,
-  recipientAvatarId: string
+  recipientAvatarId: string,
+  txHash?: string
 ): Promise<{ message: Message; transaction: Transaction }> {
   const paymentMessage: Message = {
     id: `m${Date.now()}`,
@@ -330,6 +331,7 @@ export async function sendPayment(
     memo,
     timestamp: Date.now(),
     status: "completed",
+    txHash,
   };
   
   try {

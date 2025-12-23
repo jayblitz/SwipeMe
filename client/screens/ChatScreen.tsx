@@ -659,14 +659,15 @@ export default function ChatScreen() {
         throw new Error(txData.error || "Transfer failed");
       }
       
-      // Record the payment in chat
+      // Record the payment in chat and transaction history
       const { message } = await sendPayment(
         chatId,
         amount,
-        `${memo || "Payment"} (${selectedToken.symbol}) - TX: ${txData.txHash?.slice(0, 10)}...`,
+        `${memo || "Payment"} (${selectedToken.symbol})`,
         participant.id,
         participant.name,
-        participant.avatarId
+        participant.avatarId,
+        txData.txHash
       );
       setMessages(prev => [message, ...prev]);
       
