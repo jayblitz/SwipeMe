@@ -40,11 +40,6 @@ export default function ChatsStackNavigator() {
         options={({ route }) => ({
           ...opaqueOptions,
           headerTitle: route.params.name,
-          headerRight: () => (
-            <Pressable style={{ padding: 8 }}>
-              <Feather name="dollar-sign" size={20} color={theme.primary} />
-            </Pressable>
-          ),
         })}
       />
     </Stack.Navigator>

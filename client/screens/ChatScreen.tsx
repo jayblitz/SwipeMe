@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, StyleSheet, FlatList, TextInput, Pressable, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
+import { View, StyleSheet, FlatList, TextInput, Pressable, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
-import { useHeaderHeight } from "@react-navigation/elements";
+import { useRoute, RouteProp, useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useHeaderHeight, HeaderButton } from "@react-navigation/elements";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
@@ -13,6 +15,75 @@ import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { getMessages, sendMessage, sendPayment, getChats, getBalance, Message, Chat } from "@/lib/storage";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
+
+interface AttachmentOption {
+  id: string;
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  color: string;
+}
+
+const attachmentOptions: AttachmentOption[] = [
+  { id: "photos", icon: "image", label: "Photos", color: "#0066FF" },
+  { id: "camera", icon: "camera", label: "Camera", color: "#6B7280" },
+  { id: "location", icon: "map-pin", label: "Location", color: "#10B981" },
+  { id: "contact", icon: "user", label: "Contact", color: "#6B7280" },
+  { id: "document", icon: "file-text", label: "Document", color: "#0066FF" },
+];
+
+interface AttachmentsModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelectOption: (optionId: string) => void;
+}
+
+function AttachmentsModal({ visible, onClose, onSelectOption }: AttachmentsModalProps) {
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.attachmentOverlay} onPress={onClose}>
+        <Pressable 
+          style={[
+            styles.attachmentSheet, 
+            { 
+              backgroundColor: theme.backgroundRoot,
+              paddingBottom: insets.bottom + Spacing.lg,
+            }
+          ]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={styles.attachmentHandle} />
+          <View style={styles.attachmentGrid}>
+            {attachmentOptions.map((option) => (
+              <Pressable
+                key={option.id}
+                style={styles.attachmentItem}
+                onPress={() => {
+                  onSelectOption(option.id);
+                  onClose();
+                }}
+              >
+                <View style={[styles.attachmentIcon, { backgroundColor: theme.backgroundSecondary }]}>
+                  <Feather name={option.icon} size={24} color={option.color} />
+                </View>
+                <ThemedText style={[styles.attachmentLabel, { color: theme.text }]}>
+                  {option.label}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
 
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp);
@@ -214,15 +285,27 @@ export default function ChatScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const route = useRoute<RouteProp<ChatsStackParamList, "Chat">>();
+  const navigation = useNavigation<NativeStackNavigationProp<ChatsStackParamList>>();
   const { chatId, name } = route.params;
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [showPayment, setShowPayment] = useState(false);
+  const [showAttachments, setShowAttachments] = useState(false);
   const [sending, setSending] = useState(false);
   const [balance, setBalance] = useState(0);
   const [chat, setChat] = useState<Chat | null>(null);
   const flatListRef = useRef<FlatList>(null);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <HeaderButton onPress={() => setShowPayment(true)}>
+          <Feather name="dollar-sign" size={20} color={theme.primary} />
+        </HeaderButton>
+      ),
+    });
+  }, [navigation, theme]);
 
   const loadData = useCallback(async () => {
     const [loadedMessages, loadedBalance, loadedChats] = await Promise.all([
@@ -274,6 +357,91 @@ export default function ChatScreen() {
     }
   };
 
+  const requestMediaLibraryPermission = async (): Promise<boolean> => {
+    const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status === "granted") return true;
+    
+    if (!canAskAgain && Platform.OS !== "web") {
+      Alert.alert(
+        "Permission Required",
+        "Please enable photo library access in Settings to share photos.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Open Settings", 
+            onPress: async () => {
+              try {
+                await Linking.openSettings();
+              } catch (e) {}
+            }
+          },
+        ]
+      );
+    }
+    return false;
+  };
+
+  const requestCameraPermission = async (): Promise<boolean> => {
+    const { status, canAskAgain } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status === "granted") return true;
+    
+    if (!canAskAgain && Platform.OS !== "web") {
+      Alert.alert(
+        "Permission Required",
+        "Please enable camera access in Settings to take photos.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Open Settings", 
+            onPress: async () => {
+              try {
+                await Linking.openSettings();
+              } catch (e) {}
+            }
+          },
+        ]
+      );
+    }
+    return false;
+  };
+
+  const handleAttachmentOption = async (optionId: string) => {
+    switch (optionId) {
+      case "photos":
+        const hasMediaPermission = await requestMediaLibraryPermission();
+        if (!hasMediaPermission) return;
+        
+        const photoResult = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          quality: 0.8,
+        });
+        if (!photoResult.canceled) {
+          Alert.alert("Photo Selected", "Photo sharing coming soon!");
+        }
+        break;
+      case "camera":
+        const hasCameraPermission = await requestCameraPermission();
+        if (!hasCameraPermission) return;
+        
+        const cameraResult = await ImagePicker.launchCameraAsync({
+          quality: 0.8,
+        });
+        if (!cameraResult.canceled) {
+          Alert.alert("Photo Captured", "Photo sharing coming soon!");
+        }
+        break;
+      case "location":
+        Alert.alert("Location", "Location sharing coming soon!");
+        break;
+      case "contact":
+        Alert.alert("Contact", "Contact sharing coming soon!");
+        break;
+      case "document":
+        Alert.alert("Document", "Document sharing coming soon!");
+        break;
+    }
+  };
+
   const participant = chat?.participants[0];
 
   return (
@@ -305,10 +473,10 @@ export default function ChatScreen() {
           }
         ]}>
           <Pressable 
-            onPress={() => setShowPayment(true)}
-            style={[styles.paymentButton, { backgroundColor: theme.primary }]}
+            onPress={() => setShowAttachments(true)}
+            style={[styles.attachButton, { backgroundColor: theme.backgroundSecondary }]}
           >
-            <Feather name="dollar-sign" size={20} color="#FFFFFF" />
+            <Feather name="plus" size={22} color={theme.text} />
           </Pressable>
           
           <View style={[
@@ -360,6 +528,12 @@ export default function ChatScreen() {
           sending={sending}
         />
       ) : null}
+
+      <AttachmentsModal
+        visible={showAttachments}
+        onClose={() => setShowAttachments(false)}
+        onSelectOption={handleAttachmentOption}
+      />
     </ThemedView>
   );
 }
@@ -467,6 +641,55 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 2,
+  },
+  attachButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  attachmentOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  attachmentSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  attachmentHandle: {
+    width: 36,
+    height: 5,
+    backgroundColor: "rgba(128,128,128,0.4)",
+    borderRadius: 2.5,
+    alignSelf: "center",
+    marginBottom: Spacing.lg,
+  },
+  attachmentGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    gap: Spacing.lg,
+  },
+  attachmentItem: {
+    width: 72,
+    alignItems: "center",
+  },
+  attachmentIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.xs,
+  },
+  attachmentLabel: {
+    fontSize: 12,
+    textAlign: "center",
   },
   modalContainer: {
     flex: 1,
