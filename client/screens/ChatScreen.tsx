@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
-import { View, StyleSheet, FlatList, TextInput, Pressable, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Linking } from "react-native";
+import { View, StyleSheet, FlatList, TextInput, Pressable, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Linking, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useHeaderHeight, HeaderButton } from "@react-navigation/elements";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import * as Contacts from "expo-contacts";
+import * as DocumentPicker from "expo-document-picker";
+import { Image } from "expo-image";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
@@ -13,7 +17,7 @@ import { Button } from "@/components/Button";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { getMessages, sendMessage, sendPayment, getChats, getBalance, Message, Chat } from "@/lib/storage";
+import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, getBalance, Message, Chat } from "@/lib/storage";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 
 interface AttachmentOption {
@@ -95,6 +99,9 @@ interface MessageBubbleProps {
   isOwnMessage: boolean;
 }
 
+const { width: screenWidth } = Dimensions.get("window");
+const IMAGE_MAX_WIDTH = screenWidth * 0.65;
+
 function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
   const { theme } = useTheme();
   
@@ -147,6 +154,149 @@ function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
             {message.paymentStatus === "completed" ? "Completed" : "Pending"}
           </ThemedText>
         </View>
+      </View>
+    );
+  }
+
+  if (message.type === "image" && message.imageAttachment) {
+    const aspectRatio = (message.imageAttachment.width && message.imageAttachment.height)
+      ? message.imageAttachment.width / message.imageAttachment.height
+      : 1;
+    const imageWidth = Math.min(IMAGE_MAX_WIDTH, message.imageAttachment.width || IMAGE_MAX_WIDTH);
+    const imageHeight = imageWidth / aspectRatio;
+    
+    return (
+      <View style={[
+        styles.imageBubble,
+        { alignSelf: isOwnMessage ? "flex-end" : "flex-start" }
+      ]}>
+        <Image
+          source={{ uri: message.imageAttachment.uri }}
+          style={[styles.imageMessage, { width: imageWidth, height: imageHeight }]}
+          contentFit="cover"
+        />
+        <ThemedText style={[
+          styles.imageTime,
+          { color: "rgba(255,255,255,0.9)" }
+        ]}>
+          {formatTime(message.timestamp)}
+        </ThemedText>
+      </View>
+    );
+  }
+
+  if (message.type === "location" && message.locationAttachment) {
+    const { latitude, longitude, address } = message.locationAttachment;
+    return (
+      <View style={[
+        styles.locationBubble,
+        { 
+          backgroundColor: isOwnMessage ? theme.sentMessage : theme.receivedMessage,
+          alignSelf: isOwnMessage ? "flex-end" : "flex-start",
+        }
+      ]}>
+        <View style={[styles.locationPreview, { backgroundColor: theme.backgroundSecondary }]}>
+          <Feather name="map-pin" size={32} color={theme.primary} />
+        </View>
+        <View style={styles.locationInfo}>
+          <ThemedText style={[styles.locationTitle, { color: isOwnMessage ? "#FFFFFF" : theme.text }]}>
+            Shared Location
+          </ThemedText>
+          {address ? (
+            <ThemedText style={[styles.locationAddress, { color: isOwnMessage ? "rgba(255,255,255,0.8)" : theme.textSecondary }]} numberOfLines={2}>
+              {address}
+            </ThemedText>
+          ) : null}
+          <ThemedText style={[styles.locationCoords, { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }]}>
+            {latitude.toFixed(6)}, {longitude.toFixed(6)}
+          </ThemedText>
+        </View>
+        <ThemedText style={[
+          styles.messageTime,
+          { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
+        ]}>
+          {formatTime(message.timestamp)}
+        </ThemedText>
+      </View>
+    );
+  }
+
+  if (message.type === "contact" && message.contactAttachment) {
+    const { name, phoneNumber, email } = message.contactAttachment;
+    return (
+      <View style={[
+        styles.contactBubble,
+        { 
+          backgroundColor: isOwnMessage ? theme.sentMessage : theme.receivedMessage,
+          alignSelf: isOwnMessage ? "flex-end" : "flex-start",
+        }
+      ]}>
+        <View style={styles.contactHeader}>
+          <View style={[styles.contactAvatar, { backgroundColor: theme.backgroundSecondary }]}>
+            <Feather name="user" size={20} color={theme.primary} />
+          </View>
+          <View style={styles.contactInfo}>
+            <ThemedText style={[styles.contactName, { color: isOwnMessage ? "#FFFFFF" : theme.text }]}>
+              {name}
+            </ThemedText>
+            {phoneNumber ? (
+              <ThemedText style={[styles.contactDetail, { color: isOwnMessage ? "rgba(255,255,255,0.8)" : theme.textSecondary }]}>
+                {phoneNumber}
+              </ThemedText>
+            ) : null}
+            {email ? (
+              <ThemedText style={[styles.contactDetail, { color: isOwnMessage ? "rgba(255,255,255,0.8)" : theme.textSecondary }]}>
+                {email}
+              </ThemedText>
+            ) : null}
+          </View>
+        </View>
+        <ThemedText style={[
+          styles.messageTime,
+          { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
+        ]}>
+          {formatTime(message.timestamp)}
+        </ThemedText>
+      </View>
+    );
+  }
+
+  if (message.type === "document" && message.documentAttachment) {
+    const { name: docName, mimeType, size } = message.documentAttachment;
+    const formatSize = (bytes?: number) => {
+      if (!bytes) return "";
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+    
+    return (
+      <View style={[
+        styles.documentBubble,
+        { 
+          backgroundColor: isOwnMessage ? theme.sentMessage : theme.receivedMessage,
+          alignSelf: isOwnMessage ? "flex-end" : "flex-start",
+        }
+      ]}>
+        <View style={styles.documentContent}>
+          <View style={[styles.documentIcon, { backgroundColor: theme.backgroundSecondary }]}>
+            <Feather name="file-text" size={24} color={theme.primary} />
+          </View>
+          <View style={styles.documentInfo}>
+            <ThemedText style={[styles.documentName, { color: isOwnMessage ? "#FFFFFF" : theme.text }]} numberOfLines={2}>
+              {docName}
+            </ThemedText>
+            <ThemedText style={[styles.documentMeta, { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }]}>
+              {formatSize(size)}{mimeType ? ` - ${mimeType.split("/")[1]?.toUpperCase() || mimeType}` : ""}
+            </ThemedText>
+          </View>
+        </View>
+        <ThemedText style={[
+          styles.messageTime,
+          { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
+        ]}>
+          {formatTime(message.timestamp)}
+        </ThemedText>
       </View>
     );
   }
@@ -280,6 +430,77 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
   );
 }
 
+interface DeviceContact {
+  id: string;
+  name: string;
+  phoneNumber?: string;
+  email?: string;
+}
+
+interface ContactPickerModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelectContact: (contact: DeviceContact) => void;
+  contacts: DeviceContact[];
+}
+
+function ContactPickerModal({ visible, onClose, onSelectContact, contacts }: ContactPickerModalProps) {
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.attachmentOverlay} onPress={onClose}>
+        <Pressable 
+          style={[
+            styles.contactPickerSheet, 
+            { 
+              backgroundColor: theme.backgroundRoot,
+              paddingBottom: insets.bottom + Spacing.lg,
+              maxHeight: "70%",
+            }
+          ]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={styles.attachmentHandle} />
+          <ThemedText type="h4" style={styles.contactPickerTitle}>Select Contact</ThemedText>
+          <FlatList
+            data={contacts}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <Pressable
+                style={[styles.contactPickerItem, { borderBottomColor: theme.border }]}
+                onPress={() => {
+                  onSelectContact(item);
+                  onClose();
+                }}
+              >
+                <View style={[styles.contactPickerAvatar, { backgroundColor: theme.backgroundSecondary }]}>
+                  <Feather name="user" size={20} color={theme.primary} />
+                </View>
+                <View style={styles.contactPickerInfo}>
+                  <ThemedText style={styles.contactPickerName}>{item.name}</ThemedText>
+                  {item.phoneNumber ? (
+                    <ThemedText style={[styles.contactPickerDetail, { color: theme.textSecondary }]}>
+                      {item.phoneNumber}
+                    </ThemedText>
+                  ) : null}
+                </View>
+              </Pressable>
+            )}
+            showsVerticalScrollIndicator={false}
+          />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -292,6 +513,8 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState("");
   const [showPayment, setShowPayment] = useState(false);
   const [showAttachments, setShowAttachments] = useState(false);
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [sending, setSending] = useState(false);
   const [balance, setBalance] = useState(0);
   const [chat, setChat] = useState<Chat | null>(null);
@@ -405,6 +628,54 @@ export default function ChatScreen() {
     return false;
   };
 
+  const requestLocationPermission = async (): Promise<boolean> => {
+    const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+    if (status === "granted") return true;
+    
+    if (!canAskAgain && Platform.OS !== "web") {
+      Alert.alert(
+        "Permission Required",
+        "Please enable location access in Settings to share your location.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Open Settings", 
+            onPress: async () => {
+              try {
+                await Linking.openSettings();
+              } catch (e) {}
+            }
+          },
+        ]
+      );
+    }
+    return false;
+  };
+
+  const requestContactsPermission = async (): Promise<boolean> => {
+    const { status, canAskAgain } = await Contacts.requestPermissionsAsync();
+    if (status === "granted") return true;
+    
+    if (!canAskAgain && Platform.OS !== "web") {
+      Alert.alert(
+        "Permission Required",
+        "Please enable contacts access in Settings to share contacts.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Open Settings", 
+            onPress: async () => {
+              try {
+                await Linking.openSettings();
+              } catch (e) {}
+            }
+          },
+        ]
+      );
+    }
+    return false;
+  };
+
   const handleAttachmentOption = async (optionId: string) => {
     switch (optionId) {
       case "photos":
@@ -415,8 +686,16 @@ export default function ChatScreen() {
           mediaTypes: ["images"],
           quality: 0.8,
         });
-        if (!photoResult.canceled) {
-          Alert.alert("Photo Selected", "Photo sharing coming soon!");
+        if (!photoResult.canceled && photoResult.assets[0]) {
+          const asset = photoResult.assets[0];
+          const message = await sendAttachmentMessage(chatId, "image", {
+            image: {
+              uri: asset.uri,
+              width: asset.width,
+              height: asset.height,
+            },
+          });
+          setMessages(prev => [message, ...prev]);
         }
         break;
       case "camera":
@@ -426,20 +705,117 @@ export default function ChatScreen() {
         const cameraResult = await ImagePicker.launchCameraAsync({
           quality: 0.8,
         });
-        if (!cameraResult.canceled) {
-          Alert.alert("Photo Captured", "Photo sharing coming soon!");
+        if (!cameraResult.canceled && cameraResult.assets[0]) {
+          const asset = cameraResult.assets[0];
+          const message = await sendAttachmentMessage(chatId, "image", {
+            image: {
+              uri: asset.uri,
+              width: asset.width,
+              height: asset.height,
+            },
+          });
+          setMessages(prev => [message, ...prev]);
         }
         break;
       case "location":
-        Alert.alert("Location", "Location sharing coming soon!");
+        if (Platform.OS === "web") {
+          Alert.alert("Not Available", "Run in Expo Go to use this feature");
+          return;
+        }
+        const hasLocationPermission = await requestLocationPermission();
+        if (!hasLocationPermission) return;
+        
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          const { latitude, longitude } = location.coords;
+          
+          let address: string | undefined;
+          try {
+            const [geocode] = await Location.reverseGeocodeAsync({ latitude, longitude });
+            if (geocode) {
+              const parts = [geocode.street, geocode.city, geocode.region].filter(Boolean);
+              address = parts.join(", ");
+            }
+          } catch (e) {}
+          
+          const message = await sendAttachmentMessage(chatId, "location", {
+            location: { latitude, longitude, address },
+          });
+          setMessages(prev => [message, ...prev]);
+        } catch (error) {
+          Alert.alert("Error", "Failed to get your location");
+        }
         break;
       case "contact":
-        Alert.alert("Contact", "Contact sharing coming soon!");
+        if (Platform.OS === "web") {
+          Alert.alert("Not Available", "Run in Expo Go to use this feature");
+          return;
+        }
+        const hasContactsPermission = await requestContactsPermission();
+        if (!hasContactsPermission) return;
+        
+        try {
+          const { data } = await Contacts.getContactsAsync({
+            fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
+          });
+          
+          if (data.length === 0) {
+            Alert.alert("No Contacts", "No contacts found on this device");
+            return;
+          }
+          
+          const mappedContacts: DeviceContact[] = data
+            .filter(c => c.name)
+            .map(c => ({
+              id: c.id || `contact-${Date.now()}-${Math.random()}`,
+              name: c.name || "Unknown",
+              phoneNumber: c.phoneNumbers?.[0]?.number,
+              email: c.emails?.[0]?.email,
+            }));
+          
+          setDeviceContacts(mappedContacts);
+          setShowContactPicker(true);
+        } catch (error) {
+          Alert.alert("Error", "Failed to access contacts");
+        }
         break;
       case "document":
-        Alert.alert("Document", "Document sharing coming soon!");
+        try {
+          const result = await DocumentPicker.getDocumentAsync({
+            type: "*/*",
+            copyToCacheDirectory: true,
+          });
+          
+          if (!result.canceled && result.assets[0]) {
+            const doc = result.assets[0];
+            const message = await sendAttachmentMessage(chatId, "document", {
+              document: {
+                uri: doc.uri,
+                name: doc.name,
+                mimeType: doc.mimeType,
+                size: doc.size,
+              },
+            });
+            setMessages(prev => [message, ...prev]);
+          }
+        } catch (error) {
+          Alert.alert("Error", "Failed to select document");
+        }
         break;
     }
+  };
+
+  const handleSelectContact = async (contact: DeviceContact) => {
+    const message = await sendAttachmentMessage(chatId, "contact", {
+      contact: {
+        name: contact.name,
+        phoneNumber: contact.phoneNumber,
+        email: contact.email,
+      },
+    });
+    setMessages(prev => [message, ...prev]);
   };
 
   const participant = chat?.participants[0];
@@ -533,6 +909,13 @@ export default function ChatScreen() {
         visible={showAttachments}
         onClose={() => setShowAttachments(false)}
         onSelectOption={handleAttachmentOption}
+      />
+
+      <ContactPickerModal
+        visible={showContactPicker}
+        onClose={() => setShowContactPicker(false)}
+        onSelectContact={handleSelectContact}
+        contacts={deviceContacts}
       />
     </ThemedView>
   );
@@ -771,5 +1154,148 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: Spacing.lg,
+  },
+  imageBubble: {
+    maxWidth: "80%",
+    borderRadius: BorderRadius.card,
+    overflow: "hidden",
+    marginBottom: Spacing.sm,
+  },
+  imageMessage: {
+    borderRadius: BorderRadius.card,
+  },
+  imageTime: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    fontSize: 11,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  locationBubble: {
+    maxWidth: "75%",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.card,
+    marginBottom: Spacing.sm,
+  },
+  locationPreview: {
+    width: "100%",
+    height: 80,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.sm,
+  },
+  locationInfo: {
+    marginBottom: Spacing.xs,
+  },
+  locationTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  locationAddress: {
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  locationCoords: {
+    fontSize: 11,
+  },
+  contactBubble: {
+    maxWidth: "75%",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.card,
+    marginBottom: Spacing.sm,
+  },
+  contactHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  contactAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  contactDetail: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  documentBubble: {
+    maxWidth: "75%",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.card,
+    marginBottom: Spacing.sm,
+  },
+  documentContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  documentIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+  documentInfo: {
+    flex: 1,
+  },
+  documentName: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  documentMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  contactPickerSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  contactPickerTitle: {
+    textAlign: "center",
+    marginBottom: Spacing.md,
+  },
+  contactPickerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  contactPickerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.md,
+  },
+  contactPickerInfo: {
+    flex: 1,
+  },
+  contactPickerName: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  contactPickerDetail: {
+    fontSize: 14,
+    marginTop: 2,
   },
 });
