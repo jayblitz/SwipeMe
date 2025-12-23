@@ -397,9 +397,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Recovery phrase not available for imported wallets" });
       }
       
+      // Decrypt the seed phrase on the server before returning
+      const decryptedSeedPhrase = decryptSensitiveData(wallet.encryptedSeedPhrase);
+      
       res.json({ 
         success: true,
-        encryptedSeedPhrase: wallet.encryptedSeedPhrase,
+        seedPhrase: decryptedSeedPhrase,
       });
     } catch (error) {
       console.error("Get recovery phrase error:", error);

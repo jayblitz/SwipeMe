@@ -52,9 +52,8 @@ export default function RecoveryPhraseScreen() {
         return;
       }
       
-      if (data.encryptedSeedPhrase) {
-        const decoded = atob(data.encryptedSeedPhrase);
-        setRecoveryPhrase(decoded.split(" "));
+      if (data.seedPhrase) {
+        setRecoveryPhrase(data.seedPhrase.split(" "));
       }
     } catch (err: any) {
       console.error("Fetch recovery phrase failed:", err);
