@@ -22,19 +22,24 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 - Contacts permission handling in Discover tab with FAB popup menu
 - Theme persistence via AsyncStorage
 
-**MVP Phase 2 (In Progress):**
+**MVP Phase 2 Complete:**
 - Real-time token balance fetching for all Tempo testnet assets (pathUSD, AlphaUSD, BetaUSD, ThetaUSD)
 - Multi-asset display in Wallet screen with individual token balances
 - Direct blockchain queries using viem for ERC-20 balances
+- P2P token transfers within chat conversations
+- Token selector in payment modal (choose which stablecoin to send)
+- Server-side transaction signing with AES-256-GCM wallet decryption
+- Full attachment system: photos, camera, location, contacts, documents
+- Chat input with attachment button (+) and header payment button ($)
 
 **MVP Limitations (Production Improvements Needed):**
 - API endpoints lack session-based authentication (production needs JWT or session tokens)
 - No XMTP integration yet (messages use local mock data)
-- Transaction signing not yet implemented
+- Gas sponsored transactions not yet implemented (transfers require TEMPO for gas)
 
 **Planned Features (Phase 3):**
 - XMTP SDK integration for E2E encrypted messaging
-- Transaction signing and sending on Tempo testnet
+- Gas-sponsored meta-transactions
 - Ramp SDK for fiat on-ramp
 - Session-based API authentication
 
@@ -115,6 +120,7 @@ shared/
 - POST /api/wallet/import - Import wallet using seed phrase or private key (validates with viem)
 - DELETE /api/wallet/:userId - Delete wallet (can be recovered via import)
 - GET /api/wallet/:userId/recovery - Get encrypted recovery phrase
+- POST /api/wallet/:userId/transfer - Execute ERC20 token transfer (server-side signing)
 
 ## Design System
 
