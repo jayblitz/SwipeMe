@@ -416,7 +416,7 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
           <Button 
             onPress={handleSend} 
             disabled={sending || !amount}
-            style={styles.sendButton}
+            style={styles.paymentSendButton}
           >
             {sending ? (
               <ActivityIndicator color="#FFFFFF" />
@@ -1154,6 +1154,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: Spacing.lg,
+  },
+  paymentSendButton: {
+    width: "100%",
+    marginTop: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
   },
   imageBubble: {
     maxWidth: "80%",
