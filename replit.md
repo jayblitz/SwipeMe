@@ -52,6 +52,7 @@ TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted mess
 **MVP Limitations (Production Improvements Needed):**
 - No XMTP integration yet (messages use local mock data) - deferred due to native SDK requirements
 - Gas sponsored transactions not yet implemented (users need TEMPO for gas, but can use faucet)
+- Voice message playback works on native devices (Expo Go) but has issues on web - requires native audio handling
 
 **Planned Features (Future):**
 - XMTP SDK integration for E2E encrypted messaging (requires development build, not Expo Go)
