@@ -63,8 +63,9 @@ function AttachmentsModal({ visible, onClose, onSelectOption }: AttachmentsModal
       transparent
       onRequestClose={onClose}
     >
-      <Pressable style={styles.attachmentOverlay} onPress={onClose}>
-        <Pressable 
+      <View style={styles.attachmentOverlay}>
+        <Pressable style={styles.attachmentOverlayTouch} onPress={onClose} />
+        <View 
           style={[
             styles.attachmentSheet, 
             { 
@@ -72,14 +73,16 @@ function AttachmentsModal({ visible, onClose, onSelectOption }: AttachmentsModal
               paddingBottom: insets.bottom + Spacing.lg,
             }
           ]}
-          onPress={(e) => e.stopPropagation()}
         >
           <View style={styles.attachmentHandle} />
           <View style={styles.attachmentGrid}>
             {attachmentOptions.map((option) => (
               <Pressable
                 key={option.id}
-                style={styles.attachmentItem}
+                style={({ pressed }) => [
+                  styles.attachmentItem,
+                  pressed && { opacity: 0.6 }
+                ]}
                 onPress={() => handleOptionPress(option.id)}
               >
                 <View style={[styles.attachmentIcon, { backgroundColor: theme.backgroundSecondary }]}>
@@ -91,8 +94,8 @@ function AttachmentsModal({ visible, onClose, onSelectOption }: AttachmentsModal
               </Pressable>
             ))}
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -1178,7 +1181,7 @@ export default function ChatScreen() {
           },
         ]
       );
-    } else if (status !== "granted") {
+    } else {
       Alert.alert("Permission Denied", "Photo library access is required to share photos.");
     }
     return false;
@@ -1204,7 +1207,7 @@ export default function ChatScreen() {
           },
         ]
       );
-    } else if (status !== "granted") {
+    } else {
       Alert.alert("Permission Denied", "Camera access is required to take photos.");
     }
     return false;
@@ -1230,7 +1233,7 @@ export default function ChatScreen() {
           },
         ]
       );
-    } else if (status !== "granted") {
+    } else {
       Alert.alert("Permission Denied", "Location access is required to share your location.");
     }
     return false;
@@ -1256,7 +1259,7 @@ export default function ChatScreen() {
           },
         ]
       );
-    } else if (status !== "granted") {
+    } else {
       Alert.alert("Permission Denied", "Contacts access is required to share contacts.");
     }
     return false;
@@ -1876,6 +1879,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "flex-end",
+  },
+  attachmentOverlayTouch: {
+    flex: 1,
   },
   attachmentSheet: {
     borderTopLeftRadius: 20,
