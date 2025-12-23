@@ -1,0 +1,148 @@
+### Next Step: Integrate XMTP for Real Decentralized Messaging
+
+Based on what you've built so far (as described in `replit.md`), your MVP is solid with authentication, wallet management, P2P payments, voice messages, and UI/navigation aligned to the design guidelines in `design_guidelines.md`. The key limitation is that messaging is still using local mock data—integrating XMTP will make chats real, end-to-end encrypted, and decentralized, fulfilling the core "basic messaging" feature of Version 1. This is a high-priority next step because it turns your app from a prototype into something testable with actual users.
+
+Gas sponsorship and Ramp (for fiat on-ramps) are also planned, but XMTP is foundational for the super app vision. However, the XMTP React Native SDK requires native modules, so it won't work in Expo Go (your current Replit setup). You'll need to create a **development build** using Expo's EAS (free tier available). This is doable in Replit with no cost, but it limits initial testing to Android (free sideload) unless you have an Apple Developer account ($99/year for iOS). Start with Android for proof-of-concept.
+
+Below, I'll outline the steps to set up a development build in Replit, then integrate XMTP. This assumes your current package.json and config files (e.g., app.json, tsconfig.json) are ready—your setup looks good with Expo 54 and React Native 0.81.
+
+#### Step 1: Set Up Expo Development Builds in Replit (1-2 Hours for Setup)
+1. **Install EAS CLI**: In your Replit shell (bottom panel), run:
+   ```
+   npm install -g eas-cli
+   ```
+   This is free and adds the EAS command-line tool.
+
+2. **Create an Expo Account**: If you don't have one, sign up at https://expo.dev/signup (free). Then login in Replit shell:
+   ```
+   eas login
+   ```
+   Follow the prompts (email/password or GitHub).
+
+3. **Configure EAS in app.json**: Add an `extra` section if not there (your app.json already has good basics):
+   ```json
+   "extra": {
+     "eas": {
+       "projectId": "your-project-id"  // You'll get this after step 4
+     }
+   }
+   ```
+   Save and commit.
+
+4. **Initialize EAS Project**: Run:
+   ```
+   eas init
+   ```
+   This creates a project on Expo's servers (free) and gives you a project ID—add it to app.json as above.
+
+5. **Create eas.json for Builds**: Add a new file `eas.json` in root:
+   ```json
+   {
+     "build": {
+       "development": {
+         "developmentClient": true,
+         "distribution": "internal",
+         "android": {
+           "gradleCommand": ":app:installDebug"
+         },
+         "ios": {
+           "simulator": true
+         }
+       }
+     }
+   }
+   ```
+   This defines a "development" profile.
+
+6. **Build for Android (Free)**: Run:
+   ```
+   eas build --profile development --platform android
+   ```
+   - This builds an APK on Expo's cloud (free tier: 30 builds/month, ~10-20 min wait).
+   - Download the APK from the link provided (or https://expo.dev/projects).
+   - On your Android phone: Enable "Install from unknown sources," sideload the APK via USB/email.
+
+7. **Test the Build**: Run `npx expo start --dev-client` in Replit. Scan the QR with the Expo Go app (it'll prompt to use the dev client). Your app now supports native modules!
+
+   **Note on iOS**: Skip for now (requires paid Apple Developer for .ipa build and TestFlight). Test on Android or emulator (install Android Studio in Replit if needed, but phone is better).
+
+   **Free Tier Limits**: EAS free plan has build concurrency limits and 100 GB/month artifacts—plenty for MVP.
+
+If issues (e.g., Replit env vars), add `EXPO_DEBUG=true` before commands for logs.
+
+#### Step 2: Install and Integrate XMTP SDK (1-2 Days of Iteration)
+Once dev build is ready, add XMTP.
+
+1. **Install Packages**: In shell:
+   ```
+   npx expo install @xmtp/react-native-sdk expo-dev-client
+   npm install @noble/secp256k1 @noble/hashes  // For crypto utils if needed
+   ```
+   Update for iOS (if building): Run `npx pod-install`.
+
+2. **Update Configs** (If Needed): Your babel.config.js and metro.config.js look fine; add if errors occur.
+
+3. **Create XMTP Client**: In a util file (e.g., `client/lib/xmtp-client.ts`):
+   ```tsx
+   import { Client } from '@xmtp/react-native-sdk';
+   import { useWalletClient } from 'viem';  // Assuming viem wallet from your setup
+
+   export async function initXMTPClient() {
+     const wallet = useWalletClient();  // Get from your wallet context
+     const signer = {
+       getAddress: async () => wallet.address,
+       signMessage: async (message) => await wallet.signMessage({ message }),
+     };
+     const client = await Client.create(signer, { env: 'dev' });  // Use 'production' later
+     return client;
+   }
+   ```
+
+4. **Replace Mock Messaging with XMTP**:
+   - In `ChatsScreen.tsx` and `ChatScreen.tsx`: Use XMTP to list/stream conversations.
+     Example in `ChatScreen.tsx`:
+     ```tsx
+     import { useEffect, useState } from 'react';
+     import { initXMTPClient } from '../lib/xmtp-client';
+
+     // In component
+     const [client, setClient] = useState(null);
+     useEffect(() => {
+       async function setup() {
+         const xmtp = await initXMTPClient();
+         setClient(xmtp);
+         // Stream messages
+         for await (const message of await xmtp.conversations.streamAllMessages()) {
+           // Update UI with message
+         }
+       }
+       setup();
+     }, []);
+
+     // Send message
+     async function sendMessage(convo, text) {
+       await convo.send(text);
+     }
+     ```
+   - For groups/1:1: Use `client.conversations.newConversation(recipientAddress)` or `newGroup([addresses])`.
+   - Integrate with your message bubbles/UI: Replace mock data with XMTP streams/lists.
+
+5. **Handle Permissions/Onboarding**: Tie to wallet (user must have wallet set up). Add error handling for network (Tempo testnet chain ID 42429).
+
+6. **Test**: Run in dev build on phone. Send/receive messages between accounts. Check E2E encryption works.
+
+#### Why This Over Other Features?
+- Messaging is the app's core (WeChat-like)—mock data limits usability.
+- Ramp integration is similar (native SDK), so do it next after dev build setup.
+- Gas sponsorship: Implement after (use viem with ERC-4337 paymaster; Tempo supports it natively—add a relayer in server/index.ts).
+
+If XMTP feels too complex, swap with Ramp: Install `@ramp-network/react-native-sdk`, create instance in WalletScreen.tsx for "Add Funds," e.g.:
+```tsx
+import RampSdk from '@ramp-network/react-native-sdk';
+
+const ramp = new RampSdk({ url: 'https://app.demo.ramp.network', hostAppName: 'TempoChat', hostLogoUrl: 'your-logo-url' });
+ramp.show();
+```
+Get a free Ramp demo API key from https://ramp.network/developers.
+
+Debug in Replit console/logs. If stuck, prompt Replit Agent with "Integrate XMTP into my Expo app" and paste code. Let me know progress or tweaks!
