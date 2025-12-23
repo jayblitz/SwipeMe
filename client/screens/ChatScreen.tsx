@@ -1178,6 +1178,8 @@ export default function ChatScreen() {
           },
         ]
       );
+    } else if (status !== "granted") {
+      Alert.alert("Permission Denied", "Photo library access is required to share photos.");
     }
     return false;
   };
@@ -1202,6 +1204,8 @@ export default function ChatScreen() {
           },
         ]
       );
+    } else if (status !== "granted") {
+      Alert.alert("Permission Denied", "Camera access is required to take photos.");
     }
     return false;
   };
@@ -1226,6 +1230,8 @@ export default function ChatScreen() {
           },
         ]
       );
+    } else if (status !== "granted") {
+      Alert.alert("Permission Denied", "Location access is required to share your location.");
     }
     return false;
   };
@@ -1250,6 +1256,8 @@ export default function ChatScreen() {
           },
         ]
       );
+    } else if (status !== "granted") {
+      Alert.alert("Permission Denied", "Contacts access is required to share contacts.");
     }
     return false;
   };
