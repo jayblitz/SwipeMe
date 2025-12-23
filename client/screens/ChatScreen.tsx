@@ -48,6 +48,13 @@ function AttachmentsModal({ visible, onClose, onSelectOption }: AttachmentsModal
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
 
+  const handleOptionPress = (optionId: string) => {
+    onClose();
+    setTimeout(() => {
+      onSelectOption(optionId);
+    }, 300);
+  };
+
   return (
     <Modal
       visible={visible}
@@ -72,10 +79,7 @@ function AttachmentsModal({ visible, onClose, onSelectOption }: AttachmentsModal
               <Pressable
                 key={option.id}
                 style={styles.attachmentItem}
-                onPress={() => {
-                  onSelectOption(option.id);
-                  onClose();
-                }}
+                onPress={() => handleOptionPress(option.id)}
               >
                 <View style={[styles.attachmentIcon, { backgroundColor: theme.backgroundSecondary }]}>
                   <Feather name={option.icon} size={24} color={option.color} />

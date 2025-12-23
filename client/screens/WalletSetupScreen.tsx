@@ -1,8 +1,10 @@
 import "react-native-get-random-values";
 import React, { useState } from "react";
-import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
+import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from "react-native-reanimated";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/Button";
@@ -13,6 +15,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import { generateMnemonic, english, mnemonicToAccount } from "viem/accounts";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 
 type SetupStep = "choose" | "creating" | "showPhrase" | "import";
 
@@ -34,6 +39,39 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
   const [error, setError] = useState("");
   const [importType, setImportType] = useState<"seed" | "private">("seed");
   const [phraseConfirmed, setPhraseConfirmed] = useState(false);
+
+  const translateX = useSharedValue(0);
+
+  const goBackToChoose = () => {
+    setStep("choose");
+    setGeneratedPhrase("");
+    setGeneratedAddress("");
+    setPhraseConfirmed(false);
+    setSeedPhrase("");
+    setPrivateKey("");
+    setError("");
+  };
+
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX(20)
+    .failOffsetY([-20, 20])
+    .onUpdate((event) => {
+      if (step !== "choose" && step !== "creating") {
+        translateX.value = Math.max(0, event.translationX);
+      }
+    })
+    .onEnd((event) => {
+      if (step !== "choose" && step !== "creating") {
+        if (event.translationX > SWIPE_THRESHOLD) {
+          runOnJS(goBackToChoose)();
+        }
+        translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
 
   const handleCreateNewWallet = async () => {
     if (!user) return;
@@ -228,12 +266,7 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
       >
         <View style={styles.phraseHeader}>
           <Pressable 
-            onPress={() => {
-              setStep("choose");
-              setGeneratedPhrase("");
-              setGeneratedAddress("");
-              setPhraseConfirmed(false);
-            }} 
+            onPress={goBackToChoose} 
             style={styles.backButton}
           >
             <Feather name="arrow-left" size={24} color={theme.text} />
@@ -310,7 +343,7 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
       ]}
     >
       <View style={styles.importHeader}>
-        <Pressable onPress={() => setStep("choose")} style={styles.backButton}>
+        <Pressable onPress={goBackToChoose} style={styles.backButton}>
           <Feather name="arrow-left" size={24} color={theme.text} />
         </Pressable>
         <ThemedText type="h3">Import Wallet</ThemedText>
@@ -411,13 +444,30 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
     </KeyboardAwareScrollViewCompat>
   );
 
+  const renderContent = () => {
+    if (step === "choose") return renderChooseStep();
+    if (step === "creating") return renderCreatingStep();
+    if (step === "showPhrase") return renderShowPhraseStep();
+    if (step === "import") return renderImportStep();
+    return null;
+  };
+
+  if (step === "choose" || step === "creating") {
+    return (
+      <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.xl }]}>
+        {renderContent()}
+      </ThemedView>
+    );
+  }
+
   return (
-    <ThemedView style={[styles.container, { paddingTop: step === "choose" || step === "creating" ? insets.top + Spacing.xl : insets.top + Spacing.md }]}>
-      {step === "choose" ? renderChooseStep() : null}
-      {step === "creating" ? renderCreatingStep() : null}
-      {step === "showPhrase" ? renderShowPhraseStep() : null}
-      {step === "import" ? renderImportStep() : null}
-    </ThemedView>
+    <GestureDetector gesture={swipeGesture}>
+      <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+        <ThemedView style={[styles.container, { paddingTop: insets.top + Spacing.md }]}>
+          {renderContent()}
+        </ThemedView>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
