@@ -1,5 +1,6 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet, View } from "react-native";
@@ -18,8 +19,36 @@ export type MainTabParamList = {
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+function getTabBarStyle(route: any, theme: any, isDark: boolean) {
+  const routeName = getFocusedRouteNameFromRoute(route) ?? "ChatsList";
+  
+  if (routeName === "Chat") {
+    return { display: "none" as const };
+  }
+
+  return {
+    position: "absolute" as const,
+    backgroundColor: Platform.select({
+      ios: "transparent",
+      android: theme.backgroundRoot,
+    }),
+    borderTopWidth: 0,
+    elevation: 0,
+  };
+}
+
 export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
+
+  const baseTabBarStyle = {
+    position: "absolute" as const,
+    backgroundColor: Platform.select({
+      ios: "transparent",
+      android: theme.backgroundRoot,
+    }),
+    borderTopWidth: 0,
+    elevation: 0,
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -28,15 +57,7 @@ export default function MainTabNavigator() {
         screenOptions={{
           tabBarActiveTintColor: theme.tabIconSelected,
           tabBarInactiveTintColor: theme.tabIconDefault,
-          tabBarStyle: {
-            position: "absolute",
-            backgroundColor: Platform.select({
-              ios: "transparent",
-              android: theme.backgroundRoot,
-            }),
-            borderTopWidth: 0,
-            elevation: 0,
-          },
+          tabBarStyle: baseTabBarStyle,
           tabBarBackground: () =>
             Platform.OS === "ios" ? (
               <BlurView
@@ -51,12 +72,13 @@ export default function MainTabNavigator() {
         <Tab.Screen
           name="ChatsTab"
           component={ChatsStackNavigator}
-          options={{
+          options={({ route }) => ({
             title: "Chats",
             tabBarIcon: ({ color, size }) => (
               <Feather name="message-circle" size={size} color={color} />
             ),
-          }}
+            tabBarStyle: getTabBarStyle(route, theme, isDark),
+          })}
         />
         <Tab.Screen
           name="WalletTab"
