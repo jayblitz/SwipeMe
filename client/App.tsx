@@ -13,28 +13,31 @@ import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { XMTPProvider } from "@/contexts/XMTPContext";
+import { PrivyProvider } from "@/contexts/PrivyContext";
 import { ThemeProvider } from "@/hooks/useTheme";
 
 export default function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <XMTPProvider>
-            <ThemeProvider>
-              <SafeAreaProvider>
-                <GestureHandlerRootView style={styles.root}>
-                  <KeyboardProvider>
-                    <NavigationContainer>
-                      <RootStackNavigator />
-                    </NavigationContainer>
-                    <StatusBar style="auto" />
-                  </KeyboardProvider>
-                </GestureHandlerRootView>
-              </SafeAreaProvider>
-            </ThemeProvider>
-          </XMTPProvider>
-        </AuthProvider>
+        <PrivyProvider>
+          <AuthProvider>
+            <XMTPProvider>
+              <ThemeProvider>
+                <SafeAreaProvider>
+                  <GestureHandlerRootView style={styles.root}>
+                    <KeyboardProvider>
+                      <NavigationContainer>
+                        <RootStackNavigator />
+                      </NavigationContainer>
+                      <StatusBar style="auto" />
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
+                </SafeAreaProvider>
+              </ThemeProvider>
+            </XMTPProvider>
+          </AuthProvider>
+        </PrivyProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

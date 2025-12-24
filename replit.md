@@ -81,7 +81,15 @@ SwipeMe is a WeChat-inspired super app MVP combining end-to-end encrypted messag
 - Relative asset paths for GoDaddy export compatibility
 - Ready for export: rename landing-page.html to index.html, include assets/images/icon.png
 
-**Note:** Privy integration was removed due to SDK incompatibility with Expo Go. Wallet creation now uses local viem-based wallet generation.
+**MVP Phase 5 In Progress (Privy Integration):**
+- Privy SDK (@privy-io/expo) integrated for email-based wallet setup
+- WalletSetupScreen offers "Continue with Email" option for managed wallet creation
+- Metro config updated with package resolvers for Privy compatibility (isows, zustand, jose)
+- EAS project created: @crypto4eva/swipeme (ID: 26540cf7-4cc6-4892-881f-a4070c21b3f2)
+- Android development build submitted to EAS Build (requires native modules not available in Expo Go)
+- Build URL: https://expo.dev/accounts/crypto4eva/projects/swipeme/builds/d4082879-e51b-4754-8e02-ae3cc95f0e17
+
+**Note:** Privy SDK requires a development build (not Expo Go). After the EAS build completes, download and install the APK on Android to test the Privy email wallet flow. iOS development builds deferred for now.
 
 ## Project Architecture
 
@@ -90,6 +98,7 @@ client/                     # Expo/React Native frontend
 ├── App.tsx                 # Root app component with providers
 ├── contexts/
 │   ├── AuthContext.tsx     # Authentication state management (signup, login, user updates)
+│   ├── PrivyContext.tsx    # Privy SDK provider for email-based wallet management
 │   └── XMTPContext.tsx     # XMTP client state management and initialization
 ├── screens/
 │   ├── AuthScreen.tsx      # Multi-step login/signup with email verification

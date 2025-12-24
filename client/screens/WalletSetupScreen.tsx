@@ -1,6 +1,6 @@
 import "react-native-get-random-values";
 import React, { useState } from "react";
-import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, Dimensions } from "react-native";
+import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, Dimensions, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -16,10 +16,25 @@ import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import { generateMnemonic, english, mnemonicToAccount } from "viem/accounts";
 
+let usePrivy: any = null;
+let useLoginWithEmail: any = null;
+let useEmbeddedEthereumWallet: any = null;
+
+if (Platform.OS !== "web") {
+  try {
+    const privyExpo = require("@privy-io/expo");
+    usePrivy = privyExpo.usePrivy;
+    useLoginWithEmail = privyExpo.useLoginWithEmail;
+    useEmbeddedEthereumWallet = privyExpo.useEmbeddedEthereumWallet;
+  } catch (e) {
+    console.log("Privy SDK not available");
+  }
+}
+
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 
-type SetupStep = "choose" | "creating" | "showPhrase" | "import";
+type SetupStep = "choose" | "creating" | "showPhrase" | "import" | "privyEmail";
 
 interface WalletSetupScreenProps {
   onWalletCreated: (wallet: { address: string }) => void;
@@ -39,6 +54,14 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
   const [error, setError] = useState("");
   const [importType, setImportType] = useState<"seed" | "private">("seed");
   const [phraseConfirmed, setPhraseConfirmed] = useState(false);
+  const [privyEmail, setPrivyEmail] = useState("");
+  const [privyOtp, setPrivyOtp] = useState("");
+  const [privyOtpSent, setPrivyOtpSent] = useState(false);
+
+  const privyAvailable = Platform.OS !== "web" && usePrivy !== null;
+  const privy = privyAvailable && usePrivy ? usePrivy() : null;
+  const loginWithEmail = privyAvailable && useLoginWithEmail ? useLoginWithEmail() : null;
+  const embeddedWallet = privyAvailable && useEmbeddedEthereumWallet ? useEmbeddedEthereumWallet() : null;
 
   const translateX = useSharedValue(0);
 
@@ -50,6 +73,9 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
     setSeedPhrase("");
     setPrivateKey("");
     setError("");
+    setPrivyEmail("");
+    setPrivyOtp("");
+    setPrivyOtpSent(false);
   };
 
   const swipeGesture = Gesture.Pan()
@@ -173,6 +199,137 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
     }
   };
 
+  const handlePrivySendCode = async () => {
+    if (!loginWithEmail || !privyEmail.trim()) return;
+    
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      await loginWithEmail.sendCode({ email: privyEmail.trim() });
+      setPrivyOtpSent(true);
+    } catch (err: any) {
+      console.error("Privy send code failed:", err);
+      setError(err.message || "Failed to send verification code");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePrivyVerifyCode = async () => {
+    if (!loginWithEmail || !privyOtp.trim()) return;
+    
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      await loginWithEmail.loginWithCode({ code: privyOtp.trim(), email: privyEmail.trim() });
+      
+      if (embeddedWallet && embeddedWallet.wallets.length === 0) {
+        await embeddedWallet.create();
+      }
+      
+      const walletAddress = embeddedWallet?.wallets[0]?.address;
+      if (walletAddress) {
+        const response = await apiRequest("POST", "/api/wallet/privy", {
+          userId: user?.id,
+          address: walletAddress,
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          onWalletCreated(data.wallet);
+        } else {
+          throw new Error(data.error || "Failed to link wallet");
+        }
+      } else {
+        Alert.alert("Success", "Wallet created! Please restart the app to see your wallet.");
+      }
+    } catch (err: any) {
+      console.error("Privy login failed:", err);
+      setError(err.message || "Failed to verify code");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderPrivyEmailStep = () => (
+    <KeyboardAwareScrollViewCompat
+      contentContainerStyle={[
+        styles.importContainer,
+        { paddingBottom: insets.bottom + Spacing.xl },
+      ]}
+    >
+      <View style={styles.importHeader}>
+        <Pressable onPress={goBackToChoose} style={styles.backButton}>
+          <Feather name="arrow-left" size={24} color={theme.text} />
+        </Pressable>
+        <ThemedText type="h3">Continue with Email</ThemedText>
+      </View>
+
+      <View style={styles.inputSection}>
+        <ThemedText style={[styles.inputLabel, { color: theme.textSecondary }]}>
+          {privyOtpSent ? "Enter the verification code sent to your email" : "Enter your email address"}
+        </ThemedText>
+        
+        {!privyOtpSent ? (
+          <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: error ? Colors.light.error : theme.border }]}>
+            <Feather name="mail" size={20} color={theme.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.input, { color: theme.text }]}
+              placeholder="your@email.com"
+              placeholderTextColor={theme.textSecondary}
+              value={privyEmail}
+              onChangeText={(text) => { setPrivyEmail(text); setError(""); }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        ) : (
+          <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: error ? Colors.light.error : theme.border }]}>
+            <Feather name="key" size={20} color={theme.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.input, { color: theme.text }]}
+              placeholder="Enter 6-digit code"
+              placeholderTextColor={theme.textSecondary}
+              value={privyOtp}
+              onChangeText={(text) => { setPrivyOtp(text); setError(""); }}
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+          </View>
+        )}
+        
+        {error ? (
+          <ThemedText style={[styles.errorText, { color: Colors.light.error }]}>{error}</ThemedText>
+        ) : null}
+      </View>
+
+      <Button 
+        onPress={privyOtpSent ? handlePrivyVerifyCode : handlePrivySendCode} 
+        disabled={isLoading || (!privyOtpSent && !privyEmail.trim()) || (privyOtpSent && privyOtp.length !== 6)}
+        style={styles.importButton}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : privyOtpSent ? (
+          "Verify and Create Wallet"
+        ) : (
+          "Send Verification Code"
+        )}
+      </Button>
+
+      {privyOtpSent ? (
+        <Pressable onPress={() => { setPrivyOtpSent(false); setPrivyOtp(""); }} style={styles.changeEmailButton}>
+          <ThemedText style={[styles.changeEmailText, { color: theme.primary }]}>
+            Change email address
+          </ThemedText>
+        </Pressable>
+      ) : null}
+    </KeyboardAwareScrollViewCompat>
+  );
+
   const renderChooseStep = () => (
     <View style={styles.chooseContainer}>
       <View style={styles.header}>
@@ -221,6 +378,26 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
             <Feather name="chevron-right" size={24} color={theme.textSecondary} />
           </Pressable>
         </Card>
+
+        {privyAvailable ? (
+          <Card style={styles.optionCard} elevation={1}>
+            <Pressable 
+              style={styles.optionButton}
+              onPress={() => setStep("privyEmail")}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: "#F3E8FF" }]}>
+                <Feather name="mail" size={24} color="#9333EA" />
+              </View>
+              <View style={styles.optionContent}>
+                <ThemedText style={styles.optionTitle}>Continue with Email</ThemedText>
+                <ThemedText style={[styles.optionDescription, { color: theme.textSecondary }]}>
+                  Create a wallet linked to your email
+                </ThemedText>
+              </View>
+              <Feather name="chevron-right" size={24} color={theme.textSecondary} />
+            </Pressable>
+          </Card>
+        ) : null}
       </View>
 
       <View style={styles.features}>
@@ -449,6 +626,7 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
     if (step === "creating") return renderCreatingStep();
     if (step === "showPhrase") return renderShowPhraseStep();
     if (step === "import") return renderImportStep();
+    if (step === "privyEmail") return renderPrivyEmailStep();
     return null;
   };
 
@@ -720,5 +898,29 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     marginTop: Spacing.md,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: Spacing.sm,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    height: "100%",
+  },
+  changeEmailButton: {
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+  },
+  changeEmailText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
