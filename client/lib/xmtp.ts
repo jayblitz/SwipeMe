@@ -100,11 +100,12 @@ export async function getConversations(): Promise<ConversationInfo[]> {
   for (const dm of dms) {
     const members = await dm.members();
     const peerMember = members.find(m => m.inboxId !== xmtpClient?.inboxId);
+    const peerAddress = peerMember?.identities?.[0]?.identifier || "";
     
     conversationInfos.push({
       id: dm.id,
       peerInboxId: peerMember?.inboxId || "",
-      peerAddress: peerMember?.addresses[0] || "",
+      peerAddress,
       dm,
     });
   }
@@ -118,7 +119,7 @@ export async function findOrCreateDm(peerAddress: string): Promise<ConversationI
   }
 
   const peerIdentity = new PublicIdentity(peerAddress as `0x${string}`, "ETHEREUM");
-  const peerInboxId = await xmtpClient.findInboxIdByIdentifier(peerIdentity);
+  const peerInboxId = await xmtpClient.findInboxIdFromIdentity(peerIdentity);
   
   if (!peerInboxId) {
     throw new Error("This address is not registered with XMTP");
