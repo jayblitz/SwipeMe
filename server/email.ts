@@ -47,9 +47,7 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     const { client, fromEmail } = await getResendClient();
     console.log(`Using from email: ${fromEmail}`);
     
-    const senderEmail = fromEmail?.includes('@gmail.com') || fromEmail?.includes('@yahoo.com') || fromEmail?.includes('@hotmail.com')
-      ? 'SwipeMe <onboarding@resend.dev>'
-      : fromEmail || 'SwipeMe <onboarding@resend.dev>';
+    const senderEmail = 'SwipeMe <noreply@swipeme.org>';
     
     console.log(`Sending from: ${senderEmail}`);
     
