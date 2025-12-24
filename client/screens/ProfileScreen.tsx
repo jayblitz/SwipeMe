@@ -830,7 +830,7 @@ export default function ProfileScreen() {
         </Pressable>
 
         <ThemedText style={[styles.version, { color: theme.textSecondary }]}>
-          TempoChat v1.0.0
+          SwipeMe v1.0.0
         </ThemedText>
       </ScrollView>
 

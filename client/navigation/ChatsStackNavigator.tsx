@@ -26,7 +26,7 @@ export default function ChatsStackNavigator() {
         name="ChatsList"
         component={ChatsScreen}
         options={{
-          headerTitle: () => <HeaderTitle title="TempoChat" />,
+          headerTitle: () => <HeaderTitle title="SwipeMe" />,
           headerRight: () => (
             <Pressable style={{ padding: 8 }}>
               <Feather name="search" size={22} color={theme.text} />

@@ -424,7 +424,7 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
       <View style={styles.warningCard}>
         <Feather name="alert-triangle" size={20} color={Colors.light.warning} />
         <ThemedText style={[styles.warningText, { color: theme.textSecondary }]}>
-          Never share your seed phrase or private key with anyone. TempoChat staff will never ask for this information.
+          Never share your seed phrase or private key with anyone. SwipeMe staff will never ask for this information.
         </ThemedText>
       </View>
 

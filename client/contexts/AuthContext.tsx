@@ -31,7 +31,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const USER_STORAGE_KEY = "@tempochat_user";
+const USER_STORAGE_KEY = "@swipeme_user";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

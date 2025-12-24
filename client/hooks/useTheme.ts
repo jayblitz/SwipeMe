@@ -14,7 +14,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const THEME_STORAGE_KEY = "@tempochat_theme_mode";
+const THEME_STORAGE_KEY = "@swipeme_theme_mode";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemColorScheme = useSystemColorScheme();

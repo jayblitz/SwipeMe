@@ -61,13 +61,13 @@ function PermissionRequest({ onRequestPermission }: { onRequestPermission: () =>
       </View>
       <ThemedText type="h3" style={styles.permissionTitle}>Find Your Friends</ThemedText>
       <ThemedText style={[styles.permissionSubtitle, { color: theme.textSecondary }]}>
-        Allow TempoChat to access your contacts to find friends who are already using the app.
+        Allow SwipeMe to access your contacts to find friends who are already using the app.
       </ThemedText>
       <Button onPress={onRequestPermission} style={styles.permissionButton}>
         Allow Access
       </Button>
       <ThemedText style={[styles.permissionNote, { color: theme.textSecondary }]}>
-        Your contacts are only used to find friends on TempoChat and are never shared.
+        Your contacts are only used to find friends on SwipeMe and are never shared.
       </ThemedText>
     </View>
   );
@@ -93,7 +93,7 @@ function PermissionDenied() {
       </View>
       <ThemedText type="h3" style={styles.permissionTitle}>Contacts Access Required</ThemedText>
       <ThemedText style={[styles.permissionSubtitle, { color: theme.textSecondary }]}>
-        To find your friends on TempoChat, please enable contacts access in your device settings.
+        To find your friends on SwipeMe, please enable contacts access in your device settings.
       </ThemedText>
       {Platform.OS !== "web" ? (
         <Button onPress={openSettings} style={styles.permissionButton}>
@@ -113,10 +113,10 @@ function EmptyState({ searchQuery }: { searchQuery: string }) {
         <Feather name="users" size={36} color={theme.textSecondary} />
       </View>
       <ThemedText style={[styles.emptyTitle, { fontWeight: "600" }]}>
-        {searchQuery ? "No contacts found" : "No friends on TempoChat yet"}
+        {searchQuery ? "No contacts found" : "No friends on SwipeMe yet"}
       </ThemedText>
       <ThemedText style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-        {searchQuery ? "Try a different search term" : "Invite your friends to join TempoChat"}
+        {searchQuery ? "Try a different search term" : "Invite your friends to join SwipeMe"}
       </ThemedText>
     </View>
   );
@@ -138,7 +138,7 @@ function FABMenu({ visible, onClose, onNewContact, onNewGroup, onPayAnyone, onSy
     { icon: "user-plus" as const, label: "New Contact", onPress: onNewContact },
     { icon: "users" as const, label: "New Group", onPress: onNewGroup },
     { icon: "send" as const, label: "Pay Anyone", onPress: onPayAnyone },
-    { icon: "refresh-cw" as const, label: "Contacts on TempoChat", onPress: onSyncContacts },
+    { icon: "refresh-cw" as const, label: "Contacts on SwipeMe", onPress: onSyncContacts },
   ];
 
   return (
@@ -260,7 +260,7 @@ export default function DiscoverScreen() {
     if (permissionStatus !== Contacts.PermissionStatus.GRANTED) {
       await requestPermission();
     } else {
-      Alert.alert("Syncing", "Checking your contacts for TempoChat users...");
+      Alert.alert("Syncing", "Checking your contacts for SwipeMe users...");
       await loadContacts();
     }
   };

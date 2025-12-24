@@ -1,11 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const CHATS_KEY = "@tempochat_chats";
-const MESSAGES_KEY = "@tempochat_messages";
-const TRANSACTIONS_KEY = "@tempochat_transactions";
-const BALANCE_KEY = "@tempochat_balance";
-const CONTACTS_KEY = "@tempochat_contacts";
-const STORAGE_VERSION_KEY = "@tempochat_storage_version";
+const CHATS_KEY = "@swipeme_chats";
+const MESSAGES_KEY = "@swipeme_messages";
+const TRANSACTIONS_KEY = "@swipeme_transactions";
+const BALANCE_KEY = "@swipeme_balance";
+const CONTACTS_KEY = "@swipeme_contacts";
+const STORAGE_VERSION_KEY = "@swipeme_storage_version";
 const CURRENT_STORAGE_VERSION = "2";
 
 export interface Contact {
@@ -510,7 +510,7 @@ export async function clearAllData(): Promise<void> {
   }
 }
 
-const CHAT_BACKGROUNDS_KEY = "@tempochat_chat_backgrounds";
+const CHAT_BACKGROUNDS_KEY = "@swipeme_chat_backgrounds";
 
 export interface ChatBackground {
   type: "color" | "image" | "preset";

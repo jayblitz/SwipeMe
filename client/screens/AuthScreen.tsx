@@ -398,9 +398,9 @@ export default function AuthScreen() {
               style={styles.logo}
               resizeMode="contain"
             />
-            <ThemedText type="h2" style={styles.title}>TempoChat</ThemedText>
-            <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Secure messaging with instant payments
+            <ThemedText type="h2" style={styles.title}>SwipeMe</ThemedText>
+            <ThemedText style={[styles.tagline, { color: Colors.light.primary }]}>
+              Just SwipeMe – instant money, straight from your chat
             </ThemedText>
           </View>
         ) : null}
@@ -458,6 +458,12 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     textAlign: "center",
+  },
+  tagline: {
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "500",
+    marginTop: Spacing.sm,
   },
   stepHeader: {
     flexDirection: "row",
