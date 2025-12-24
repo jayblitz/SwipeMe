@@ -1,4 +1,4 @@
-# TempoChat Design Guidelines
+# SwipeMe Design Guidelines
 
 ## Architecture Decisions
 

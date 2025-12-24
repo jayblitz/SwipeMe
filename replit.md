@@ -1,8 +1,8 @@
-# TempoChat - WeChat-Style Super App
+# SwipeMe - WeChat-Style Super App
 
 ## Overview
 
-TempoChat is a WeChat-inspired super app MVP combining end-to-end encrypted messaging and blockchain-based P2P payments. Built with Expo (React Native) for cross-platform mobile experience.
+SwipeMe is a WeChat-inspired super app MVP combining end-to-end encrypted messaging and blockchain-based P2P payments. The tagline is "Just SwipeMe – instant money, straight from your chat". Built with Expo (React Native) for cross-platform mobile experience.
 
 ## Current State
 
