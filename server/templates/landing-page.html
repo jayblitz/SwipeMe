@@ -91,14 +91,14 @@
     .nav-logo-icon {
       width: 40px;
       height: 40px;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
       border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--white);
-      font-weight: 800;
-      font-size: 20px;
+      overflow: hidden;
+    }
+
+    .nav-logo-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     .nav-logo-text {
@@ -446,92 +446,384 @@
       line-height: 1.7;
     }
 
-    /* Promos Section */
-    .promos {
+    /* App Preview Section */
+    .app-preview {
       padding: 100px 0;
       background: linear-gradient(180deg, var(--gray-100) 0%, var(--white) 100%);
     }
 
-    .promos-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px;
+    .app-screens {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 40px;
+      margin-top: 60px;
     }
 
-    .promo-card {
+    .app-screen {
+      text-align: center;
+    }
+
+    .app-screen.featured {
+      transform: scale(1.1);
+      z-index: 2;
+    }
+
+    .phone-frame {
+      width: 280px;
+      height: 560px;
+      background: var(--gray-900);
+      border-radius: 40px;
+      padding: 12px;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255,255,255,0.1) inset;
+      position: relative;
+    }
+
+    .phone-frame::before {
+      content: '';
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 24px;
+      background: var(--dark);
+      border-radius: 20px;
+      z-index: 10;
+    }
+
+    .phone-screen {
+      width: 100%;
+      height: 100%;
       background: var(--white);
-      border: 1px solid var(--gray-200);
-      border-radius: 16px;
-      padding: 24px;
-      transition: transform 0.3s, box-shadow 0.3s;
+      border-radius: 32px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
-    .promo-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+    .mock-header {
+      background: var(--gray-100);
+      padding: 48px 16px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
-    .promo-header {
+    .mock-header.dark {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: var(--white);
+    }
+
+    .mock-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .mock-icon {
+      width: 24px;
+      height: 24px;
+      background: var(--gray-300);
+      border-radius: 6px;
+    }
+
+    .mock-header.dark .mock-icon {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .mock-back {
+      width: 24px;
+      height: 24px;
+      background: var(--gray-300);
+      border-radius: 6px;
+    }
+
+    .mock-icon.payment {
+      background: var(--primary);
+    }
+
+    .mock-chat-list {
+      flex: 1;
+      padding: 8px;
+      overflow: hidden;
+    }
+
+    .mock-chat-item {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 16px;
+      padding: 12px;
+      border-radius: 12px;
+      transition: background 0.2s;
     }
 
-    .promo-logo {
+    .mock-chat-item:hover {
+      background: var(--gray-100);
+    }
+
+    .mock-avatar {
       width: 48px;
       height: 48px;
-      background: var(--gray-200);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
+      border-radius: 50%;
+      flex-shrink: 0;
     }
 
-    .promo-brand {
-      font-size: 18px;
+    .mock-chat-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .mock-chat-name {
+      font-size: 14px;
       font-weight: 600;
       color: var(--gray-900);
     }
 
-    .promo-discount {
-      font-size: 28px;
-      font-weight: 800;
-      color: var(--primary);
-      margin-bottom: 8px;
+    .mock-chat-message {
+      font-size: 12px;
+      color: var(--gray-500);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .promo-description {
-      font-size: 14px;
-      color: var(--gray-600);
+    .mock-time {
+      font-size: 11px;
+      color: var(--gray-400);
+    }
+
+    .mock-nav-bar {
+      display: flex;
+      justify-content: space-around;
+      padding: 12px 8px;
+      background: var(--gray-100);
+      border-top: 1px solid var(--gray-200);
+    }
+
+    .mock-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: var(--gray-500);
+    }
+
+    .mock-nav-item.active {
+      color: var(--primary);
+    }
+
+    .mock-nav-icon {
+      width: 24px;
+      height: 24px;
+      background: currentColor;
+      border-radius: 6px;
+      opacity: 0.3;
+    }
+
+    .mock-nav-item.active .mock-nav-icon {
+      opacity: 1;
+    }
+
+    .mock-wallet {
+      flex: 1;
+      padding: 16px;
+      background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 50%, var(--white) 50%);
+    }
+
+    .mock-balance-card {
+      background: var(--white);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
       margin-bottom: 16px;
     }
 
-    .promo-timer {
+    .mock-balance-label {
+      font-size: 12px;
+      color: var(--gray-500);
+      margin-bottom: 4px;
+    }
+
+    .mock-balance-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--gray-900);
+    }
+
+    .mock-balance-change {
+      font-size: 12px;
+      color: var(--success);
+      margin-top: 4px;
+    }
+
+    .mock-tokens {
       display: flex;
+      flex-direction: column;
       gap: 8px;
     }
 
-    .timer-block {
-      background: var(--gray-100);
-      border-radius: 8px;
-      padding: 8px 12px;
-      text-align: center;
-      min-width: 52px;
+    .mock-token {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--white);
+      padding: 12px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
-    .timer-value {
+    .mock-token-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--white);
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .mock-token-info {
+      flex: 1;
+    }
+
+    .mock-token-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-900);
+    }
+
+    .mock-token-amount {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-700);
+    }
+
+    .mock-messages {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .mock-message {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mock-message.sent {
+      align-items: flex-end;
+    }
+
+    .mock-message.received {
+      align-items: flex-start;
+    }
+
+    .mock-msg-bubble {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .mock-message.sent .mock-msg-bubble {
+      background: var(--primary);
+      color: var(--white);
+      border-bottom-right-radius: 4px;
+    }
+
+    .mock-message.received .mock-msg-bubble {
+      background: var(--gray-200);
+      color: var(--gray-900);
+      border-bottom-left-radius: 4px;
+    }
+
+    .mock-msg-time {
+      font-size: 10px;
+      color: var(--gray-400);
+      margin-top: 4px;
+      padding: 0 4px;
+    }
+
+    .mock-payment-bubble {
+      background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+      color: var(--white);
+      padding: 14px 18px;
+      border-radius: 16px;
+      text-align: center;
+      border-bottom-right-radius: 4px;
+    }
+
+    .mock-payment-icon {
+      width: 32px;
+      height: 32px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 50%;
+      margin: 0 auto 8px;
+    }
+
+    .mock-payment-amount {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .mock-payment-status {
+      font-size: 10px;
+      opacity: 0.8;
+      margin-top: 4px;
+    }
+
+    .mock-input-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: var(--gray-100);
+      border-top: 1px solid var(--gray-200);
+    }
+
+    .mock-attach {
+      width: 32px;
+      height: 32px;
+      background: var(--gray-300);
+      border-radius: 50%;
+    }
+
+    .mock-input {
+      flex: 1;
+      background: var(--white);
+      padding: 10px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--gray-400);
+    }
+
+    .mock-send {
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      border-radius: 50%;
+    }
+
+    .screen-label {
       font-size: 18px;
       font-weight: 700;
       color: var(--gray-900);
-      display: block;
+      margin-top: 24px;
+      margin-bottom: 8px;
     }
 
-    .timer-label {
-      font-size: 10px;
-      color: var(--gray-500);
-      text-transform: uppercase;
+    .screen-description {
+      font-size: 14px;
+      color: var(--gray-600);
+      max-width: 240px;
+      margin: 0 auto;
     }
 
     /* Security Section */
@@ -734,14 +1026,14 @@
     .footer-brand-icon {
       width: 40px;
       height: 40px;
-      background: var(--primary);
       border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--white);
-      font-weight: 800;
-      font-size: 20px;
+      overflow: hidden;
+    }
+
+    .footer-brand-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     .footer-brand-text {
@@ -887,6 +1179,19 @@
         grid-template-columns: repeat(2, 1fr);
       }
 
+      .app-screens {
+        gap: 24px;
+      }
+
+      .app-screen.featured {
+        transform: scale(1.05);
+      }
+
+      .phone-frame {
+        width: 240px;
+        height: 480px;
+      }
+
       .security-grid {
         grid-template-columns: 1fr;
         gap: 48px;
@@ -940,8 +1245,24 @@
         grid-template-columns: 1fr;
       }
 
-      .promos-grid {
-        grid-template-columns: 1fr;
+      .app-screens {
+        flex-direction: column;
+        align-items: center;
+        gap: 40px;
+      }
+
+      .app-screen.featured {
+        transform: none;
+        order: -1;
+      }
+
+      .phone-frame {
+        width: 260px;
+        height: 520px;
+      }
+
+      .app-screens .app-screen:not(.featured) {
+        display: block;
       }
 
       .security-content h3 {
@@ -995,12 +1316,12 @@
   <nav class="nav">
     <div class="nav-container">
       <a href="#" class="nav-logo">
-        <div class="nav-logo-icon">S</div>
+        <div class="nav-logo-icon"><img src="/assets/images/icon.png" alt="SwipeMe"></div>
         <span class="nav-logo-text">SwipeMe</span>
       </a>
       <div class="nav-links">
         <a href="#features" class="nav-link">Features</a>
-        <a href="#promos" class="nav-link">Merchants</a>
+        <a href="#app-preview" class="nav-link">App Preview</a>
         <a href="#security" class="nav-link">Security</a>
         <a href="#waitlist" class="nav-cta">Get Early Access</a>
       </div>
@@ -1113,124 +1434,177 @@
     </div>
   </section>
 
-  <!-- Promos Section -->
-  <section class="promos" id="promos">
+  <!-- App Preview Section -->
+  <section class="app-preview" id="app-preview">
     <div class="container">
       <div class="section-header fade-in">
-        <span class="section-label">Merchant Network</span>
-        <h2 class="section-title">An Extensive Merchant Network</h2>
-        <p class="section-subtitle">Pay with SwipeMe at partner merchants and earn exclusive discounts with stablecoin payments.</p>
+        <span class="section-label">App Preview</span>
+        <h2 class="section-title">See SwipeMe in Action</h2>
+        <p class="section-subtitle">A beautiful, intuitive interface designed for seamless messaging and payments.</p>
       </div>
-      <div class="promos-grid">
-        <div class="promo-card fade-in">
-          <div class="promo-header">
-            <div class="promo-logo">C</div>
-            <span class="promo-brand">CoffeeChain</span>
+      <div class="app-screens fade-in">
+        <div class="app-screen">
+          <div class="phone-frame">
+            <div class="phone-screen" id="screen-chats">
+              <div class="mock-header">
+                <div class="mock-title">Chats</div>
+                <div class="mock-icon"></div>
+              </div>
+              <div class="mock-chat-list">
+                <div class="mock-chat-item">
+                  <div class="mock-avatar" style="background: #10B981;"></div>
+                  <div class="mock-chat-content">
+                    <div class="mock-chat-name">Alex Chen</div>
+                    <div class="mock-chat-message">Thanks for the payment!</div>
+                  </div>
+                  <div class="mock-time">2m</div>
+                </div>
+                <div class="mock-chat-item">
+                  <div class="mock-avatar" style="background: #8B5CF6;"></div>
+                  <div class="mock-chat-content">
+                    <div class="mock-chat-name">Sarah Kim</div>
+                    <div class="mock-chat-message">Sent 25 pathUSD</div>
+                  </div>
+                  <div class="mock-time">1h</div>
+                </div>
+                <div class="mock-chat-item">
+                  <div class="mock-avatar" style="background: #F59E0B;"></div>
+                  <div class="mock-chat-content">
+                    <div class="mock-chat-name">Mike R.</div>
+                    <div class="mock-chat-message">Voice message</div>
+                  </div>
+                  <div class="mock-time">3h</div>
+                </div>
+                <div class="mock-chat-item">
+                  <div class="mock-avatar" style="background: #EC4899;"></div>
+                  <div class="mock-chat-content">
+                    <div class="mock-chat-name">Emma W.</div>
+                    <div class="mock-chat-message">See you tomorrow!</div>
+                  </div>
+                  <div class="mock-time">5h</div>
+                </div>
+              </div>
+              <div class="mock-nav-bar">
+                <div class="mock-nav-item active">
+                  <div class="mock-nav-icon"></div>
+                  <span>Chats</span>
+                </div>
+                <div class="mock-nav-item">
+                  <div class="mock-nav-icon"></div>
+                  <span>Wallet</span>
+                </div>
+                <div class="mock-nav-item">
+                  <div class="mock-nav-icon"></div>
+                  <span>Discover</span>
+                </div>
+                <div class="mock-nav-item">
+                  <div class="mock-nav-icon"></div>
+                  <span>Profile</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="promo-discount">15% OFF</div>
-          <p class="promo-description">Pay with pathUSD at any CoffeeChain location and save on your daily brew.</p>
-          <div class="promo-timer" data-days="52" data-hours="14" data-mins="32">
-            <div class="timer-block">
-              <span class="timer-value days">52</span>
-              <span class="timer-label">Days</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value hours">14</span>
-              <span class="timer-label">Hours</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value mins">32</span>
-              <span class="timer-label">Mins</span>
-            </div>
-          </div>
+          <h4 class="screen-label">Chat List</h4>
+          <p class="screen-description">All your conversations in one place with payment indicators</p>
         </div>
-        <div class="promo-card fade-in">
-          <div class="promo-header">
-            <div class="promo-logo">T</div>
-            <span class="promo-brand">TechMart</span>
+        <div class="app-screen featured">
+          <div class="phone-frame">
+            <div class="phone-screen" id="screen-wallet">
+              <div class="mock-header dark">
+                <div class="mock-title">Wallet</div>
+                <div class="mock-icon"></div>
+              </div>
+              <div class="mock-wallet">
+                <div class="mock-balance-card">
+                  <div class="mock-balance-label">Total Balance</div>
+                  <div class="mock-balance-value">$2,547.82</div>
+                  <div class="mock-balance-change">+2.4% today</div>
+                </div>
+                <div class="mock-tokens">
+                  <div class="mock-token">
+                    <div class="mock-token-icon" style="background: #0066FF;">p</div>
+                    <div class="mock-token-info">
+                      <div class="mock-token-name">pathUSD</div>
+                      <div class="mock-token-amount">1,250.00</div>
+                    </div>
+                  </div>
+                  <div class="mock-token">
+                    <div class="mock-token-icon" style="background: #10B981;">a</div>
+                    <div class="mock-token-info">
+                      <div class="mock-token-name">AlphaUSD</div>
+                      <div class="mock-token-amount">847.32</div>
+                    </div>
+                  </div>
+                  <div class="mock-token">
+                    <div class="mock-token-icon" style="background: #8B5CF6;">b</div>
+                    <div class="mock-token-info">
+                      <div class="mock-token-name">BetaUSD</div>
+                      <div class="mock-token-amount">450.50</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="mock-nav-bar">
+                <div class="mock-nav-item">
+                  <div class="mock-nav-icon"></div>
+                  <span>Chats</span>
+                </div>
+                <div class="mock-nav-item active">
+                  <div class="mock-nav-icon"></div>
+                  <span>Wallet</span>
+                </div>
+                <div class="mock-nav-item">
+                  <div class="mock-nav-icon"></div>
+                  <span>Discover</span>
+                </div>
+                <div class="mock-nav-item">
+                  <div class="mock-nav-icon"></div>
+                  <span>Profile</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="promo-discount">20% OFF</div>
-          <p class="promo-description">Get 20% off electronics when you pay with any supported stablecoin.</p>
-          <div class="promo-timer" data-days="30" data-hours="8" data-mins="45">
-            <div class="timer-block">
-              <span class="timer-value days">30</span>
-              <span class="timer-label">Days</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value hours">08</span>
-              <span class="timer-label">Hours</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value mins">45</span>
-              <span class="timer-label">Mins</span>
-            </div>
-          </div>
+          <h4 class="screen-label">Wallet Dashboard</h4>
+          <p class="screen-description">Multi-stablecoin support with real-time balances</p>
         </div>
-        <div class="promo-card fade-in">
-          <div class="promo-header">
-            <div class="promo-logo">F</div>
-            <span class="promo-brand">FreshGrocer</span>
-          </div>
-          <div class="promo-discount">10% OFF</div>
-          <p class="promo-description">Save on groceries every week with SwipeMe stablecoin payments.</p>
-          <div class="promo-timer" data-days="7" data-hours="23" data-mins="59">
-            <div class="timer-block">
-              <span class="timer-value days">07</span>
-              <span class="timer-label">Days</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value hours">23</span>
-              <span class="timer-label">Hours</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value mins">59</span>
-              <span class="timer-label">Mins</span>
-            </div>
-          </div>
-        </div>
-        <div class="promo-card fade-in">
-          <div class="promo-header">
-            <div class="promo-logo">R</div>
-            <span class="promo-brand">RideShare</span>
-          </div>
-          <div class="promo-discount">25% OFF</div>
-          <p class="promo-description">First 5 rides are 25% off when you pay with AlphaUSD or BetaUSD.</p>
-          <div class="promo-timer" data-days="14" data-hours="6" data-mins="20">
-            <div class="timer-block">
-              <span class="timer-value days">14</span>
-              <span class="timer-label">Days</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value hours">06</span>
-              <span class="timer-label">Hours</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value mins">20</span>
-              <span class="timer-label">Mins</span>
+        <div class="app-screen">
+          <div class="phone-frame">
+            <div class="phone-screen" id="screen-payment">
+              <div class="mock-header">
+                <div class="mock-back"></div>
+                <div class="mock-title">Alex Chen</div>
+                <div class="mock-icon payment"></div>
+              </div>
+              <div class="mock-messages">
+                <div class="mock-message received">
+                  <div class="mock-msg-bubble">Hey, can you send me the 50 for lunch?</div>
+                  <div class="mock-msg-time">2:30 PM</div>
+                </div>
+                <div class="mock-message sent">
+                  <div class="mock-msg-bubble">Sure, sending now!</div>
+                  <div class="mock-msg-time">2:31 PM</div>
+                </div>
+                <div class="mock-message sent payment-msg">
+                  <div class="mock-payment-bubble">
+                    <div class="mock-payment-icon"></div>
+                    <div class="mock-payment-amount">50 pathUSD</div>
+                    <div class="mock-payment-status">Sent</div>
+                  </div>
+                </div>
+                <div class="mock-message received">
+                  <div class="mock-msg-bubble">Thanks! Got it</div>
+                  <div class="mock-msg-time">2:32 PM</div>
+                </div>
+              </div>
+              <div class="mock-input-bar">
+                <div class="mock-attach"></div>
+                <div class="mock-input">Message...</div>
+                <div class="mock-send"></div>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="promo-card fade-in">
-          <div class="promo-header">
-            <div class="promo-logo">G</div>
-            <span class="promo-brand">GameZone</span>
-          </div>
-          <div class="promo-discount">30% OFF</div>
-          <p class="promo-description">Exclusive gaming deals for SwipeMe users. Pay with crypto, save big.</p>
-          <div class="promo-timer" data-days="21" data-hours="12" data-mins="0">
-            <div class="timer-block">
-              <span class="timer-value days">21</span>
-              <span class="timer-label">Days</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value hours">12</span>
-              <span class="timer-label">Hours</span>
-            </div>
-            <div class="timer-block">
-              <span class="timer-value mins">00</span>
-              <span class="timer-label">Mins</span>
-            </div>
-          </div>
+          <h4 class="screen-label">In-Chat Payments</h4>
+          <p class="screen-description">Send money directly within your conversations</p>
         </div>
       </div>
     </div>
@@ -1320,7 +1694,7 @@
       <div class="footer-grid">
         <div>
           <div class="footer-brand">
-            <div class="footer-brand-icon">S</div>
+            <div class="footer-brand-icon"><img src="/assets/images/icon.png" alt="SwipeMe"></div>
             <span class="footer-brand-text">SwipeMe</span>
           </div>
           <p class="footer-description">
@@ -1368,7 +1742,7 @@
           <h4 class="footer-title">Product</h4>
           <div class="footer-links">
             <a href="#features" class="footer-link">Features</a>
-            <a href="#promos" class="footer-link">Merchants</a>
+            <a href="#app-preview" class="footer-link">App Preview</a>
             <a href="#security" class="footer-link">Security</a>
             <a href="#" class="footer-link">Roadmap</a>
           </div>
@@ -1420,48 +1794,6 @@
 
     document.querySelectorAll('.fade-in').forEach(el => {
       observer.observe(el);
-    });
-
-    // Countdown timers with seconds
-    document.querySelectorAll('.promo-timer').forEach(timer => {
-      let days = parseInt(timer.dataset.days) || 0;
-      let hours = parseInt(timer.dataset.hours) || 0;
-      let mins = parseInt(timer.dataset.mins) || 0;
-      let secs = 59;
-      
-      const secsBlock = document.createElement('div');
-      secsBlock.className = 'timer-block';
-      secsBlock.innerHTML = '<span class="timer-value secs">59</span><span class="timer-label">Secs</span>';
-      timer.appendChild(secsBlock);
-
-      function updateTimer() {
-        secs--;
-        if (secs < 0) {
-          secs = 59;
-          mins--;
-        }
-        if (mins < 0) {
-          mins = 59;
-          hours--;
-        }
-        if (hours < 0) {
-          hours = 23;
-          days--;
-        }
-        if (days < 0) {
-          days = 0;
-          hours = 0;
-          mins = 0;
-          secs = 0;
-        }
-
-        timer.querySelector('.days').textContent = String(days).padStart(2, '0');
-        timer.querySelector('.hours').textContent = String(hours).padStart(2, '0');
-        timer.querySelector('.mins').textContent = String(mins).padStart(2, '0');
-        timer.querySelector('.secs').textContent = String(secs).padStart(2, '0');
-      }
-
-      setInterval(updateTimer, 1000);
     });
 
     // Smooth scroll for navigation
