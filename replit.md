@@ -73,6 +73,13 @@ SwipeMe is a WeChat-inspired super app MVP combining end-to-end encrypted messag
 - Gas-sponsored meta-transactions
 - Ramp SDK for fiat on-ramp
 
+**Marketing Landing Page:**
+- Marketing website served on Express port 5000 (server/templates/landing-page.html)
+- Desktop-optimized with mobile responsive breakpoints
+- Waitlist signup form with database storage (waitlist_signups table)
+- App Store/Google Play buttons show "Coming Soon" alert
+- Relative asset paths for GoDaddy export compatibility
+
 **Note:** Privy integration was removed due to SDK incompatibility with Expo Go. Wallet creation now uses local viem-based wallet generation.
 
 ## Project Architecture
@@ -133,6 +140,7 @@ shared/
 - **chat_participants**: id, chatId, userId, role, timestamps
 - **messages**: id, chatId, senderId, content, type, timestamps
 - **transactions**: id, chatId, messageId, senderId, receiverId, amount, currency, status, txHash, timestamps
+- **waitlist_signups**: id, email (unique), source, createdAt
 
 ## API Routes
 

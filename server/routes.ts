@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
 import { storage, verifyPassword } from "./storage";
 import { sendVerificationEmail } from "./email";
-import { signupSchema, verifyCodeSchema, setPasswordSchema, loginSchema } from "@shared/schema";
+import { signupSchema, verifyCodeSchema, setPasswordSchema, loginSchema, waitlistSchema } from "@shared/schema";
 import { z } from "zod";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
@@ -181,6 +181,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } else {
       res.json({ authenticated: false });
+    }
+  });
+
+  app.post("/api/waitlist", async (req: Request, res: Response) => {
+    try {
+      const { email } = waitlistSchema.parse(req.body);
+      
+      const existing = await storage.getWaitlistSignupByEmail(email);
+      if (existing) {
+        return res.status(409).json({ error: "You're already on our waitlist!" });
+      }
+      
+      await storage.createWaitlistSignup(email, "landing_page");
+      res.json({ success: true, message: "You've been added to the waitlist!" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Waitlist signup error:", error);
+      res.status(500).json({ error: "Something went wrong. Please try again." });
+    }
+  });
+
+  app.get("/api/waitlist", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const signups = await storage.getAllWaitlistSignups();
+      res.json({ signups });
+    } catch (error) {
+      console.error("Get waitlist error:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 

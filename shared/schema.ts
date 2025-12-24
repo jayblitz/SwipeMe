@@ -137,3 +137,18 @@ export type Chat = typeof chats.$inferSelect;
 export type ChatParticipant = typeof chatParticipants.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
+
+export const waitlistSignups = pgTable("waitlist_signups", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  source: text("source").default("landing_page"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const waitlistSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
+export type WaitlistSignup = typeof waitlistSignups.$inferSelect;

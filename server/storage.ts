@@ -9,9 +9,11 @@ import {
   chatParticipants, 
   messages, 
   transactions,
+  waitlistSignups,
   type User,
   type VerificationCode,
-  type Wallet
+  type Wallet,
+  type WaitlistSignup
 } from "@shared/schema";
 import { randomBytes, createHash, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -134,5 +136,22 @@ export const storage = {
   async deleteWallet(userId: string): Promise<boolean> {
     const result = await db.delete(wallets).where(eq(wallets.userId, userId));
     return true;
+  },
+
+  async createWaitlistSignup(email: string, source: string = "landing_page"): Promise<WaitlistSignup> {
+    const [signup] = await db.insert(waitlistSignups).values({
+      email: email.toLowerCase(),
+      source,
+    }).returning();
+    return signup;
+  },
+
+  async getWaitlistSignupByEmail(email: string): Promise<WaitlistSignup | undefined> {
+    const [signup] = await db.select().from(waitlistSignups).where(eq(waitlistSignups.email, email.toLowerCase()));
+    return signup;
+  },
+
+  async getAllWaitlistSignups(): Promise<WaitlistSignup[]> {
+    return await db.select().from(waitlistSignups).orderBy(desc(waitlistSignups.createdAt));
   },
 };
