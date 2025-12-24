@@ -48,8 +48,8 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     console.log(`Using from email: ${fromEmail}`);
     
     const senderEmail = fromEmail?.includes('@gmail.com') || fromEmail?.includes('@yahoo.com') || fromEmail?.includes('@hotmail.com')
-      ? 'TempoChat <onboarding@resend.dev>'
-      : fromEmail || 'TempoChat <onboarding@resend.dev>';
+      ? 'SwipeMe <onboarding@resend.dev>'
+      : fromEmail || 'SwipeMe <onboarding@resend.dev>';
     
     console.log(`Sending from: ${senderEmail}`);
     
@@ -64,11 +64,11 @@ export async function sendVerificationEmail(email: string, code: string): Promis
           </h1>
           
           <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0 0 24px 0;">
-            There's one quick step you need to complete before creating your TempoChat account. Let's make sure this is the right email address for you — please confirm this is the right address to use for your new account.
+            There's one quick step you need to complete before creating your SwipeMe account. Let's make sure this is the right email address for you — please confirm this is the right address to use for your new account.
           </p>
           
           <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0 0 16px 0;">
-            Please enter this verification code to get started on TempoChat:
+            Please enter this verification code to get started on SwipeMe:
           </p>
           
           <div style="background: #f7f9f9; border-radius: 4px; padding: 20px; text-align: center; margin: 0 0 24px 0;">
@@ -83,7 +83,7 @@ export async function sendVerificationEmail(email: string, code: string): Promis
           
           <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0;">
             Thanks,<br>
-            TempoChat
+            SwipeMe
           </p>
         </div>
       `

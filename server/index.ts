@@ -66,7 +66,7 @@ function setupSession(app: express.Application) {
       secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
-      name: "tempochat.sid",
+      name: "swipeme.sid",
       cookie: {
         secure: process.env.NODE_ENV === "production" || process.env.REPLIT_DEV_DOMAIN ? true : false,
         httpOnly: true,

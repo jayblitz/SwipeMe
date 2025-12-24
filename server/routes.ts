@@ -167,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Logout error:", err);
         return res.status(500).json({ error: "Failed to logout" });
       }
-      res.clearCookie("tempochat.sid");
+      res.clearCookie("swipeme.sid");
       res.json({ success: true, message: "Logged out successfully" });
     });
   });
@@ -583,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const secret = new OTPAuth.Secret({ size: 20 });
       
       const totp = new OTPAuth.TOTP({
-        issuer: "TempoChat",
+        issuer: "SwipeMe",
         label: user.email,
         algorithm: "SHA1",
         digits: 6,
@@ -617,7 +617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const totp = new OTPAuth.TOTP({
-        issuer: "TempoChat",
+        issuer: "SwipeMe",
         label: user.email,
         algorithm: "SHA1",
         digits: 6,
@@ -657,7 +657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const totp = new OTPAuth.TOTP({
-        issuer: "TempoChat",
+        issuer: "SwipeMe",
         label: user.email,
         algorithm: "SHA1",
         digits: 6,
