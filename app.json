@@ -1,16 +1,17 @@
 {
   "expo": {
-    "name": "TempoChat",
-    "slug": "tempochat",
+    "name": "SwipeMe",
+    "slug": "swipeme",
     "version": "1.0.0",
+    "description": "Just SwipeMe – instant money, straight from your chat",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tempochat",
+    "scheme": "swipeme",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tempochat.app"
+      "bundleIdentifier": "com.swipeme.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +22,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.tempochat.app"
+      "package": "com.swipeme.app"
     },
     "web": {
       "output": "single",
