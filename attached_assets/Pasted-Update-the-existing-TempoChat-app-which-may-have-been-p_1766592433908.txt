@@ -1,0 +1,25 @@
+Update the existing TempoChat app (which may have been previously renamed to ZipPay or similar) to the new name "SwipeMe" and incorporate the tagline "Just SwipeMe – instant money, straight from your chat". Perform a comprehensive rename across the entire project, ensuring all functionality remains intact. Follow these steps:
+
+1. **Rename the App Globally**:
+   - In app.json: Change "name" to "SwipeMe", "slug" to "swipeme", "scheme" to "swipeme", "ios.bundleIdentifier" to "com.swipeme.app", "android.package" to "com.swipeme.app", and any other references like icon paths or splash screen if they contain "tempochat" or "zippay".
+   - In package.json: Change "name" to "swipeme".
+   - Search and replace all string occurrences of "TempoChat", "ZipPay", or similar app names in code files (e.g., UI text, headers, comments, screen titles) with "SwipeMe". This includes screens like AuthScreen.tsx, ChatsScreen.tsx, etc.
+   - If any file names contain "TempoChat" or "ZipPay" (e.g., TempoChat.tsx), rename them to "SwipeMe.tsx" or appropriate equivalents and update imports accordingly.
+
+2. **Incorporate the Tagline**:
+   - In app.json: Add or update the "description" field to: "Just SwipeMe – instant money, straight from your chat".
+   - Display the tagline prominently on the welcome/onboarding screen (e.g., in AuthScreen.tsx or the main entry screen): Add a <Text> component below the logo or title, styled with the theme (e.g., primary color #0066FF, title2 typography, centered). For example: <Text style={styles.tagline}>Just SwipeMe – instant money, straight from your chat</Text>.
+   - Ensure the tagline fits the design system: Use neutral text color, caption or body font scale, with spacing.md margins.
+
+3. **Handle Assets and Metadata**:
+   - If splash screen (assets/images/splash-icon.png) or icons have embedded text, suggest or overlay the new name/tagline if possible, or note to update manually.
+   - Update any app store metadata or comments in code to reflect the new name and tagline.
+
+4. **Preserve Functionality**:
+   - Do not alter auth, wallets, payments, chats, or other features—only rename and add the tagline.
+   - Run linting (npm run lint) and fix any issues post-changes.
+
+5. **Test the Changes**:
+   - Ensure the app builds and runs without errors in Expo Go or dev build.
+   - Verify the new name appears in app headers, titles, and the tagline shows on onboarding.
+   - Output a summary of changes made and any warnings.
