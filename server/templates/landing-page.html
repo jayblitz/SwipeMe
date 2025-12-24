@@ -523,23 +523,82 @@
     .mock-icon {
       width: 24px;
       height: 24px;
-      background: var(--gray-300);
-      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .mock-header.dark .mock-icon {
-      background: rgba(255,255,255,0.3);
+    .mock-icon svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--gray-600);
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .mock-header.dark .mock-icon svg {
+      stroke: rgba(255,255,255,0.9);
     }
 
     .mock-back {
       width: 24px;
       height: 24px;
-      background: var(--gray-300);
-      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mock-back svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--gray-600);
+      stroke-width: 2;
+      fill: none;
     }
 
     .mock-icon.payment {
       background: var(--primary);
+      border-radius: 6px;
+    }
+
+    .mock-icon.payment svg {
+      stroke: var(--white);
+      width: 16px;
+      height: 16px;
+    }
+
+    .mock-unread-badge {
+      background: var(--primary);
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      min-width: 18px;
+      height: 18px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+    }
+
+    .mock-chat-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .mock-avatar-initials {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+      flex-shrink: 0;
     }
 
     .mock-chat-list {
@@ -628,34 +687,149 @@
     .mock-wallet {
       flex: 1;
       padding: 16px;
-      background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 50%, var(--white) 50%);
+      background: var(--white);
+      overflow: hidden;
     }
 
     .mock-balance-card {
       background: var(--white);
       border-radius: 16px;
-      padding: 20px;
-      text-align: center;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-      margin-bottom: 16px;
+      padding: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom: 12px;
+      border: 1px solid var(--gray-200);
+    }
+
+    .mock-balance-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
     }
 
     .mock-balance-label {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--gray-500);
-      margin-bottom: 4px;
     }
 
     .mock-balance-value {
       font-size: 28px;
       font-weight: 800;
       color: var(--gray-900);
+      margin-bottom: 8px;
     }
 
-    .mock-balance-change {
+    .mock-wallet-address {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--gray-500);
+      margin-bottom: 8px;
+    }
+
+    .mock-wallet-address svg {
+      width: 12px;
+      height: 12px;
+      stroke: var(--gray-500);
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .mock-network-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .mock-network-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--gray-100);
+      padding: 4px 8px;
+      border-radius: 12px;
+    }
+
+    .mock-network-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--success);
+      border-radius: 50%;
+    }
+
+    .mock-network-text {
+      font-size: 9px;
+      color: var(--gray-600);
+    }
+
+    .mock-faucet-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--gray-100);
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 9px;
+      color: var(--primary);
+    }
+
+    .mock-faucet-btn svg {
+      width: 10px;
+      height: 10px;
+      stroke: var(--primary);
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .mock-action-buttons {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .mock-action-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px;
+      border-radius: 12px;
       font-size: 12px;
-      color: var(--success);
-      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    .mock-action-btn.send {
+      background: var(--primary);
+      color: white;
+    }
+
+    .mock-action-btn.receive {
+      background: var(--gray-100);
+      color: var(--primary);
+    }
+
+    .mock-action-btn svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .mock-action-btn.send svg {
+      stroke: white;
+    }
+
+    .mock-action-btn.receive svg {
+      stroke: var(--primary);
+    }
+
+    .mock-assets-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 8px;
     }
 
     .mock-tokens {
@@ -752,31 +926,79 @@
     }
 
     .mock-payment-bubble {
-      background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+      background: var(--primary);
       color: var(--white);
       padding: 14px 18px;
       border-radius: 16px;
-      text-align: center;
       border-bottom-right-radius: 4px;
+      min-width: 140px;
     }
 
-    .mock-payment-icon {
-      width: 32px;
-      height: 32px;
-      background: rgba(255,255,255,0.3);
-      border-radius: 50%;
-      margin: 0 auto 8px;
+    .mock-payment-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .mock-payment-header svg {
+      width: 14px;
+      height: 14px;
+      stroke: white;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .mock-payment-label {
+      font-size: 11px;
+      opacity: 0.8;
     }
 
     .mock-payment-amount {
-      font-size: 16px;
+      font-size: 20px;
       font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .mock-payment-memo {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-bottom: 6px;
     }
 
     .mock-payment-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
       font-size: 10px;
       opacity: 0.8;
-      margin-top: 4px;
+    }
+
+    .mock-payment-status svg {
+      width: 12px;
+      height: 12px;
+      stroke: white;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .mock-payment-bubble.received {
+      background: var(--gray-100);
+      color: var(--gray-900);
+    }
+
+    .mock-payment-bubble.received .mock-payment-header svg,
+    .mock-payment-bubble.received .mock-payment-status svg {
+      stroke: var(--primary);
+    }
+
+    .mock-payment-bubble.received .mock-payment-label,
+    .mock-payment-bubble.received .mock-payment-memo {
+      color: var(--gray-600);
+    }
+
+    .mock-payment-bubble.received .mock-payment-status {
+      color: var(--success);
     }
 
     .mock-input-bar {
@@ -791,8 +1013,19 @@
     .mock-attach {
       width: 32px;
       height: 32px;
-      background: var(--gray-300);
+      background: var(--gray-200);
       border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mock-attach svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--gray-700);
+      stroke-width: 2;
+      fill: none;
     }
 
     .mock-input {
@@ -802,6 +1035,7 @@
       border-radius: 20px;
       font-size: 12px;
       color: var(--gray-400);
+      border: 1px solid var(--gray-300);
     }
 
     .mock-send {
@@ -809,6 +1043,17 @@
       height: 32px;
       background: var(--primary);
       border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mock-send svg {
+      width: 16px;
+      height: 16px;
+      stroke: white;
+      stroke-width: 2;
+      fill: none;
     }
 
     .screen-label {
@@ -1591,62 +1836,75 @@
         <p class="section-subtitle">A beautiful, intuitive interface designed for seamless messaging and payments.</p>
       </div>
       <div class="app-screens fade-in">
+        <!-- Chat List Screen -->
         <div class="app-screen">
           <div class="phone-frame">
             <div class="phone-screen" id="screen-chats">
               <div class="mock-header">
                 <div class="mock-title">Chats</div>
-                <div class="mock-icon"></div>
+                <div class="mock-icon">
+                  <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                </div>
               </div>
               <div class="mock-chat-list">
                 <div class="mock-chat-item">
-                  <div class="mock-avatar" style="background: #10B981;"></div>
+                  <div class="mock-avatar-initials" style="background: #10B981;">AC</div>
                   <div class="mock-chat-content">
                     <div class="mock-chat-name">Alex Chen</div>
                     <div class="mock-chat-message">Thanks for the payment!</div>
                   </div>
-                  <div class="mock-time">2m</div>
+                  <div class="mock-chat-right">
+                    <div class="mock-time">2m</div>
+                    <div class="mock-unread-badge">2</div>
+                  </div>
                 </div>
                 <div class="mock-chat-item">
-                  <div class="mock-avatar" style="background: #8B5CF6;"></div>
+                  <div class="mock-avatar-initials" style="background: #8B5CF6;">SK</div>
                   <div class="mock-chat-content">
                     <div class="mock-chat-name">Sarah Kim</div>
                     <div class="mock-chat-message">Sent 25 pathUSD</div>
                   </div>
-                  <div class="mock-time">1h</div>
+                  <div class="mock-chat-right">
+                    <div class="mock-time">1h</div>
+                  </div>
                 </div>
                 <div class="mock-chat-item">
-                  <div class="mock-avatar" style="background: #F59E0B;"></div>
+                  <div class="mock-avatar-initials" style="background: #F59E0B;">MR</div>
                   <div class="mock-chat-content">
                     <div class="mock-chat-name">Mike R.</div>
                     <div class="mock-chat-message">Received 100 pathUSD</div>
                   </div>
-                  <div class="mock-time">3h</div>
+                  <div class="mock-chat-right">
+                    <div class="mock-time">3h</div>
+                  </div>
                 </div>
                 <div class="mock-chat-item">
-                  <div class="mock-avatar" style="background: #EC4899;"></div>
+                  <div class="mock-avatar-initials" style="background: #EC4899;">EW</div>
                   <div class="mock-chat-content">
                     <div class="mock-chat-name">Emma W.</div>
                     <div class="mock-chat-message">See you tomorrow!</div>
                   </div>
-                  <div class="mock-time">5h</div>
+                  <div class="mock-chat-right">
+                    <div class="mock-time">5h</div>
+                    <div class="mock-unread-badge">1</div>
+                  </div>
                 </div>
               </div>
               <div class="mock-nav-bar">
                 <div class="mock-nav-item active">
-                  <div class="mock-nav-icon"></div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                   <span>Chats</span>
                 </div>
                 <div class="mock-nav-item">
-                  <div class="mock-nav-icon"></div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/></svg>
                   <span>Wallet</span>
                 </div>
                 <div class="mock-nav-item">
-                  <div class="mock-nav-icon"></div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10"/></svg>
                   <span>Discover</span>
                 </div>
                 <div class="mock-nav-item">
-                  <div class="mock-nav-icon"></div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                   <span>Profile</span>
                 </div>
               </div>
@@ -1655,58 +1913,89 @@
           <h4 class="screen-label">Chat List</h4>
           <p class="screen-description">All your conversations in one place with payment indicators</p>
         </div>
+        
+        <!-- Wallet Screen (Featured) -->
         <div class="app-screen featured">
           <div class="phone-frame">
             <div class="phone-screen" id="screen-wallet">
-              <div class="mock-header dark">
+              <div class="mock-header">
                 <div class="mock-title">Wallet</div>
-                <div class="mock-icon"></div>
+                <div class="mock-icon">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                </div>
               </div>
               <div class="mock-wallet">
                 <div class="mock-balance-card">
-                  <div class="mock-balance-label">Total Balance</div>
+                  <div class="mock-balance-header">
+                    <div class="mock-balance-label">Total Balance</div>
+                  </div>
                   <div class="mock-balance-value">$2,547.82</div>
-                  <div class="mock-balance-change">+2.4% today</div>
+                  <div class="mock-wallet-address">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/></svg>
+                    0x7a3B...9f2E
+                    <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  </div>
+                  <div class="mock-network-row">
+                    <div class="mock-network-indicator">
+                      <div class="mock-network-dot"></div>
+                      <span class="mock-network-text">Tempo Testnet</span>
+                    </div>
+                    <div class="mock-faucet-btn">
+                      <svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>
+                      Get Free TEMPO
+                    </div>
+                  </div>
                 </div>
+                <div class="mock-action-buttons">
+                  <div class="mock-action-btn send">
+                    <svg viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                    Send
+                  </div>
+                  <div class="mock-action-btn receive">
+                    <svg viewBox="0 0 24 24"><path d="M17 7L7 17M7 17H17M7 17V7"/></svg>
+                    Receive
+                  </div>
+                </div>
+                <div class="mock-assets-label">Assets</div>
                 <div class="mock-tokens">
                   <div class="mock-token">
-                    <div class="mock-token-icon" style="background: #0066FF;">p</div>
+                    <div class="mock-token-icon" style="background: #0066FF;">P</div>
                     <div class="mock-token-info">
                       <div class="mock-token-name">pathUSD</div>
-                      <div class="mock-token-amount">1,250.00</div>
+                      <div class="mock-token-amount">$1,250.00</div>
                     </div>
                   </div>
                   <div class="mock-token">
-                    <div class="mock-token-icon" style="background: #10B981;">a</div>
+                    <div class="mock-token-icon" style="background: #10B981;">A</div>
                     <div class="mock-token-info">
                       <div class="mock-token-name">AlphaUSD</div>
-                      <div class="mock-token-amount">847.32</div>
+                      <div class="mock-token-amount">$847.32</div>
                     </div>
                   </div>
                   <div class="mock-token">
-                    <div class="mock-token-icon" style="background: #8B5CF6;">b</div>
+                    <div class="mock-token-icon" style="background: #8B5CF6;">B</div>
                     <div class="mock-token-info">
                       <div class="mock-token-name">BetaUSD</div>
-                      <div class="mock-token-amount">450.50</div>
+                      <div class="mock-token-amount">$450.50</div>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="mock-nav-bar">
                 <div class="mock-nav-item">
-                  <div class="mock-nav-icon"></div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                   <span>Chats</span>
                 </div>
                 <div class="mock-nav-item active">
-                  <div class="mock-nav-icon"></div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/></svg>
                   <span>Wallet</span>
                 </div>
                 <div class="mock-nav-item">
-                  <div class="mock-nav-icon"></div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10"/></svg>
                   <span>Discover</span>
                 </div>
                 <div class="mock-nav-item">
-                  <div class="mock-nav-icon"></div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                   <span>Profile</span>
                 </div>
               </div>
@@ -1715,13 +2004,19 @@
           <h4 class="screen-label">Wallet Dashboard</h4>
           <p class="screen-description">Multi-stablecoin support with real-time balances</p>
         </div>
+        
+        <!-- In-Chat Payment Screen -->
         <div class="app-screen">
           <div class="phone-frame">
             <div class="phone-screen" id="screen-payment">
               <div class="mock-header">
-                <div class="mock-back"></div>
+                <div class="mock-back">
+                  <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                </div>
                 <div class="mock-title">Alex Chen</div>
-                <div class="mock-icon payment"></div>
+                <div class="mock-icon payment">
+                  <svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                </div>
               </div>
               <div class="mock-messages">
                 <div class="mock-message received">
@@ -1734,20 +2029,31 @@
                 </div>
                 <div class="mock-message sent payment-msg">
                   <div class="mock-payment-bubble">
-                    <div class="mock-payment-icon"></div>
-                    <div class="mock-payment-amount">50 pathUSD</div>
-                    <div class="mock-payment-status">Sent</div>
+                    <div class="mock-payment-header">
+                      <svg viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                      <span class="mock-payment-label">You sent</span>
+                    </div>
+                    <div class="mock-payment-amount">$50.00</div>
+                    <div class="mock-payment-memo">For lunch</div>
+                    <div class="mock-payment-status">
+                      <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+                      Completed
+                    </div>
                   </div>
                 </div>
                 <div class="mock-message received">
-                  <div class="mock-msg-bubble">Thanks! Got it</div>
+                  <div class="mock-msg-bubble">Thanks! Got it instantly</div>
                   <div class="mock-msg-time">2:32 PM</div>
                 </div>
               </div>
               <div class="mock-input-bar">
-                <div class="mock-attach"></div>
-                <div class="mock-input">Message...</div>
-                <div class="mock-send"></div>
+                <div class="mock-attach">
+                  <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                </div>
+                <div class="mock-input">Type a message...</div>
+                <div class="mock-send">
+                  <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                </div>
               </div>
             </div>
           </div>
