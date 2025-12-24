@@ -76,9 +76,10 @@ SwipeMe is a WeChat-inspired super app MVP combining end-to-end encrypted messag
 **Marketing Landing Page:**
 - Marketing website served on Express port 5000 (server/templates/landing-page.html)
 - Desktop-optimized with mobile responsive breakpoints
-- Waitlist signup form with database storage (waitlist_signups table)
+- Waitlist signup via Google Forms (https://forms.gle/WpY7LDTSANbxeWuG9)
 - App Store/Google Play buttons show "Coming Soon" alert
 - Relative asset paths for GoDaddy export compatibility
+- Ready for export: rename landing-page.html to index.html, include assets/images/icon.png
 
 **Note:** Privy integration was removed due to SDK incompatibility with Expo Go. Wallet creation now uses local viem-based wallet generation.
 

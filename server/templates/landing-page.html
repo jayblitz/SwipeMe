@@ -1205,34 +1205,23 @@
 
     .waitlist-form {
       display: flex;
+      justify-content: center;
       max-width: 500px;
       margin: 0 auto;
       gap: 12px;
     }
 
-    .waitlist-input {
-      flex: 1;
-      padding: 16px 20px;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      background: var(--white);
-      color: var(--gray-900);
-    }
-
-    .waitlist-input::placeholder {
-      color: var(--gray-500);
-    }
-
     .waitlist-btn {
+      display: inline-block;
       background: var(--dark);
       color: var(--white);
-      padding: 16px 32px;
+      padding: 18px 48px;
       border: none;
       border-radius: 10px;
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
       cursor: pointer;
+      text-decoration: none;
       transition: background 0.2s, transform 0.2s;
     }
 
@@ -2126,10 +2115,9 @@
     <div class="container fade-in">
       <h2>Get Whitelisted</h2>
       <p>Be among the first to experience SwipeMe. Join our waitlist for early access and exclusive benefits.</p>
-      <form class="waitlist-form" id="waitlistForm">
-        <input type="email" class="waitlist-input" placeholder="Enter your email" required>
-        <button type="submit" class="waitlist-btn">Join Waitlist</button>
-      </form>
+      <div class="waitlist-form">
+        <a href="https://forms.gle/WpY7LDTSANbxeWuG9" target="_blank" rel="noopener noreferrer" class="waitlist-btn">Join Waitlist</a>
+      </div>
       <p class="waitlist-note">We respect your privacy. No spam, ever.</p>
     </div>
   </section>
@@ -2247,39 +2235,6 @@
           }
         }
       });
-    });
-
-    // Waitlist form handling
-    document.getElementById('waitlistForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const emailInput = this.querySelector('input[type="email"]');
-      const submitBtn = this.querySelector('button[type="submit"]');
-      const email = emailInput.value;
-      
-      submitBtn.textContent = 'Joining...';
-      submitBtn.disabled = true;
-      
-      try {
-        const response = await fetch('/api/waitlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          alert('You\'ve been added to the waitlist! We\'ll notify you at ' + email + ' when we launch.');
-          this.reset();
-        } else {
-          alert(data.error || 'Something went wrong. Please try again.');
-        }
-      } catch (error) {
-        alert('Network error. Please check your connection and try again.');
-      } finally {
-        submitBtn.textContent = 'Join Waitlist';
-        submitBtn.disabled = false;
-      }
     });
 
     // Mobile menu toggle
