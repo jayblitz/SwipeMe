@@ -1,4 +1,4 @@
-import { eq, and, gt, desc } from "drizzle-orm";
+import { eq, and, gt, desc, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { 
   users, 
@@ -46,6 +46,13 @@ export const storage = {
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
     return user;
+  },
+
+  async getUsersByEmails(emails: string[]): Promise<User[]> {
+    if (emails.length === 0) return [];
+    const normalizedEmails = emails.map(e => e.toLowerCase());
+    const matchedUsers = await db.select().from(users).where(inArray(users.email, normalizedEmails));
+    return matchedUsers;
   },
 
   async createUser(email: string, password: string): Promise<User> {

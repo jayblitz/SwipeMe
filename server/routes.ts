@@ -214,6 +214,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/contacts/match", async (req: Request, res: Response) => {
+    try {
+      const { emails, phones } = req.body;
+      
+      if (!emails || !Array.isArray(emails)) {
+        return res.status(400).json({ error: "emails array is required" });
+      }
+      
+      const matchedUsers = await storage.getUsersByEmails(emails);
+      
+      const usersWithWallets = await Promise.all(
+        matchedUsers.map(async (user) => {
+          const wallet = await storage.getWalletByUserId(user.id);
+          return {
+            id: user.id,
+            email: user.email,
+            displayName: user.displayName,
+            profileImage: user.profileImage,
+            walletAddress: wallet?.address || null,
+          };
+        })
+      );
+      
+      res.json(usersWithWallets);
+    } catch (error) {
+      console.error("Contact match error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/user/:id", requireSameUser, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUserById(req.params.id);

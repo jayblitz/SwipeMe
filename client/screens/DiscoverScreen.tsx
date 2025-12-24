@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, FlatList, Pressable, RefreshControl, TextInput, Modal, Platform, Linking, Alert } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, TextInput, Modal, Platform, Linking, Alert, ActivityIndicator } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -14,7 +14,8 @@ import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius, Shadows } from "@/constants/theme";
-import { getContacts, createChat, Contact } from "@/lib/storage";
+import { createChat, Contact } from "@/lib/storage";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 import { MainTabParamList } from "@/navigation/MainTabNavigator";
 
@@ -104,19 +105,53 @@ function PermissionDenied() {
   );
 }
 
-function EmptyState({ searchQuery }: { searchQuery: string }) {
+function EmptyState({ searchQuery, isWeb }: { searchQuery: string; isWeb: boolean }) {
   const { theme } = useTheme();
+
+  const getMessage = () => {
+    if (isWeb) {
+      return {
+        title: "Contacts not available on web",
+        subtitle: "Use the SwipeMe app on your phone to find friends from your contacts",
+      };
+    }
+    if (searchQuery) {
+      return {
+        title: "No contacts found",
+        subtitle: "Try a different search term",
+      };
+    }
+    return {
+      title: "No friends on SwipeMe yet",
+      subtitle: "Invite your friends to join SwipeMe",
+    };
+  };
+
+  const { title, subtitle } = getMessage();
 
   return (
     <View style={styles.emptyContainer}>
       <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundDefault }]}>
-        <Feather name="users" size={36} color={theme.textSecondary} />
+        <Feather name={isWeb ? "smartphone" : "users"} size={36} color={theme.textSecondary} />
       </View>
       <ThemedText style={[styles.emptyTitle, { fontWeight: "600" }]}>
-        {searchQuery ? "No contacts found" : "No friends on SwipeMe yet"}
+        {title}
       </ThemedText>
       <ThemedText style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-        {searchQuery ? "Try a different search term" : "Invite your friends to join SwipeMe"}
+        {subtitle}
+      </ThemedText>
+    </View>
+  );
+}
+
+function LoadingState() {
+  const { theme } = useTheme();
+
+  return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={theme.primary} />
+      <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
+        Finding contacts on SwipeMe...
       </ThemedText>
     </View>
   );
@@ -182,6 +217,13 @@ function FABMenu({ visible, onClose, onNewContact, onNewGroup, onPayAnyone, onSy
   );
 }
 
+interface DeviceContact {
+  id: string;
+  name: string;
+  phoneNumbers: string[];
+  emails: string[];
+}
+
 export default function DiscoverScreen() {
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
@@ -189,8 +231,10 @@ export default function DiscoverScreen() {
   const navigation = useNavigation<NavigationProp>();
   
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<Contacts.PermissionStatus | null>(null);
 
@@ -218,9 +262,87 @@ export default function DiscoverScreen() {
     }
   };
 
+  const fetchDeviceContacts = async (): Promise<DeviceContact[]> => {
+    if (Platform.OS === "web") {
+      return [];
+    }
+    
+    try {
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails, Contacts.Fields.Name],
+      });
+      
+      return data.map(contact => ({
+        id: contact.id,
+        name: contact.name || "Unknown",
+        phoneNumbers: contact.phoneNumbers?.map(p => p.number?.replace(/[\s\-\(\)]/g, "") || "") || [],
+        emails: contact.emails?.map(e => e.email || "") || [],
+      })).filter(c => c.phoneNumbers.length > 0 || c.emails.length > 0);
+    } catch (error) {
+      console.error("Failed to fetch device contacts:", error);
+      return [];
+    }
+  };
+
+  const matchContactsWithUsers = async (deviceContactsList: DeviceContact[]): Promise<Contact[]> => {
+    if (deviceContactsList.length === 0) {
+      return [];
+    }
+    
+    try {
+      const emails = deviceContactsList.flatMap(c => c.emails).filter(Boolean);
+      const phones = deviceContactsList.flatMap(c => c.phoneNumbers).filter(Boolean);
+      
+      const response = await apiRequest("POST", "/api/contacts/match", {
+        emails,
+        phones,
+      });
+      
+      if (!response.ok) {
+        console.error("Failed to match contacts");
+        return [];
+      }
+      
+      const matchedUsers = await response.json();
+      
+      return matchedUsers.map((user: any) => {
+        const deviceContact = deviceContactsList.find(dc => 
+          dc.emails.includes(user.email) || 
+          dc.phoneNumbers.some(p => user.phone && p.includes(user.phone))
+        );
+        
+        return {
+          id: user.id.toString(),
+          name: deviceContact?.name || user.displayName || user.email.split("@")[0],
+          avatarId: user.id.toString(),
+          walletAddress: user.walletAddress || "",
+          phone: deviceContact?.phoneNumbers[0] || user.phone,
+        };
+      });
+    } catch (error) {
+      console.error("Failed to match contacts with users:", error);
+      return [];
+    }
+  };
+
   const loadContacts = useCallback(async () => {
-    const loadedContacts = await getContacts();
-    setContacts(loadedContacts);
+    if (Platform.OS === "web") {
+      setContacts([]);
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const deviceContactsList = await fetchDeviceContacts();
+      setDeviceContacts(deviceContactsList);
+      
+      const matchedContacts = await matchContactsWithUsers(deviceContactsList);
+      setContacts(matchedContacts);
+    } catch (error) {
+      console.error("Failed to load contacts:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -260,8 +382,12 @@ export default function DiscoverScreen() {
     if (permissionStatus !== Contacts.PermissionStatus.GRANTED) {
       await requestPermission();
     } else {
-      Alert.alert("Syncing", "Checking your contacts for SwipeMe users...");
       await loadContacts();
+      if (contacts.length === 0) {
+        Alert.alert("No Matches", "None of your contacts are on SwipeMe yet. Invite them to join!");
+      } else {
+        Alert.alert("Contacts Updated", `Found ${contacts.length} contact(s) on SwipeMe!`);
+      }
     }
   };
 
@@ -359,7 +485,7 @@ export default function DiscoverScreen() {
             </Pressable>
           </View>
         }
-        ListEmptyComponent={<EmptyState searchQuery={searchQuery} />}
+        ListEmptyComponent={loading ? <LoadingState /> : <EmptyState searchQuery={searchQuery} isWeb={Platform.OS === "web"} />}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -500,6 +626,16 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     textAlign: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: Spacing["2xl"],
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: 14,
   },
   fab: {
     position: "absolute",
