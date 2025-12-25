@@ -801,15 +801,15 @@ export default function ProfileScreen() {
             SUPPORT
           </ThemedText>
           <MenuItem
-            icon="help-circle"
-            title="Help Center"
-            onPress={() => {}}
+            icon="globe"
+            title="Website"
+            onPress={() => Linking.openURL("https://swipeme.org")}
           />
           <View style={[styles.menuSeparator, { backgroundColor: theme.border }]} />
           <MenuItem
-            icon="message-square"
+            icon="mail"
             title="Contact Support"
-            onPress={() => {}}
+            onPress={() => Linking.openURL("mailto:marketing@swipeme.org")}
           />
         </Card>
 

@@ -258,7 +258,7 @@ export default function DiscoverScreen() {
     setPermissionStatus(status);
     
     if (status === Contacts.PermissionStatus.GRANTED) {
-      await loadContacts();
+      await loadContacts(true);
     }
   };
 
@@ -325,8 +325,8 @@ export default function DiscoverScreen() {
     }
   };
 
-  const loadContacts = useCallback(async () => {
-    if (Platform.OS === "web") {
+  const loadContacts = useCallback(async (hasPermission: boolean) => {
+    if (Platform.OS === "web" || !hasPermission) {
       setContacts([]);
       return;
     }
@@ -347,14 +347,27 @@ export default function DiscoverScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      checkPermission();
-      loadContacts();
-    }, [checkPermission, loadContacts])
+      const initialize = async () => {
+        if (Platform.OS === "web") {
+          setPermissionStatus(Contacts.PermissionStatus.GRANTED);
+          return;
+        }
+        
+        const { status } = await Contacts.getPermissionsAsync();
+        setPermissionStatus(status);
+        
+        if (status === Contacts.PermissionStatus.GRANTED) {
+          await loadContacts(true);
+        }
+      };
+      
+      initialize();
+    }, [loadContacts])
   );
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadContacts();
+    await loadContacts(permissionStatus === Contacts.PermissionStatus.GRANTED);
     setRefreshing(false);
   };
 
@@ -382,7 +395,7 @@ export default function DiscoverScreen() {
     if (permissionStatus !== Contacts.PermissionStatus.GRANTED) {
       await requestPermission();
     } else {
-      await loadContacts();
+      await loadContacts(true);
       if (contacts.length === 0) {
         Alert.alert("No Matches", "None of your contacts are on SwipeMe yet. Invite them to join!");
       } else {
