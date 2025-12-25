@@ -13,6 +13,8 @@ declare module "express-session" {
     userId: string;
     email: string;
     passkeyChallenge?: string;
+    passkeyLoginChallenge?: string;
+    passkeyLoginChallengeExpiry?: number;
   }
 }
 

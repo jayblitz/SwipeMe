@@ -7,6 +7,7 @@ import { signupSchema, verifyCodeSchema, setPasswordSchema, loginSchema, waitlis
 import { z } from "zod";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
+import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { 
   generateWallet, 
   importWalletFromMnemonic, 
@@ -876,6 +877,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const challenge = Buffer.from(randomBytes(32)).toString("base64url");
       
+      // Store challenge in session for verification (with expiration)
+      req.session.passkeyLoginChallenge = challenge;
+      req.session.passkeyLoginChallengeExpiry = Date.now() + 60000; // 60 seconds
+      
       res.json({
         success: true,
         options: {
@@ -893,11 +898,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/passkey/login", async (req: Request, res: Response) => {
     try {
-      const { credentialId, userId } = req.body;
+      const { credentialId, rawId, authenticatorData, clientDataJSON, signature } = req.body;
       
-      if (!credentialId) {
-        return res.status(400).json({ error: "Missing credential ID" });
+      if (!credentialId || !rawId || !authenticatorData || !clientDataJSON || !signature) {
+        return res.status(400).json({ error: "Missing required assertion data" });
       }
+      
+      // Verify server-stored challenge exists and hasn't expired
+      const storedChallenge = req.session.passkeyLoginChallenge;
+      const challengeExpiry = req.session.passkeyLoginChallengeExpiry;
+      
+      if (!storedChallenge || !challengeExpiry) {
+        return res.status(401).json({ error: "No pending passkey authentication. Please try again." });
+      }
+      
+      if (Date.now() > challengeExpiry) {
+        delete req.session.passkeyLoginChallenge;
+        delete req.session.passkeyLoginChallengeExpiry;
+        return res.status(401).json({ error: "Authentication expired. Please try again." });
+      }
+      
+      // Immediately invalidate the challenge (one-time use)
+      const expectedChallenge = storedChallenge;
+      delete req.session.passkeyLoginChallenge;
+      delete req.session.passkeyLoginChallengeExpiry;
       
       // Find the passkey
       const passkey = await storage.getPasskeyByCredentialId(credentialId);
@@ -909,6 +933,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUserById(passkey.userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Build the authentication response for verification
+      const authenticationResponse: AuthenticationResponseJSON = {
+        id: credentialId,
+        rawId: rawId,
+        type: "public-key",
+        response: {
+          authenticatorData,
+          clientDataJSON,
+          signature,
+        },
+        clientExtensionResults: {},
+        authenticatorAttachment: "platform",
+      };
+      
+      // Get the RP ID from environment
+      const rpID = process.env.REPLIT_DEV_DOMAIN || "localhost";
+      const origin = `https://${rpID}`;
+      
+      // Verify the authentication response cryptographically
+      let verification;
+      try {
+        verification = await verifyAuthenticationResponse({
+          response: authenticationResponse,
+          expectedChallenge: expectedChallenge,
+          expectedOrigin: origin,
+          expectedRPID: rpID,
+          credential: {
+            id: passkey.credentialId,
+            publicKey: Buffer.from(passkey.publicKey, "base64url"),
+            counter: 0, // We're not tracking counters in MVP
+          },
+        });
+      } catch (verifyError: any) {
+        console.error("Passkey verification error:", verifyError.message);
+        return res.status(401).json({ error: "Passkey verification failed: " + verifyError.message });
+      }
+      
+      if (!verification.verified) {
+        console.error("Passkey verification failed - signature invalid");
+        return res.status(401).json({ error: "Passkey verification failed" });
       }
       
       // Create session - passkey login bypasses 2FA (passkey is already strong auth)

@@ -132,10 +132,19 @@ export default function AuthScreen() {
         return;
       }
       
-      const result = await Passkey.get(data.options);
+      const result = await Passkey.get({
+        ...data.options,
+        challenge: data.options.challenge,
+      });
       
-      if (result && result.id) {
-        await signInWithPasskey(result.id);
+      if (result && result.id && result.response) {
+        await signInWithPasskey(
+          result.id,
+          result.rawId,
+          result.response.authenticatorData,
+          result.response.clientDataJSON,
+          result.response.signature
+        );
       } else {
         throw new Error("Passkey authentication failed");
       }

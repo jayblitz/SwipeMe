@@ -29,7 +29,13 @@ interface AuthContextType {
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<LoginResult>;
   verify2FA: (userId: string, code: string) => Promise<void>;
-  signInWithPasskey: (credentialId: string) => Promise<void>;
+  signInWithPasskey: (
+    credentialId: string,
+    rawId: string,
+    authenticatorData: string,
+    clientDataJSON: string,
+    signature: string
+  ) => Promise<void>;
   startSignUp: (email: string) => Promise<void>;
   verifyCode: (email: string, code: string) => Promise<void>;
   completeSignUp: (email: string, code: string, password: string) => Promise<void>;
@@ -121,10 +127,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const signInWithPasskey = useCallback(async (credentialId: string): Promise<void> => {
+  const signInWithPasskey = useCallback(async (
+    credentialId: string,
+    rawId: string,
+    authenticatorData: string,
+    clientDataJSON: string,
+    signature: string
+  ): Promise<void> => {
     setIsLoading(true);
     try {
-      const response = await apiRequest("POST", "/api/auth/passkey/login", { credentialId });
+      const response = await apiRequest("POST", "/api/auth/passkey/login", {
+        credentialId,
+        rawId,
+        authenticatorData,
+        clientDataJSON,
+        signature,
+      });
       const data = await response.json();
       
       if (!data.success) {
