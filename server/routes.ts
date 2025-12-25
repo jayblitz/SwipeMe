@@ -377,46 +377,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallet/privy", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const { userId, privyUserId, walletAddress, accessToken } = req.body;
-      
-      if (!userId || !walletAddress) {
-        return res.status(400).json({ error: "User ID and wallet address are required" });
-      }
-      
-      const existingWallet = await storage.getWalletByUserId(userId);
-      if (existingWallet) {
-        return res.status(400).json({ error: "Wallet already exists" });
-      }
-      
-      const wallet = await storage.createWallet(
-        userId, 
-        walletAddress, 
-        undefined,
-        undefined, 
-        false
-      );
-      
-      res.json({ 
-        success: true,
-        wallet: { 
-          id: wallet.id, 
-          address: wallet.address,
-          isImported: wallet.isImported,
-          createdAt: wallet.createdAt,
-        },
-        network: {
-          name: tempoTestnet.name,
-          chainId: tempoTestnet.id,
-        }
-      });
-    } catch (error) {
-      console.error("Privy wallet link error:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
   app.post("/api/wallet/import", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId, seedPhrase, privateKey } = req.body;

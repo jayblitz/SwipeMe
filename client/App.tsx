@@ -14,17 +14,15 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { XMTPProvider } from "@/contexts/XMTPContext";
-import { PrivyProvider } from "@/contexts/PrivyContext";
 import { ThemeProvider } from "@/hooks/useTheme";
 
 export default function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <PrivyProvider>
-          <AuthProvider>
-            <WalletProvider>
-              <XMTPProvider>
+        <AuthProvider>
+          <WalletProvider>
+            <XMTPProvider>
               <ThemeProvider>
                 <SafeAreaProvider>
                   <GestureHandlerRootView style={styles.root}>
@@ -37,10 +35,9 @@ export default function App() {
                   </GestureHandlerRootView>
                 </SafeAreaProvider>
               </ThemeProvider>
-              </XMTPProvider>
-            </WalletProvider>
-          </AuthProvider>
-        </PrivyProvider>
+            </XMTPProvider>
+          </WalletProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

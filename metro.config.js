@@ -34,25 +34,6 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     return ctx.resolveRequest(ctx, moduleName, platform);
   }
 
-  if (moduleName.startsWith('@privy-io/')) {
-    if (platform === 'web') {
-      return {
-        type: 'empty',
-      };
-    }
-    const ctx = {
-      ...context,
-      unstable_enablePackageExports: true,
-    };
-    return ctx.resolveRequest(ctx, moduleName, platform);
-  }
-
-  if (moduleName === 'expo-apple-authentication' && platform === 'web') {
-    return {
-      type: 'empty',
-    };
-  }
-  
   return context.resolveRequest(context, moduleName, platform);
 };
 
