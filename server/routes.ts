@@ -872,6 +872,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/auth/passkey/login/options", async (req: Request, res: Response) => {
+    try {
+      const challenge = Buffer.from(randomBytes(32)).toString("base64url");
+      
+      res.json({
+        success: true,
+        options: {
+          challenge,
+          timeout: 60000,
+          rpId: process.env.REPLIT_DEV_DOMAIN || "localhost",
+          userVerification: "required",
+        }
+      });
+    } catch (error) {
+      console.error("Passkey login options error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/auth/passkey/login", async (req: Request, res: Response) => {
     try {
       const { credentialId, userId } = req.body;

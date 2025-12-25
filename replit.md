@@ -92,6 +92,18 @@ SwipeMe is a WeChat-inspired super app MVP combining end-to-end encrypted messag
 - EAS project: @crypto4eva/swipeme (ID: 26540cf7-4cc6-4892-881f-a4070c21b3f2)
 - Android development build available at: https://expo.dev/accounts/crypto4eva/projects/swipeme/builds/d4082879-e51b-4754-8e02-ae3cc95f0e17
 
+**MVP Phase 6 Complete (Enhanced Authentication):**
+- Binance-style multi-step login flow: email → password → 2FA (if enabled)
+- 2FA enforcement: login endpoint returns `requires2FA` flag when user has 2FA enabled
+- /api/auth/verify-2fa endpoint for TOTP code verification before session creation
+- Passkey authentication infrastructure with WebAuthn endpoints
+- Passkey endpoints: check, register/options, register/complete, login/options, login
+- "Continue with Passkey" button on login screen (native platforms only)
+- Passkey login uses react-native-passkeys on native development builds
+- Passkey login bypasses 2FA (passkey is strong authentication)
+- AuthContext updated with verify2FA and signInWithPasskey functions
+- signIn now returns LoginResult type with requires2FA flag
+
 ## Project Architecture
 
 ```
@@ -152,6 +164,7 @@ shared/
 - **messages**: id, chatId, senderId, content, type, timestamps
 - **transactions**: id, chatId, messageId, senderId, receiverId, amount, currency, status, txHash, timestamps
 - **waitlist_signups**: id, email (unique), source, createdAt
+- **passkeys**: id, userId, credentialId (unique), publicKey, deviceName, createdAt
 
 ## API Routes
 
@@ -159,9 +172,19 @@ shared/
 - POST /api/auth/signup/start - Send verification email
 - POST /api/auth/signup/verify - Verify email code
 - POST /api/auth/signup/complete - Set password and create account (sets session)
-- POST /api/auth/login - Login with email/password (sets session)
+- POST /api/auth/login - Login with email/password (returns requires2FA flag if 2FA enabled)
+- POST /api/auth/verify-2fa - Verify TOTP code and create session
 - POST /api/auth/logout - Destroy session and clear cookie
 - GET /api/auth/session - Check authentication status
+
+**Passkey (WebAuthn):**
+- POST /api/auth/passkey/check - Check if user has registered passkey
+- POST /api/auth/passkey/register/options - Get registration challenge (requireAuth)
+- POST /api/auth/passkey/register/complete - Store passkey credentials (requireAuth)
+- POST /api/auth/passkey/login/options - Get assertion challenge
+- POST /api/auth/passkey/login - Authenticate with passkey credential (bypasses 2FA)
+- GET /api/auth/passkeys - List user's registered passkeys (requireAuth)
+- DELETE /api/auth/passkey/:id - Delete a passkey (requireAuth)
 
 **User (protected - requireSameUser):**
 - GET /api/user/:id - Get user profile

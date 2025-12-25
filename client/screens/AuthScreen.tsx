@@ -9,6 +9,16 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { apiRequest } from "@/lib/query-client";
+
+let Passkey: any = null;
+if (Platform.OS !== "web") {
+  try {
+    Passkey = require("react-native-passkeys").Passkey;
+  } catch (e) {
+    console.log("react-native-passkeys not available");
+  }
+}
 
 type AuthStep = 
   | "login-email" 
@@ -96,18 +106,45 @@ export default function AuthScreen() {
 
   const handlePasskeyLogin = async () => {
     if (Platform.OS === "web") {
-      Alert.alert("Not Available", "Passkey login requires the mobile app");
+      Alert.alert("Not Available", "Passkey login requires the mobile app. Please download the app to use passkey authentication.");
       return;
     }
     
+    if (!Passkey) {
+      Alert.alert("Not Available", "Passkey authentication requires a development build. Please use the Android or iOS app.");
+      return;
+    }
+    
+    const isSupported = Passkey.isSupported();
+    if (!isSupported) {
+      Alert.alert("Not Supported", "Your device does not support passkey authentication.");
+      return;
+    }
+    
+    setError("");
+    
     try {
-      Alert.alert(
-        "Passkey Login",
-        "Passkey authentication will be available after you set up a passkey in your profile settings.",
-        [{ text: "OK" }]
-      );
+      const response = await apiRequest("POST", "/api/auth/passkey/login/options", {});
+      const data = await response.json();
+      
+      if (!data.success || !data.options) {
+        Alert.alert("No Passkeys", "No passkeys found. Please log in with your email and password, then set up a passkey in your profile settings.");
+        return;
+      }
+      
+      const result = await Passkey.get(data.options);
+      
+      if (result && result.id) {
+        await signInWithPasskey(result.id);
+      } else {
+        throw new Error("Passkey authentication failed");
+      }
     } catch (err: any) {
-      setError(err.message || "Passkey login failed");
+      if (err.message?.includes("cancelled") || err.message?.includes("cancel")) {
+        return;
+      }
+      console.error("Passkey login error:", err);
+      setError("Passkey authentication failed. Please try logging in with email and password.");
     }
   };
 
