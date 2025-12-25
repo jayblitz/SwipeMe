@@ -81,17 +81,16 @@ SwipeMe is a WeChat-inspired super app MVP combining end-to-end encrypted messag
 - Relative asset paths for GoDaddy export compatibility
 - Ready for export: rename landing-page.html to index.html, include assets/images/icon.png
 
-**MVP Phase 5 Complete (Wallet Persistence & Privy Integration):**
+**MVP Phase 5 Complete (Wallet Persistence & Data Cleanup):**
 - WalletContext added to persist wallet data globally across all screens
 - Wallet automatically loads when user logs in, no need to re-import
 - Wallet data persisted to AsyncStorage, available immediately after app restart
-- Privy SDK integration prepared (native-only, disabled on web via Metro config)
-- Metro config excludes @privy-io/expo and expo-apple-authentication on web platform
-- EAS project created: @crypto4eva/swipeme (ID: 26540cf7-4cc6-4892-881f-a4070c21b3f2)
-- Android development build submitted to EAS Build
-- Build URL: https://expo.dev/accounts/crypto4eva/projects/swipeme/builds/d4082879-e51b-4754-8e02-ae3cc95f0e17
-
-**Note:** Privy SDK requires a development build (not Expo Go). Web app now bundles correctly without Privy dependencies. iOS development builds deferred for now.
+- Privy SDK integration removed (was causing bundling issues)
+- All mock data removed from storage.ts - app now uses real data only
+- On web platform, empty states shown instead of mock data (XMTP requires native)
+- On native platforms, real XMTP conversations and messages displayed
+- EAS project: @crypto4eva/swipeme (ID: 26540cf7-4cc6-4892-881f-a4070c21b3f2)
+- Android development build available at: https://expo.dev/accounts/crypto4eva/projects/swipeme/builds/d4082879-e51b-4754-8e02-ae3cc95f0e17
 
 ## Project Architecture
 
@@ -100,7 +99,7 @@ client/                     # Expo/React Native frontend
 ├── App.tsx                 # Root app component with providers
 ├── contexts/
 │   ├── AuthContext.tsx     # Authentication state management (signup, login, user updates)
-│   ├── PrivyContext.tsx    # Privy SDK provider for email-based wallet management
+│   ├── WalletContext.tsx   # Wallet state persistence across screens
 │   └── XMTPContext.tsx     # XMTP client state management and initialization
 ├── screens/
 │   ├── AuthScreen.tsx      # Multi-step login/signup with email verification
@@ -120,7 +119,7 @@ client/                     # Expo/React Native frontend
 │   ├── DiscoverStackNavigator.tsx # Discovery screens stack
 │   └── ProfileStackNavigator.tsx  # Profile + RecoveryPhrase screens
 ├── lib/
-│   ├── storage.ts          # AsyncStorage data layer (mock data for chats/transactions)
+│   ├── storage.ts          # AsyncStorage data layer (real data only, no mocks)
 │   ├── query-client.ts     # React Query setup + API helpers
 │   ├── tempo-tokens.ts     # Tempo testnet token configs + balance fetching via viem
 │   └── xmtp.ts             # XMTP client utilities with remote signer and DM management
