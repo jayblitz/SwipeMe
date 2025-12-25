@@ -372,7 +372,7 @@ function PasskeyModal({ visible, onClose, userId }: PasskeyModalProps) {
       // Step 2: Create credentials using react-native-passkeys
       const rnPasskeys = await import("react-native-passkeys");
       
-      const credential = await rnPasskeys.default.create({
+      const credential = await rnPasskeys.create({
         challenge: options.challenge,
         rp: {
           id: options.rp.id,

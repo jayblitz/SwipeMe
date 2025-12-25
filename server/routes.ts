@@ -311,6 +311,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/contacts/check", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      const user = await storage.getUserByEmail(email);
+      
+      if (user) {
+        const wallet = await storage.getWalletByUserId(user.id);
+        return res.json({
+          exists: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            displayName: user.displayName,
+            profileImage: user.profileImage,
+            walletAddress: wallet?.address || null,
+          },
+        });
+      }
+      
+      res.json({ exists: false });
+    } catch (error) {
+      console.error("Contact check error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/contacts/invite", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { email, name } = req.body;
+      const userId = req.session.userId;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      const inviter = await storage.getUserById(userId!);
+      const inviterName = inviter?.displayName || inviter?.email?.split("@")[0] || "A friend";
+      
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "This person is already on SwipeMe" });
+      }
+      
+      const { getResendClient } = await import("./email");
+      const { client } = await getResendClient();
+      
+      const result = await client.emails.send({
+        from: "SwipeMe <noreply@swipeme.org>",
+        to: email,
+        subject: `${inviterName} invited you to SwipeMe`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
+            <div style="text-align: center; margin-bottom: 32px;">
+              <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #0066FF 0%, #00A3FF 100%); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center;">
+                <span style="font-size: 40px; color: white;">S</span>
+              </div>
+            </div>
+            
+            <h1 style="color: #000000; font-size: 24px; font-weight: 700; margin: 0 0 16px 0; text-align: center;">
+              ${inviterName} wants to chat on SwipeMe
+            </h1>
+            
+            <p style="color: #536471; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0; text-align: center;">
+              SwipeMe is a fast, simple, and secure way to chat and send money to your friends. Join now and start chatting with ${inviterName}!
+            </p>
+            
+            <div style="text-align: center; margin-bottom: 24px;">
+              <a href="https://swipeme.org" style="display: inline-block; background-color: #0066FF; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                Join SwipeMe
+              </a>
+            </div>
+            
+            <p style="color: #9CA3AF; font-size: 13px; line-height: 1.5; margin: 0; text-align: center;">
+              This invitation was sent by ${inviterName} via SwipeMe.
+            </p>
+          </div>
+        `
+      });
+      
+      if (result.error) {
+        console.error("Failed to send invite:", result.error);
+        return res.status(500).json({ error: "Failed to send invitation" });
+      }
+      
+      res.json({ success: true, message: "Invitation sent successfully" });
+    } catch (error) {
+      console.error("Invite error:", error);
+      res.status(500).json({ error: "Failed to send invitation" });
+    }
+  });
+
   app.get("/api/user/:id", requireSameUser, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUserById(req.params.id);

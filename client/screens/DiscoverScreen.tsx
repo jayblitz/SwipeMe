@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, FlatList, Pressable, RefreshControl, TextInput, Modal, Platform, Linking, Alert, ActivityIndicator } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, TextInput, Modal, Platform, Linking, Alert, ActivityIndicator, KeyboardAvoidingView } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -217,6 +217,212 @@ function FABMenu({ visible, onClose, onNewContact, onNewGroup, onPayAnyone, onSy
   );
 }
 
+interface NewContactModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onStartChat: (userId: string, name: string) => void;
+}
+
+function NewContactModal({ visible, onClose, onStartChat }: NewContactModalProps) {
+  const { theme } = useTheme();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [userExists, setUserExists] = useState<{ id: string; displayName: string } | null>(null);
+  const [error, setError] = useState("");
+
+  const resetForm = () => {
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setUserExists(null);
+    setError("");
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const checkUser = async () => {
+    if (!email.trim() || !validateEmail(email.trim())) {
+      return;
+    }
+
+    setChecking(true);
+    setError("");
+    
+    try {
+      const response = await apiRequest("POST", "/api/contacts/check", { email: email.trim() });
+      const data = await response.json();
+      
+      if (data.exists) {
+        setUserExists({ id: data.user.id, displayName: data.user.displayName || email.split("@")[0] });
+      } else {
+        setUserExists(null);
+      }
+    } catch (err) {
+      console.error("Failed to check user:", err);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const handleDone = async () => {
+    if (!email.trim()) {
+      setError("Email is required");
+      return;
+    }
+
+    if (!validateEmail(email.trim())) {
+      setError("Please enter a valid email");
+      return;
+    }
+
+    if (userExists) {
+      const name = firstName.trim() || lastName.trim() 
+        ? `${firstName.trim()} ${lastName.trim()}`.trim() 
+        : userExists.displayName;
+      onStartChat(userExists.id, name);
+      handleClose();
+    } else {
+      setLoading(true);
+      try {
+        const name = `${firstName.trim()} ${lastName.trim()}`.trim() || "Friend";
+        const response = await apiRequest("POST", "/api/contacts/invite", { 
+          email: email.trim(), 
+          name 
+        });
+        
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "Failed to send invitation");
+        }
+        
+        Alert.alert(
+          "Invitation Sent",
+          `We've sent an invitation to ${email}. They'll be able to chat with you once they join SwipeMe!`
+        );
+        handleClose();
+      } catch (err: any) {
+        setError(err.message || "Failed to send invitation");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
+        <View style={[styles.newContactContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={[styles.newContactHeader, { borderBottomColor: theme.border }]}>
+            <Pressable onPress={handleClose} style={styles.newContactHeaderBtn}>
+              <ThemedText style={{ color: theme.text }}>Cancel</ThemedText>
+            </Pressable>
+            <ThemedText type="h4">New Contact</ThemedText>
+            <Pressable 
+              onPress={handleDone} 
+              style={styles.newContactHeaderBtn}
+              disabled={loading || !email.trim()}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <ThemedText style={{ color: email.trim() ? theme.primary : theme.textSecondary, fontWeight: "600" }}>
+                  Done
+                </ThemedText>
+              )}
+            </Pressable>
+          </View>
+
+          <View style={styles.newContactForm}>
+            <View style={[styles.inputGroup, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+              <TextInput
+                style={[styles.newContactInput, { color: theme.text, borderBottomColor: theme.border }]}
+                placeholder="First name"
+                placeholderTextColor={theme.textSecondary}
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCapitalize="words"
+              />
+              <TextInput
+                style={[styles.newContactInput, { color: theme.text }]}
+                placeholder="Last name"
+                placeholderTextColor={theme.textSecondary}
+                value={lastName}
+                onChangeText={setLastName}
+                autoCapitalize="words"
+              />
+            </View>
+
+            <View style={[styles.inputGroup, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, marginTop: Spacing.xl }]}>
+              <View style={styles.emailInputRow}>
+                <ThemedText style={[styles.emailLabel, { color: theme.text }]}>Email</ThemedText>
+                <TextInput
+                  style={[styles.emailInput, { color: theme.text }]}
+                  placeholder="email@example.com"
+                  placeholderTextColor={theme.textSecondary}
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    setUserExists(null);
+                    setError("");
+                  }}
+                  onBlur={checkUser}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {checking ? (
+                  <ActivityIndicator size="small" color={theme.textSecondary} />
+                ) : null}
+              </View>
+            </View>
+
+            {error ? (
+              <View style={styles.errorRow}>
+                <Feather name="alert-circle" size={14} color={Colors.light.error} />
+                <ThemedText style={[styles.errorText, { color: Colors.light.error }]}>{error}</ThemedText>
+              </View>
+            ) : null}
+
+            {userExists ? (
+              <View style={[styles.statusBadge, { backgroundColor: Colors.light.successLight }]}>
+                <Feather name="check-circle" size={16} color={Colors.light.success} />
+                <ThemedText style={[styles.statusText, { color: Colors.light.success }]}>
+                  This person is on SwipeMe - you can chat now!
+                </ThemedText>
+              </View>
+            ) : email.trim() && validateEmail(email.trim()) && !checking ? (
+              <View style={[styles.statusBadge, { backgroundColor: Colors.light.primaryLight }]}>
+                <Feather name="send" size={16} color={Colors.light.primary} />
+                <ThemedText style={[styles.statusText, { color: Colors.light.primary }]}>
+                  Tap Done to send an invite to join SwipeMe
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 interface DeviceContact {
   id: string;
   name: string;
@@ -236,6 +442,7 @@ export default function DiscoverScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showNewContact, setShowNewContact] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<Contacts.PermissionStatus | null>(null);
 
   const checkPermission = useCallback(async () => {
@@ -380,7 +587,15 @@ export default function DiscoverScreen() {
   };
 
   const handleNewContact = () => {
-    Alert.alert("New Contact", "Add a new contact by entering their wallet address or phone number.");
+    setShowNewContact(true);
+  };
+
+  const handleStartChatWithUser = async (userId: string, name: string) => {
+    const chat = await createChat({ id: userId, name, avatarId: userId, walletAddress: "", phone: "" });
+    navigation.navigate("ChatsTab", {
+      screen: "Chat",
+      params: { chatId: chat.id, name },
+    } as any);
   };
 
   const handleNewGroup = () => {
@@ -425,6 +640,11 @@ export default function DiscoverScreen() {
           onPayAnyone={handlePayAnyone}
           onSyncContacts={handleSyncContacts}
         />
+        <NewContactModal
+          visible={showNewContact}
+          onClose={() => setShowNewContact(false)}
+          onStartChat={handleStartChatWithUser}
+        />
         <Pressable
           onPress={() => setShowMenu(true)}
           style={[styles.fab, { bottom: tabBarHeight + Spacing.lg }]}
@@ -446,6 +666,11 @@ export default function DiscoverScreen() {
           onNewGroup={handleNewGroup}
           onPayAnyone={handlePayAnyone}
           onSyncContacts={handleSyncContacts}
+        />
+        <NewContactModal
+          visible={showNewContact}
+          onClose={() => setShowNewContact(false)}
+          onStartChat={handleStartChatWithUser}
         />
         <Pressable
           onPress={() => setShowMenu(true)}
@@ -518,6 +743,12 @@ export default function DiscoverScreen() {
         onNewGroup={handleNewGroup}
         onPayAnyone={handlePayAnyone}
         onSyncContacts={handleSyncContacts}
+      />
+
+      <NewContactModal
+        visible={showNewContact}
+        onClose={() => setShowNewContact(false)}
+        onStartChat={handleStartChatWithUser}
       />
       
       <Pressable
@@ -702,5 +933,69 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: "500",
+  },
+  newContactContainer: {
+    flex: 1,
+  },
+  newContactHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  newContactHeaderBtn: {
+    minWidth: 60,
+  },
+  newContactForm: {
+    padding: Spacing.lg,
+  },
+  inputGroup: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  newContactInput: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    fontSize: 16,
+    borderBottomWidth: 1,
+  },
+  emailInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  emailLabel: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginRight: Spacing.md,
+  },
+  emailInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.md,
+  },
+  errorText: {
+    fontSize: 14,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginTop: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+  },
+  statusText: {
+    fontSize: 14,
+    flex: 1,
   },
 });
