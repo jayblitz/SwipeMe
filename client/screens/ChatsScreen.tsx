@@ -188,13 +188,11 @@ export default function ChatsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadConversations = useCallback(async () => {
-    if (Platform.OS === "web" || !isSupported) {
-      const loadedChats = await getChats();
-      setLegacyChats(loadedChats.sort((a, b) => b.lastMessageTime - a.lastMessageTime));
-      return;
-    }
+    // Always load legacy chats from AsyncStorage first
+    const loadedChats = await getChats();
+    setLegacyChats(loadedChats.sort((a, b) => b.lastMessageTime - a.lastMessageTime));
 
-    if (!client) {
+    if (Platform.OS === "web" || !isSupported || !client) {
       return;
     }
 
@@ -267,67 +265,79 @@ export default function ChatsScreen() {
     });
   };
 
-  const useXMTPMode = Platform.OS !== "web" && isSupported && client;
+  // Create unified chat item type for combined list
+  type UnifiedChatItem = 
+    | { type: "xmtp"; data: XMTPConversationItem }
+    | { type: "legacy"; data: Chat };
+
+  // Combine XMTP and legacy chats, sorted by time
+  const combinedChats: UnifiedChatItem[] = React.useMemo(() => {
+    const xmtpItems: UnifiedChatItem[] = xmtpConversations.map(conv => ({
+      type: "xmtp" as const,
+      data: conv,
+    }));
+    
+    // Filter out legacy chats that might have matching XMTP conversations
+    // (to avoid duplicates if a contact has both)
+    const xmtpPeerAddresses = new Set(xmtpConversations.map(c => c.peerAddress.toLowerCase()));
+    const filteredLegacy = legacyChats.filter(chat => {
+      // Keep legacy chats that don't have a matching XMTP conversation
+      const participant = chat.participants[0];
+      if (!participant?.walletAddress) return true;
+      return !xmtpPeerAddresses.has(participant.walletAddress.toLowerCase());
+    });
+    
+    const legacyItems: UnifiedChatItem[] = filteredLegacy.map(chat => ({
+      type: "legacy" as const,
+      data: chat,
+    }));
+    
+    // Combine and sort by time
+    return [...xmtpItems, ...legacyItems].sort((a, b) => {
+      const timeA = a.type === "xmtp" ? a.data.lastMessageTime : a.data.lastMessageTime;
+      const timeB = b.type === "xmtp" ? b.data.lastMessageTime : b.data.lastMessageTime;
+      return timeB - timeA;
+    });
+  }, [xmtpConversations, legacyChats]);
+
+  const renderChatItem = ({ item }: { item: UnifiedChatItem }) => {
+    if (item.type === "xmtp") {
+      return <XMTPChatItem conversation={item.data} onPress={() => handleXMTPChatPress(item.data)} />;
+    }
+    return <LegacyChatItem chat={item.data} onPress={() => handleLegacyChatPress(item.data)} />;
+  };
+
+  const isNativeMode = Platform.OS !== "web" && isSupported;
+  const showEmptyState = combinedChats.length === 0 && !isInitializing;
 
   return (
     <ThemedView style={styles.container}>
       <XMTPStatus isInitializing={isInitializing} error={error} />
       
-      {useXMTPMode ? (
-        <FlatList
-          data={xmtpConversations}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <XMTPChatItem conversation={item} onPress={() => handleXMTPChatPress(item)} />
-          )}
-          contentContainerStyle={[
-            styles.listContent,
-            {
-              paddingTop: headerHeight + Spacing.md,
-              paddingBottom: tabBarHeight + Spacing.xl,
-            },
-            xmtpConversations.length === 0 && styles.emptyListContent,
-          ]}
-          ListEmptyComponent={isInitializing ? null : EmptyState}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.primary}
-            />
-          }
-          ItemSeparatorComponent={() => (
-            <View style={[styles.separator, { backgroundColor: theme.border }]} />
-          )}
-        />
-      ) : (
-        <FlatList
-          data={legacyChats}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <LegacyChatItem chat={item} onPress={() => handleLegacyChatPress(item)} />
-          )}
-          contentContainerStyle={[
-            styles.listContent,
-            {
-              paddingTop: headerHeight + Spacing.md,
-              paddingBottom: tabBarHeight + Spacing.xl,
-            },
-            legacyChats.length === 0 && styles.emptyListContent,
-          ]}
-          ListEmptyComponent={EmptyState}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.primary}
-            />
-          }
-          ItemSeparatorComponent={() => (
-            <View style={[styles.separator, { backgroundColor: theme.border }]} />
-          )}
-        />
-      )}
+      <FlatList
+        data={combinedChats}
+        keyExtractor={(item) => item.type === "xmtp" ? `xmtp-${item.data.id}` : `legacy-${item.data.id}`}
+        renderItem={renderChatItem}
+        contentContainerStyle={[
+          styles.listContent,
+          {
+            paddingTop: headerHeight + Spacing.md,
+            paddingBottom: tabBarHeight + Spacing.xl,
+          },
+          showEmptyState && styles.emptyListContent,
+        ]}
+        ListEmptyComponent={isInitializing ? null : EmptyState}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.primary}
+          />
+        }
+        ItemSeparatorComponent={() => (
+          <View style={[styles.separator, { backgroundColor: theme.border }]} />
+        )}
+      />
     </ThemedView>
   );
 }

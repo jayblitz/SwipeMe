@@ -16,6 +16,8 @@ export interface Contact {
   phone?: string;
 }
 
+export type DisappearingTimer = "24h" | "7d" | "30d" | null;
+
 export interface Chat {
   id: string;
   participants: Contact[];
@@ -24,6 +26,7 @@ export interface Chat {
   unreadCount: number;
   isGroup: boolean;
   name?: string;
+  disappearingMessagesTimer?: DisappearingTimer; // null = off, "24h" = 24 hours, "7d" = 7 days, "30d" = 30 days
 }
 
 export type MessageType = "text" | "payment" | "image" | "location" | "contact" | "document" | "audio";
@@ -73,6 +76,7 @@ export interface Message {
   contactAttachment?: ContactAttachment;
   documentAttachment?: DocumentAttachment;
   audioAttachment?: AudioAttachment;
+  expiresAt?: number; // Timestamp when message should be deleted (for disappearing messages)
 }
 
 export interface Transaction {
@@ -133,13 +137,20 @@ export async function getMessages(chatId: string): Promise<Message[]> {
 }
 
 export async function sendMessage(chatId: string, content: string, senderId: string = "me"): Promise<Message> {
+  // Get the chat's disappearing messages timer
+  const chats = await getChats();
+  const chat = chats.find(c => c.id === chatId);
+  const timer = chat?.disappearingMessagesTimer;
+  
+  const now = Date.now();
   const newMessage: Message = {
-    id: `m${Date.now()}`,
+    id: `m${now}`,
     chatId,
     senderId,
     content,
-    timestamp: Date.now(),
+    timestamp: now,
     type: "text",
+    expiresAt: timer ? now + getTimerDuration(timer) : undefined,
   };
   
   try {
@@ -151,11 +162,10 @@ export async function sendMessage(chatId: string, content: string, senderId: str
     allMessages[chatId].push(newMessage);
     await AsyncStorage.setItem(MESSAGES_KEY, JSON.stringify(allMessages));
     
-    const chats = await getChats();
     const chatIndex = chats.findIndex(c => c.id === chatId);
     if (chatIndex !== -1) {
       chats[chatIndex].lastMessage = content;
-      chats[chatIndex].lastMessageTime = Date.now();
+      chats[chatIndex].lastMessageTime = now;
       await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
     }
   } catch (error) {
@@ -178,6 +188,11 @@ export async function sendAttachmentMessage(
   attachment: AttachmentOptions,
   senderId: string = "me"
 ): Promise<Message> {
+  // Get chat timer for disappearing messages
+  const chats = await getChats();
+  const chat = chats.find(c => c.id === chatId);
+  const timer = chat?.disappearingMessagesTimer;
+  
   let content = "";
   let lastMessagePreview = "";
   
@@ -200,17 +215,19 @@ export async function sendAttachmentMessage(
       break;
   }
   
+  const now = Date.now();
   const newMessage: Message = {
-    id: `m${Date.now()}`,
+    id: `m${now}`,
     chatId,
     senderId,
     content,
-    timestamp: Date.now(),
+    timestamp: now,
     type,
     imageAttachment: attachment.image,
     locationAttachment: attachment.location,
     contactAttachment: attachment.contact,
     documentAttachment: attachment.document,
+    expiresAt: timer ? now + getTimerDuration(timer) : undefined,
   };
   
   try {
@@ -222,11 +239,10 @@ export async function sendAttachmentMessage(
     allMessages[chatId].push(newMessage);
     await AsyncStorage.setItem(MESSAGES_KEY, JSON.stringify(allMessages));
     
-    const chats = await getChats();
     const chatIndex = chats.findIndex(c => c.id === chatId);
     if (chatIndex !== -1) {
       chats[chatIndex].lastMessage = lastMessagePreview;
-      chats[chatIndex].lastMessageTime = Date.now();
+      chats[chatIndex].lastMessageTime = now;
       await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
     }
   } catch (error) {
@@ -242,20 +258,27 @@ export async function sendAudioMessage(
   duration: number,
   senderId: string = "me"
 ): Promise<Message> {
+  // Get chat timer for disappearing messages
+  const chats = await getChats();
+  const chat = chats.find(c => c.id === chatId);
+  const timer = chat?.disappearingMessagesTimer;
+  
   const durationSeconds = Math.round(duration);
   const durationFormatted = `${Math.floor(durationSeconds / 60)}:${(durationSeconds % 60).toString().padStart(2, '0')}`;
   
+  const now = Date.now();
   const newMessage: Message = {
-    id: `m${Date.now()}`,
+    id: `m${now}`,
     chatId,
     senderId,
     content: `Voice message (${durationFormatted})`,
-    timestamp: Date.now(),
+    timestamp: now,
     type: "audio",
     audioAttachment: {
       uri: audioUri,
       duration,
     },
+    expiresAt: timer ? now + getTimerDuration(timer) : undefined,
   };
   
   try {
@@ -267,11 +290,10 @@ export async function sendAudioMessage(
     allMessages[chatId].push(newMessage);
     await AsyncStorage.setItem(MESSAGES_KEY, JSON.stringify(allMessages));
     
-    const chats = await getChats();
     const chatIndex = chats.findIndex(c => c.id === chatId);
     if (chatIndex !== -1) {
       chats[chatIndex].lastMessage = "Sent a voice message";
-      chats[chatIndex].lastMessageTime = Date.now();
+      chats[chatIndex].lastMessageTime = now;
       await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
     }
   } catch (error) {
@@ -290,27 +312,34 @@ export async function sendPayment(
   recipientAvatarId: string,
   txHash?: string
 ): Promise<{ message: Message; transaction: Transaction }> {
+  // Get chat timer for disappearing messages
+  const chats = await getChats();
+  const chat = chats.find(c => c.id === chatId);
+  const timer = chat?.disappearingMessagesTimer;
+  
+  const now = Date.now();
   const paymentMessage: Message = {
-    id: `m${Date.now()}`,
+    id: `m${now}`,
     chatId,
     senderId: "me",
     content: `$${amount.toFixed(2)}`,
-    timestamp: Date.now(),
+    timestamp: now,
     type: "payment",
     paymentAmount: amount,
     paymentMemo: memo,
     paymentStatus: "completed",
+    expiresAt: timer ? now + getTimerDuration(timer) : undefined,
   };
   
   const transaction: Transaction = {
-    id: `t${Date.now()}`,
+    id: `t${now}`,
     type: "sent",
     amount,
     contactId: recipientId,
     contactName: recipientName,
     contactAvatarId: recipientAvatarId,
     memo,
-    timestamp: Date.now(),
+    timestamp: now,
     status: "completed",
     txHash,
   };
@@ -331,11 +360,10 @@ export async function sendPayment(
     const balance = await getBalance();
     await AsyncStorage.setItem(BALANCE_KEY, JSON.stringify(balance - amount));
     
-    const chats = await getChats();
     const chatIndex = chats.findIndex(c => c.id === chatId);
     if (chatIndex !== -1) {
       chats[chatIndex].lastMessage = `Payment sent - $${amount.toFixed(2)}`;
-      chats[chatIndex].lastMessageTime = Date.now();
+      chats[chatIndex].lastMessageTime = now;
       await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
     }
   } catch (error) {
@@ -485,5 +513,137 @@ export async function setChatBackground(chatId: string, background: ChatBackgrou
     await AsyncStorage.setItem(CHAT_BACKGROUNDS_KEY, JSON.stringify(backgrounds));
   } catch (error) {
     console.error("Failed to set chat background:", error);
+  }
+}
+
+// Disappearing Messages Functions
+
+export function getTimerDuration(timer: DisappearingTimer): number {
+  switch (timer) {
+    case "24h":
+      return 24 * 60 * 60 * 1000; // 24 hours in ms
+    case "7d":
+      return 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+    case "30d":
+      return 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+    default:
+      return 0;
+  }
+}
+
+export function getTimerLabel(timer: DisappearingTimer): string {
+  switch (timer) {
+    case "24h":
+      return "24 hours";
+    case "7d":
+      return "7 days";
+    case "30d":
+      return "30 days";
+    default:
+      return "Off";
+  }
+}
+
+export async function setChatDisappearingTimer(chatId: string, timer: DisappearingTimer): Promise<void> {
+  try {
+    const chats = await getChats();
+    const chatIndex = chats.findIndex(c => c.id === chatId);
+    if (chatIndex !== -1) {
+      chats[chatIndex].disappearingMessagesTimer = timer;
+      await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+    }
+  } catch (error) {
+    console.error("Failed to set disappearing timer:", error);
+  }
+}
+
+export async function getChatDisappearingTimer(chatId: string): Promise<DisappearingTimer> {
+  try {
+    const chats = await getChats();
+    const chat = chats.find(c => c.id === chatId);
+    return chat?.disappearingMessagesTimer || null;
+  } catch (error) {
+    console.error("Failed to get disappearing timer:", error);
+    return null;
+  }
+}
+
+export async function cleanupExpiredMessages(): Promise<number> {
+  try {
+    const messages = await AsyncStorage.getItem(MESSAGES_KEY);
+    const allMessages: Record<string, Message[]> = messages ? JSON.parse(messages) : {};
+    const now = Date.now();
+    let deletedCount = 0;
+    const affectedChatIds: string[] = [];
+    
+    for (const chatId in allMessages) {
+      const originalLength = allMessages[chatId].length;
+      allMessages[chatId] = allMessages[chatId].filter(msg => {
+        if (msg.expiresAt && msg.expiresAt <= now) {
+          return false; // Remove expired message
+        }
+        return true;
+      });
+      const deleted = originalLength - allMessages[chatId].length;
+      if (deleted > 0) {
+        affectedChatIds.push(chatId);
+        deletedCount += deleted;
+      }
+    }
+    
+    if (deletedCount > 0) {
+      await AsyncStorage.setItem(MESSAGES_KEY, JSON.stringify(allMessages));
+      
+      // Update chat metadata for affected chats
+      const chats = await getChats();
+      let chatsUpdated = false;
+      
+      for (const chatId of affectedChatIds) {
+        const chatIndex = chats.findIndex(c => c.id === chatId);
+        if (chatIndex !== -1) {
+          const chatMessages = allMessages[chatId] || [];
+          if (chatMessages.length > 0) {
+            // Get the most recent message for last message preview
+            const sortedMessages = [...chatMessages].sort((a, b) => b.timestamp - a.timestamp);
+            const latestMessage = sortedMessages[0];
+            chats[chatIndex].lastMessage = getMessagePreview(latestMessage);
+            chats[chatIndex].lastMessageTime = latestMessage.timestamp;
+          } else {
+            // No messages left - use 0 to sort to bottom
+            chats[chatIndex].lastMessage = "";
+            chats[chatIndex].lastMessageTime = 0;
+          }
+          chatsUpdated = true;
+        }
+      }
+      
+      if (chatsUpdated) {
+        await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+      }
+    }
+    
+    return deletedCount;
+  } catch (error) {
+    console.error("Failed to cleanup expired messages:", error);
+    return 0;
+  }
+}
+
+function getMessagePreview(message: Message): string {
+  switch (message.type) {
+    case "image":
+      return "Sent a photo";
+    case "location":
+      return "Shared a location";
+    case "contact":
+      return `Shared contact: ${message.contactAttachment?.name || "Contact"}`;
+    case "document":
+      return `Sent a document: ${message.documentAttachment?.name || "Document"}`;
+    case "audio":
+      return "Sent a voice message";
+    case "payment":
+      return `Payment sent - $${message.paymentAmount?.toFixed(2) || "0.00"}`;
+    default:
+      return message.content || "";
   }
 }

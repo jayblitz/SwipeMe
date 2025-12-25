@@ -1,239 +1,45 @@
 # SwipeMe - WeChat-Style Super App
 
 ## Overview
-
-SwipeMe is a WeChat-inspired super app MVP combining end-to-end encrypted messaging and blockchain-based P2P payments. The tagline is "Just SwipeMe – instant money, straight from your chat". Built with Expo (React Native) for cross-platform mobile experience.
-
-## Current State
-
-**MVP Phase 1 Complete:**
-- Full authentication system with email verification via Resend
-- Multi-step signup flow: email → verification code → password
-- Login with proper error handling ("Incorrect email or password")
-- PostgreSQL database with 8 tables: users, verification_codes, wallets, contacts, chats, chat_participants, messages, transactions
-- 4-tab navigation (Chats, Wallet, Discover, Profile)
-- Wallet setup with two options:
-  - "Create New Wallet" - Local wallet generation using viem with 12-word recovery phrase
-  - "Import Wallet" - Real wallet import using viem with seed phrase (12/24 words) or private key validation
-- Wallet import validates against Tempo testnet (chain ID 42429) and derives real addresses using viem
-- Seed phrases and private keys encrypted with AES-256-GCM before database storage (WALLET_ENCRYPTION_KEY required)
-- Recovery phrase export screen with biometric gating
-- Profile settings: biometric authentication, 2FA setup, edit profile, appearance switcher (light/dark/system)
-- Contacts permission handling in Discover tab with FAB popup menu
-- Theme persistence via AsyncStorage
-
-**MVP Phase 2 Complete:**
-- Real-time token balance fetching for all Tempo testnet assets (pathUSD, AlphaUSD, BetaUSD, ThetaUSD)
-- Multi-asset display in Wallet screen with individual token balances
-- Direct blockchain queries using viem for ERC-20 balances
-- P2P token transfers within chat conversations
-- Token selector in payment modal (choose which stablecoin to send)
-- Server-side transaction signing with AES-256-GCM wallet decryption
-- Full attachment system: photos, camera, location, contacts, documents
-- Chat input with attachment button (+) and header payment button ($)
-
-**MVP Phase 3 Complete:**
-- Session-based API authentication using express-session with secure cookies
-- All sensitive routes (wallet, user, 2FA) protected by authentication middleware
-- requireAuth and requireSameUser middleware ensure users can only access their own data
-- Logout endpoint to destroy session
-- Session status check endpoint (/api/auth/session)
-- "Get Free TEMPO" faucet button in Wallet screen for easy gas top-up
-- Payment confirmation dialog before sending tokens
-- User-friendly error messages for common payment failures (gas, auth, network)
-- Voice message recording and playback using expo-audio
-- WhatsApp-style send/mic button toggle (mic when empty, send when typing)
-- WhatsApp-style AudioMessageBubble with waveform visualization, duration, timestamp, playback speed (1x/1.5x/2x)
-- Green dot indicator for unplayed voice messages
-- Microphone permission handling with Settings redirect for denied permissions
-- Per-chat custom backgrounds (8 preset colors, stored per chatId in AsyncStorage)
-- Date separators between message groups (Today, Yesterday, weekday, or full date)
-
-**MVP Phase 4 Complete (XMTP Integration):**
-- XMTP React Native SDK v3 integration for end-to-end encrypted messaging
-- Secure remote signing architecture - private keys remain encrypted on server
-- Server-side signing endpoint (/api/wallet/:userId/sign) for XMTP authentication
-- XMTPContext provider for client state management
-- ChatsScreen lists real XMTP DM conversations on native platforms
-- ChatScreen sends/receives XMTP messages on native platforms
-- Web platform gracefully falls back to mock data (XMTP requires native modules)
-- Android development build configured via EAS (APK downloadable from Expo dashboard)
-- XMTP dev environment with dbEncryptionKey stored securely in SecureStore
-
-**MVP Limitations (Production Improvements Needed):**
-- XMTP messaging only works on native (Android/iOS development builds), web uses mock data
-- No real-time message streaming yet (requires manual refresh to see new messages)
-- Voice messages and attachments not yet integrated with XMTP (text messages only)
-- Gas sponsored transactions not yet implemented (users need TEMPO for gas, but can use faucet)
-- Voice message playback works on native devices but has issues on web
-
-**Planned Features (Future):**
-- XMTP message streaming for real-time updates
-- XMTP content types for payments, voice messages, and attachments
-- Gas-sponsored meta-transactions
-- Ramp SDK for fiat on-ramp
-
-**Marketing Landing Page:**
-- Marketing website served on Express port 5000 (server/templates/landing-page.html)
-- Desktop-optimized with mobile responsive breakpoints
-- Waitlist signup via Google Forms (https://forms.gle/WpY7LDTSANbxeWuG9)
-- App Store/Google Play buttons show "Coming Soon" alert
-- Relative asset paths for GoDaddy export compatibility
-- Ready for export: rename landing-page.html to index.html, include assets/images/icon.png
-
-**MVP Phase 5 Complete (Wallet Persistence & Data Cleanup):**
-- WalletContext added to persist wallet data globally across all screens
-- Wallet automatically loads when user logs in, no need to re-import
-- Wallet data persisted to AsyncStorage, available immediately after app restart
-- Privy SDK integration removed (was causing bundling issues)
-- All mock data removed from storage.ts - app now uses real data only
-- On web platform, empty states shown instead of mock data (XMTP requires native)
-- On native platforms, real XMTP conversations and messages displayed
-- EAS project: @crypto4eva/swipeme (ID: 26540cf7-4cc6-4892-881f-a4070c21b3f2)
-- Android development build available at: https://expo.dev/accounts/crypto4eva/projects/swipeme/builds/d4082879-e51b-4754-8e02-ae3cc95f0e17
-
-**MVP Phase 6 Complete (Enhanced Authentication):**
-- Binance-style multi-step login flow: email → password → 2FA (if enabled)
-- 2FA enforcement: login endpoint returns `requires2FA` flag when user has 2FA enabled
-- /api/auth/verify-2fa endpoint for TOTP code verification before session creation
-- Passkey authentication infrastructure with WebAuthn endpoints
-- Passkey endpoints: check, register/options, register/complete, login/options, login
-- "Continue with Passkey" button on login screen (native platforms only)
-- Passkey login uses react-native-passkeys on native development builds
-- Passkey login bypasses 2FA (passkey is strong authentication)
-- AuthContext updated with verify2FA and signInWithPasskey functions
-- signIn now returns LoginResult type with requires2FA flag
-- Passkey management UI in Profile settings (view, add, delete passkeys)
-- Passkey registration uses react-native-passkeys on native development builds
-
-## Project Architecture
-
-```
-client/                     # Expo/React Native frontend
-├── App.tsx                 # Root app component with providers
-├── contexts/
-│   ├── AuthContext.tsx     # Authentication state management (signup, login, user updates)
-│   ├── WalletContext.tsx   # Wallet state persistence across screens
-│   └── XMTPContext.tsx     # XMTP client state management and initialization
-├── screens/
-│   ├── AuthScreen.tsx      # Multi-step login/signup with email verification
-│   ├── ChatsScreen.tsx     # Chat list with search
-│   ├── ChatScreen.tsx      # Messages + integrated payment modal
-│   ├── WalletScreen.tsx    # Balance card + transaction history (shows WalletSetupScreen if no wallet)
-│   ├── WalletSetupScreen.tsx # Wallet creation/import flow
-│   ├── DiscoverScreen.tsx  # Contact search with permissions + FAB menu
-│   ├── ProfileScreen.tsx   # Settings: biometric, 2FA, edit profile, appearance
-│   ├── RecoveryPhraseScreen.tsx # Export wallet recovery phrase with biometric auth
-│   └── SettingsScreen.tsx  # Additional settings
-├── navigation/
-│   ├── RootStackNavigator.tsx    # Auth flow + main app
-│   ├── MainTabNavigator.tsx      # 4-tab bottom navigation
-│   ├── ChatsStackNavigator.tsx   # Chat screens stack
-│   ├── WalletStackNavigator.tsx  # Wallet screens stack
-│   ├── DiscoverStackNavigator.tsx # Discovery screens stack
-│   └── ProfileStackNavigator.tsx  # Profile + RecoveryPhrase screens
-├── lib/
-│   ├── storage.ts          # AsyncStorage data layer (real data only, no mocks)
-│   ├── query-client.ts     # React Query setup + API helpers
-│   ├── tempo-tokens.ts     # Tempo testnet token configs + balance fetching via viem
-│   └── xmtp.ts             # XMTP client utilities with remote signer and DM management
-├── constants/
-│   └── theme.ts            # Design tokens, colors, shadows
-├── hooks/
-│   └── useTheme.ts         # Theme management with mode persistence (ThemeProvider)
-└── components/             # Reusable UI components
-
-server/                     # Express backend (port 5000)
-├── index.ts               # API server entry
-├── routes.ts              # API endpoints (auth, user, wallet)
-├── storage.ts             # Database operations (Drizzle ORM)
-├── email.ts               # Resend email service for verification codes
-└── templates/
-    └── landing-page.html  # Static landing page
-
-shared/
-└── schema.ts              # Drizzle ORM schema + Zod validation
-```
-
-## Database Schema
-
-- **users**: id, email, password (hashed), displayName, profileImage, status, social links, theme, biometric/2FA settings
-- **verification_codes**: id, email, code, type (signup/password_reset), expiresAt, used
-- **wallets**: id, userId, address, encryptedPrivateKey, encryptedSeedPhrase, isImported, timestamps
-- **contacts**: id, userId, contactUserId, nickname, timestamps
-- **chats**: id, type (direct/group), name, timestamps
-- **chat_participants**: id, chatId, userId, role, timestamps
-- **messages**: id, chatId, senderId, content, type, timestamps
-- **transactions**: id, chatId, messageId, senderId, receiverId, amount, currency, status, txHash, timestamps
-- **waitlist_signups**: id, email (unique), source, createdAt
-- **passkeys**: id, userId, credentialId (unique), publicKey, deviceName, createdAt
-
-## API Routes
-
-**Auth:**
-- POST /api/auth/signup/start - Send verification email
-- POST /api/auth/signup/verify - Verify email code
-- POST /api/auth/signup/complete - Set password and create account (sets session)
-- POST /api/auth/login - Login with email/password (returns requires2FA flag if 2FA enabled)
-- POST /api/auth/verify-2fa - Verify TOTP code and create session
-- POST /api/auth/logout - Destroy session and clear cookie
-- GET /api/auth/session - Check authentication status
-
-**Passkey (WebAuthn):**
-- POST /api/auth/passkey/check - Check if user has registered passkey
-- POST /api/auth/passkey/register/options - Get registration challenge (requireAuth)
-- POST /api/auth/passkey/register/complete - Store passkey credentials (requireAuth)
-- POST /api/auth/passkey/login/options - Get assertion challenge
-- POST /api/auth/passkey/login - Authenticate with passkey credential (bypasses 2FA)
-- GET /api/auth/passkeys - List user's registered passkeys (requireAuth)
-- DELETE /api/auth/passkey/:id - Delete a passkey (requireAuth)
-
-**User (protected - requireSameUser):**
-- GET /api/user/:id - Get user profile
-- PUT /api/user/:id - Update user profile/settings
-
-**Wallet:**
-- GET /api/wallet/:userId - Get wallet by user
-- POST /api/wallet/privy - Link Privy-created wallet to user account
-- POST /api/wallet/import - Import wallet using seed phrase or private key (validates with viem)
-- DELETE /api/wallet/:userId - Delete wallet (can be recovered via import)
-- GET /api/wallet/:userId/recovery - Get encrypted recovery phrase
-- POST /api/wallet/:userId/transfer - Execute ERC20 token transfer (server-side signing)
-- POST /api/wallet/:userId/sign - Sign message for XMTP authentication (server-side signing)
-
-## Design System
-
-- **Primary Color:** #0066FF (blue)
-- **Icons:** Feather icons from @expo/vector-icons
-- **Typography:** System fonts
-- **Spacing Scale:** 4px, 8px, 12px, 16px, 24px, 32px
-- **Border Radius:** 8px (small), 12px (medium), 16px (large)
-- **Theme:** Light/Dark/System with persistence
-
-## Running the App
-
-- **Expo web:** Port 8081
-- **Backend API:** Port 5000
-- Use workflow "Start App" to run both servers
-
-## Technical Notes
-
-- Email verification uses Resend with 10-minute code expiration
-- Password hashing uses Node.js crypto with PBKDF2
-- Theme preference persisted via AsyncStorage
-- Biometric authentication via expo-local-authentication
-- Contacts permission via expo-contacts
-- Clipboard access via expo-clipboard
-- Privy wallet integration uses SDK v0.54+ with:
-  - Environment variables: PRIVY_APP_ID, PRIVY_CLIENT_ID_MOBILE, PRIVY_CLIENT_ID_WEB
-  - Email OTP flow with sendCode/loginWithCode API
-  - LocalStorage adapter for web persistence
-  - Iframe-based embedded wallet setup
-  - Auto-detection of mobile vs web client ID based on ReactNativeWebView presence
+SwipeMe is a WeChat-inspired super app MVP that integrates end-to-end encrypted messaging with blockchain-based P2P payments. Its core purpose is to provide "instant money, straight from your chat" by combining secure communication with seamless crypto transactions. The project aims to deliver a cross-platform mobile experience using Expo (React Native). Key capabilities include robust authentication (email verification, 2FA, passkeys), secure wallet management (creation, import, encryption), real-time multi-asset display and transfers on the Tempo testnet, and end-to-end encrypted messaging powered by XMTP. Future ambitions include real-time message streaming, advanced XMTP content types, gas-sponsored transactions, and fiat on-ramp integration.
 
 ## User Preferences
-
 - iOS 26 liquid glass UI design aesthetic
 - Mobile-first responsive design
 - No emojis in UI
 - Clean, minimal interface
+
+## System Architecture
+The application is built with an Expo/React Native frontend and an Express.js backend, communicating via a RESTful API.
+
+**UI/UX Decisions:**
+- **Design System:** Utilizes a consistent design language with a primary blue color (#0066FF), Feather icons, system fonts, and a defined spacing scale (4px to 32px).
+- **Theming:** Supports Light, Dark, and System themes with persistence via AsyncStorage.
+- **Navigation:** Features a 4-tab bottom navigation (Chats, Wallet, Discover, Profile) and dedicated stack navigators for different feature sets.
+- **Chat UI:** Includes WhatsApp-style voice message recording/playback with waveform visualization, custom per-chat backgrounds, and date separators for message grouping.
+- **Wallet UI:** Displays multi-asset token balances and provides a "Get Free TEMPO" faucet for gas.
+
+**Technical Implementations & Feature Specifications:**
+- **Authentication:** Multi-step signup/login with email verification (Resend), 2FA (TOTP), and passkey authentication (WebAuthn) using `react-native-passkeys` for native platforms. Session-based API authentication with secure cookies.
+- **Wallet Management:** Local wallet generation/import using `viem` (seed phrase/private key validation against Tempo testnet). Seed phrases and private keys are AES-256-GCM encrypted before storage. Wallet data is persisted globally via `WalletContext` and `AsyncStorage`.
+- **P2P Payments:** Real-time token balance fetching for Tempo testnet assets (pathUSD, AlphaUSD, BetaUSD, ThetaUSD). P2P token transfers within chats with server-side transaction signing and encrypted wallet decryption.
+- **Messaging:** End-to-end encrypted messaging via XMTP React Native SDK v3. Secure remote signing architecture ensures private keys remain encrypted on the server. Web platform gracefully falls back to mock data due to XMTP's native module requirements. Unified chat persistence combines XMTP conversations and local AsyncStorage chats.
+- **Disappearing Messages:** Signal-style disappearing messages with user-selectable timers (24 hours, 7 days, 30 days) per chat, automatically deleting expired messages on chat load.
+- **Attachments:** Full attachment system supporting photos, camera, location, contacts, and documents.
+- **Permissions:** Handles contacts, microphone, and biometric permissions with user-friendly prompts and settings redirects.
+
+**System Design Choices:**
+- **Frontend:** Expo (React Native) for cross-platform mobile development. `AuthContext`, `WalletContext`, and `XMTPContext` for global state management. `React Query` for API data fetching.
+- **Backend:** Express.js API server. `Drizzle ORM` for database interactions with PostgreSQL.
+- **Security:** AES-256-GCM encryption for sensitive wallet data. `requireAuth` and `requireSameUser` middleware for API protection.
+- **Database:** PostgreSQL with schemas for users, wallets, chats, messages, transactions, and authentication-related data (verification codes, passkeys).
+
+## External Dependencies
+- **Resend:** For email verification code delivery.
+- **PostgreSQL:** Primary database for application data.
+- **viem:** For Ethereum wallet generation, import, address derivation, and ERC-20 balance fetching/transaction signing on Tempo testnet.
+- **XMTP React Native SDK v3:** For end-to-end encrypted messaging.
+- **Expo Ecosystem:** `expo-auth-session`, `expo-local-authentication`, `expo-contacts`, `expo-clipboard`, `expo-audio`, `expo-image-picker`, `expo-location`, `expo-file-system`, `expo-document-picker`, `expo-linking`, `expo-secure-store` for various device functionalities.
+- **react-native-passkeys:** For WebAuthn passkey authentication on native platforms.
+- **Google Forms:** For waitlist signups on the marketing landing page.
+- **EAS (Expo Application Services):** For building and distributing native development builds.

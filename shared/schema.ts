@@ -63,6 +63,7 @@ export const chats = pgTable("chats", {
     .default(sql`gen_random_uuid()`),
   type: text("type").notNull().default("direct"),
   name: text("name"),
+  disappearingMessagesTimer: text("disappearing_messages_timer"), // null = off, "24h" | "7d" | "30d"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -85,6 +86,7 @@ export const messages = pgTable("messages", {
   content: text("content"),
   type: text("type").notNull().default("text"),
   metadata: jsonb("metadata"),
+  expiresAt: timestamp("expires_at"), // For disappearing messages - null means never expires
   createdAt: timestamp("created_at").defaultNow(),
 });
 

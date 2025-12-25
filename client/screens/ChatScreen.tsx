@@ -20,7 +20,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, sendAudioMessage, getChats, Message, Chat, getContactWalletAddress, getChatBackground, setChatBackground, PRESET_BACKGROUNDS, ChatBackground } from "@/lib/storage";
+import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, sendAudioMessage, getChats, Message, Chat, getContactWalletAddress, getChatBackground, setChatBackground, PRESET_BACKGROUNDS, ChatBackground, DisappearingTimer, getChatDisappearingTimer, setChatDisappearingTimer, getTimerLabel, cleanupExpiredMessages } from "@/lib/storage";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
 import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
@@ -876,6 +876,8 @@ export default function ChatScreen() {
   const [showAttachments, setShowAttachments] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
+  const [showDisappearingSettings, setShowDisappearingSettings] = useState(false);
+  const [disappearingTimer, setDisappearingTimer] = useState<DisappearingTimer>(null);
   const [chatBackground, setChatBackgroundState] = useState<ChatBackground | null>(null);
   const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [sending, setSending] = useState(false);
@@ -893,8 +895,24 @@ export default function ChatScreen() {
     navigation.setOptions({
       headerRight: () => (
         <View style={{ flexDirection: "row", gap: 8 }}>
+          <HeaderButton onPress={() => setShowDisappearingSettings(true)}>
+            <View style={{ position: "relative" }}>
+              <Feather name="clock" size={20} color={disappearingTimer ? theme.primary : theme.textSecondary} />
+              {disappearingTimer ? (
+                <View style={{ 
+                  position: "absolute", 
+                  top: -2, 
+                  right: -2, 
+                  width: 8, 
+                  height: 8, 
+                  borderRadius: 4, 
+                  backgroundColor: theme.primary 
+                }} />
+              ) : null}
+            </View>
+          </HeaderButton>
           <HeaderButton onPress={() => setShowBackgroundPicker(true)}>
-            <Feather name="image" size={20} color={theme.primary} />
+            <Feather name="image" size={20} color={theme.textSecondary} />
           </HeaderButton>
           <HeaderButton onPress={() => setShowPayment(true)}>
             <Feather name="dollar-sign" size={20} color={theme.primary} />
@@ -902,11 +920,19 @@ export default function ChatScreen() {
         </View>
       ),
     });
-  }, [navigation, theme]);
+  }, [navigation, theme, disappearingTimer]);
 
   const loadData = useCallback(async () => {
+    // Load chat background
     const loadedBackground = await getChatBackground(chatId);
     if (loadedBackground) setChatBackgroundState(loadedBackground);
+    
+    // Load disappearing messages timer
+    const loadedTimer = await getChatDisappearingTimer(chatId);
+    setDisappearingTimer(loadedTimer);
+    
+    // Cleanup expired messages on load
+    await cleanupExpiredMessages();
     
     if (useXMTPMode && peerAddress) {
       try {
@@ -1712,6 +1738,85 @@ export default function ChatScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Disappearing Messages Modal */}
+      <Modal
+        visible={showDisappearingSettings}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowDisappearingSettings(false)}
+      >
+        <Pressable 
+          style={styles.attachmentOverlay} 
+          onPress={() => setShowDisappearingSettings(false)}
+        >
+          <Pressable 
+            style={[styles.backgroundPickerContainer, { backgroundColor: theme.backgroundRoot }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.backgroundPickerHeader}>
+              <ThemedText style={styles.backgroundPickerTitle}>Disappearing Messages</ThemedText>
+              <Pressable onPress={() => setShowDisappearingSettings(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            
+            <ThemedText style={[styles.disappearingDescription, { color: theme.textSecondary }]}>
+              When enabled, new messages sent in this chat will disappear after the selected time.
+            </ThemedText>
+            
+            <View style={styles.disappearingOptions}>
+              {([null, "24h", "7d", "30d"] as DisappearingTimer[]).map((timer) => (
+                <Pressable
+                  key={timer || "off"}
+                  style={[
+                    styles.disappearingOption,
+                    { backgroundColor: theme.backgroundSecondary },
+                    disappearingTimer === timer && styles.disappearingOptionSelected,
+                  ]}
+                  onPress={async () => {
+                    setDisappearingTimer(timer);
+                    await setChatDisappearingTimer(chatId, timer);
+                    setShowDisappearingSettings(false);
+                    if (timer) {
+                      Alert.alert(
+                        "Disappearing Messages On",
+                        `New messages will disappear after ${getTimerLabel(timer)}.`
+                      );
+                    }
+                  }}
+                >
+                  <View style={styles.disappearingOptionContent}>
+                    <Feather 
+                      name={timer ? "clock" : "eye-off"} 
+                      size={20} 
+                      color={disappearingTimer === timer ? theme.primary : theme.text} 
+                    />
+                    <ThemedText style={[
+                      styles.disappearingOptionText,
+                      disappearingTimer === timer && { color: theme.primary, fontWeight: "600" }
+                    ]}>
+                      {getTimerLabel(timer)}
+                    </ThemedText>
+                  </View>
+                  {disappearingTimer === timer ? (
+                    <Feather name="check" size={20} color={theme.primary} />
+                  ) : null}
+                </Pressable>
+              ))}
+            </View>
+            
+            {disappearingTimer ? (
+              <View style={[styles.disappearingWarning, { backgroundColor: `${theme.warning}20` }]}>
+                <Feather name="alert-triangle" size={16} color={theme.warning} />
+                <ThemedText style={[styles.disappearingWarningText, { color: theme.warning }]}>
+                  This only affects new messages. Existing messages are not affected.
+                </ThemedText>
+              </View>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ThemedView>
   );
 }
@@ -2458,5 +2563,45 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+  },
+  disappearingDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: Spacing.lg,
+  },
+  disappearingOptions: {
+    gap: Spacing.sm,
+  },
+  disappearingOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: 12,
+  },
+  disappearingOptionSelected: {
+    borderWidth: 2,
+    borderColor: Colors.light.primary,
+  },
+  disappearingOptionContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  disappearingOptionText: {
+    fontSize: 16,
+  },
+  disappearingWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginTop: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: 8,
+  },
+  disappearingWarningText: {
+    flex: 1,
+    fontSize: 13,
   },
 });

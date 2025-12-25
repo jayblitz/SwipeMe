@@ -367,7 +367,14 @@ function PasskeyModal({ visible, onClose, userId }: PasskeyModalProps) {
     try {
       // Step 1: Get registration options from server
       const optionsRes = await apiRequest("POST", "/api/auth/passkey/register/options");
-      const options = await optionsRes.json();
+      const serverResponse = await optionsRes.json();
+      
+      if (!serverResponse.success || !serverResponse.options) {
+        setError("Failed to get registration options from server");
+        return;
+      }
+      
+      const options = serverResponse.options;
 
       // Step 2: Create credentials using react-native-passkeys
       const rnPasskeys = await import("react-native-passkeys");
