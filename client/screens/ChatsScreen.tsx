@@ -254,6 +254,7 @@ export default function ChatsScreen() {
       chatId: conversation.id,
       name: truncateAddress(conversation.peerAddress),
       peerAddress: conversation.peerAddress,
+      avatarId: undefined,
     });
   };
 
@@ -261,7 +262,8 @@ export default function ChatsScreen() {
     const participant = chat.participants[0];
     navigation.navigate("Chat", { 
       chatId: chat.id, 
-      name: chat.isGroup ? (chat.name || "Group") : participant.name 
+      name: chat.isGroup ? (chat.name || "Group") : participant.name,
+      avatarId: participant?.avatarId,
     });
   };
 

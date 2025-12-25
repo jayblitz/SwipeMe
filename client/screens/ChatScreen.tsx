@@ -865,7 +865,7 @@ export default function ChatScreen() {
   const { wallet } = useWallet();
   const route = useRoute<RouteProp<ChatsStackParamList, "Chat">>();
   const navigation = useNavigation<NativeStackNavigationProp<ChatsStackParamList>>();
-  const { chatId, name, peerAddress } = route.params;
+  const { chatId, name, peerAddress, avatarId } = route.params;
   const { client, isSupported } = useXMTP();
   const [xmtpDm, setXmtpDm] = useState<XMTPConversation | null>(null);
   const useXMTPMode = Platform.OS !== "web" && isSupported && client && peerAddress;
@@ -891,43 +891,34 @@ export default function ChatScreen() {
   const [chat, setChat] = useState<Chat | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
+  const handleOpenContactDetails = useCallback(() => {
+    navigation.navigate("ContactDetails", { chatId, name, peerAddress, avatarId });
+  }, [navigation, chatId, name, peerAddress, avatarId]);
+
   useLayoutEffect(() => {
     navigation.setOptions({
+      headerTitle: () => (
+        <Pressable onPress={handleOpenContactDetails} style={{ flexDirection: "row", alignItems: "center" }}>
+          <ThemedText style={{ fontSize: 17, fontWeight: "600" }}>{name}</ThemedText>
+          <Feather name="chevron-right" size={18} color={theme.textSecondary} style={{ marginLeft: 2 }} />
+        </Pressable>
+      ),
       headerRight: () => (
         <View style={{ flexDirection: "row", gap: 8 }}>
-          <HeaderButton onPress={() => setShowDisappearingSettings(true)}>
-            <View style={{ position: "relative" }}>
-              <Feather name="clock" size={20} color={disappearingTimer ? theme.primary : theme.textSecondary} />
-              {disappearingTimer ? (
-                <View style={{ 
-                  position: "absolute", 
-                  top: -2, 
-                  right: -2, 
-                  width: 8, 
-                  height: 8, 
-                  borderRadius: 4, 
-                  backgroundColor: theme.primary 
-                }} />
-              ) : null}
-            </View>
-          </HeaderButton>
-          <HeaderButton onPress={() => setShowBackgroundPicker(true)}>
-            <Feather name="image" size={20} color={theme.textSecondary} />
-          </HeaderButton>
           <HeaderButton onPress={() => setShowPayment(true)}>
             <Feather name="dollar-sign" size={20} color={theme.primary} />
           </HeaderButton>
         </View>
       ),
     });
-  }, [navigation, theme, disappearingTimer]);
+  }, [navigation, theme, name, handleOpenContactDetails]);
 
   const loadData = useCallback(async () => {
-    // Load chat background
+    // Load chat background (reset to null if none set)
     const loadedBackground = await getChatBackground(chatId);
-    if (loadedBackground) setChatBackgroundState(loadedBackground);
+    setChatBackgroundState(loadedBackground);
     
-    // Load disappearing messages timer
+    // Load disappearing messages timer (can be null)
     const loadedTimer = await getChatDisappearingTimer(chatId);
     setDisappearingTimer(loadedTimer);
     

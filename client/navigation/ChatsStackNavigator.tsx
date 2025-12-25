@@ -4,13 +4,15 @@ import { Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import ChatsScreen from "@/screens/ChatsScreen";
 import ChatScreen from "@/screens/ChatScreen";
+import ContactDetailsScreen from "@/screens/ContactDetailsScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
 
 export type ChatsStackParamList = {
   ChatsList: undefined;
-  Chat: { chatId: string; name: string; peerAddress?: string };
+  Chat: { chatId: string; name: string; peerAddress?: string; avatarId?: string };
+  ContactDetails: { chatId: string; name: string; peerAddress?: string; avatarId?: string };
 };
 
 const Stack = createNativeStackNavigator<ChatsStackParamList>();
@@ -37,6 +39,14 @@ export default function ChatsStackNavigator() {
       <Stack.Screen
         name="Chat"
         component={ChatScreen}
+        options={({ route }) => ({
+          ...opaqueOptions,
+          headerTitle: route.params.name,
+        })}
+      />
+      <Stack.Screen
+        name="ContactDetails"
+        component={ContactDetailsScreen}
         options={({ route }) => ({
           ...opaqueOptions,
           headerTitle: route.params.name,
