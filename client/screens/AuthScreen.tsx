@@ -318,30 +318,10 @@ export default function AuthScreen() {
       </View>
 
       <View style={styles.footer}>
+        <ThemedText style={{ color: theme.textSecondary }}>Don't have an account? </ThemedText>
         <Pressable onPress={switchToSignUp}>
-          <ThemedText style={{ color: Colors.light.primary }}>Create a SwipeMe Account</ThemedText>
+          <ThemedText type="link">Sign Up</ThemedText>
         </Pressable>
-      </View>
-
-      <View style={styles.features}>
-        <View style={styles.featureItem}>
-          <View style={[styles.featureIcon, { backgroundColor: Colors.light.primaryLight }]}>
-            <Feather name="shield" size={18} color={Colors.light.primary} />
-          </View>
-          <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>End-to-end encrypted</ThemedText>
-        </View>
-        <View style={styles.featureItem}>
-          <View style={[styles.featureIcon, { backgroundColor: Colors.light.primaryLight }]}>
-            <Feather name="zap" size={18} color={Colors.light.primary} />
-          </View>
-          <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>Instant payments</ThemedText>
-        </View>
-        <View style={styles.featureItem}>
-          <View style={[styles.featureIcon, { backgroundColor: Colors.light.primaryLight }]}>
-            <Feather name="lock" size={18} color={Colors.light.primary} />
-          </View>
-          <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>Self-custodial wallet</ThemedText>
-        </View>
       </View>
     </>
   );
@@ -798,26 +778,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     marginTop: Spacing.xl,
-  },
-  features: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: Spacing["2xl"],
-    paddingTop: Spacing.lg,
-  },
-  featureItem: {
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  featureIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  featureText: {
-    fontSize: 11,
-    textAlign: "center",
   },
 });
