@@ -905,13 +905,19 @@ export default function ChatScreen() {
       ),
       headerRight: () => (
         <View style={{ flexDirection: "row", gap: 8 }}>
+          <HeaderButton onPress={() => navigation.navigate("VideoCall", { chatId, contactName: name, contactAvatar: avatarId, isVideoCall: false })}>
+            <Feather name="phone" size={20} color={theme.text} />
+          </HeaderButton>
+          <HeaderButton onPress={() => navigation.navigate("VideoCall", { chatId, contactName: name, contactAvatar: avatarId, isVideoCall: true })}>
+            <Feather name="video" size={20} color={theme.text} />
+          </HeaderButton>
           <HeaderButton onPress={() => setShowPayment(true)}>
             <Feather name="dollar-sign" size={20} color={theme.primary} />
           </HeaderButton>
         </View>
       ),
     });
-  }, [navigation, theme, name, handleOpenContactDetails]);
+  }, [navigation, theme, name, chatId, avatarId, handleOpenContactDetails]);
 
   const loadData = useCallback(async () => {
     // Load chat background (reset to null if none set)

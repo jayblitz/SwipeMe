@@ -26,6 +26,7 @@ The application is built with an Expo/React Native frontend and an Express.js ba
 - **Messaging:** End-to-end encrypted messaging via XMTP React Native SDK v3. Secure remote signing architecture ensures private keys remain encrypted on the server. Web platform gracefully falls back to mock data due to XMTP's native module requirements. Unified chat persistence combines XMTP conversations and local AsyncStorage chats.
 - **Disappearing Messages:** Signal-style disappearing messages with user-selectable timers (24 hours, 7 days, 30 days) per chat, automatically deleting expired messages on chat load.
 - **Contact Details Screen:** Signal/WhatsApp-style contact profile accessible by tapping name in chat header. Features quick action buttons (Voice, Video, Mute, Search), settings (disappearing messages, nickname, chat theme), shared media gallery, payment history, groups in common, and safety options (block/report).
+- **Voice/Video Calling:** Real-time voice and video calling powered by VideoSDK. Full-screen call UI with mute, video toggle, speaker controls, and call duration timer. Call buttons accessible from chat header and contact details screen. Web platform shows graceful fallback directing users to Expo Go.
 - **Attachments:** Full attachment system supporting photos, camera, location, contacts, and documents.
 - **Permissions:** Handles contacts, microphone, and biometric permissions with user-friendly prompts and settings redirects.
 

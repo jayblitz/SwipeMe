@@ -13,17 +13,9 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing, BorderRadius, Typography } from "@/constants/theme";
+import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
-
-type ChatsStackParamList = {
-  VideoCall: {
-    chatId: string;
-    contactName: string;
-    contactAvatar?: string;
-    isVideoCall: boolean;
-  };
-};
+import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 
 type VideoCallRouteProp = RouteProp<ChatsStackParamList, "VideoCall">;
 
