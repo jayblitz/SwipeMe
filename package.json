@@ -37,6 +37,7 @@
     "@xmtp/react-native-sdk": "^5.4.0",
     "drizzle-orm": "^0.39.3",
     "drizzle-zod": "^0.7.0",
+    "eas-cli": "^16.28.0",
     "expo": "^54.0.23",
     "expo-audio": "^1.1.1",
     "expo-blur": "^15.0.7",
