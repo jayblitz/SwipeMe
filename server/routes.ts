@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
 import { storage, verifyPassword } from "./storage";
 import { sendVerificationEmail } from "./email";
-import { signupSchema, verifyCodeSchema, setPasswordSchema, loginSchema, waitlistSchema } from "@shared/schema";
+import { signupSchema, verifyCodeSchema, setPasswordSchema, loginSchema, waitlistSchema, verify2FASchema } from "@shared/schema";
 import { z } from "zod";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
@@ -137,11 +137,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Incorrect email or password" });
       }
       
+      // Check if 2FA is enabled - require verification before creating session
+      if (user.twoFactorEnabled && user.twoFactorSecret) {
+        return res.json({
+          success: true,
+          requires2FA: true,
+          userId: user.id,
+          message: "Please verify with your authenticator app"
+        });
+      }
+      
+      // No 2FA - create session immediately
       req.session.userId = user.id;
       req.session.email = user.email;
       
       res.json({ 
         success: true, 
+        requires2FA: false,
         user: { 
           id: user.id, 
           email: user.email,
@@ -157,6 +169,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: error.errors[0].message });
       }
       console.error("Login error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/verify-2fa", async (req: Request, res: Response) => {
+    try {
+      const { userId, code } = verify2FASchema.parse(req.body);
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      if (!user.twoFactorSecret) {
+        return res.status(400).json({ error: "2FA not set up for this account" });
+      }
+      
+      // Verify TOTP code
+      const totp = new OTPAuth.TOTP({
+        issuer: "SwipeMe",
+        label: user.email,
+        algorithm: "SHA1",
+        digits: 6,
+        period: 30,
+        secret: user.twoFactorSecret,
+      });
+      
+      const delta = totp.validate({ token: code, window: 1 });
+      if (delta === null) {
+        return res.status(401).json({ error: "Invalid verification code" });
+      }
+      
+      // 2FA verified - create session
+      req.session.userId = user.id;
+      req.session.email = user.email;
+      
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          profileImage: user.profileImage,
+          themePreference: user.themePreference,
+          biometricEnabled: user.biometricEnabled,
+          twoFactorEnabled: user.twoFactorEnabled,
+        }
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("2FA verification error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

@@ -10,10 +10,12 @@ import {
   messages, 
   transactions,
   waitlistSignups,
+  passkeys,
   type User,
   type VerificationCode,
   type Wallet,
-  type WaitlistSignup
+  type WaitlistSignup,
+  type Passkey
 } from "@shared/schema";
 import { randomBytes, createHash, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -160,5 +162,40 @@ export const storage = {
 
   async getAllWaitlistSignups(): Promise<WaitlistSignup[]> {
     return await db.select().from(waitlistSignups).orderBy(desc(waitlistSignups.createdAt));
+  },
+
+  async createPasskey(userId: string, credentialId: string, publicKey: string, deviceName?: string): Promise<Passkey> {
+    const [passkey] = await db.insert(passkeys).values({
+      userId,
+      credentialId,
+      publicKey,
+      deviceName,
+    }).returning();
+    return passkey;
+  },
+
+  async getPasskeyByCredentialId(credentialId: string): Promise<Passkey | undefined> {
+    const [passkey] = await db.select().from(passkeys).where(eq(passkeys.credentialId, credentialId));
+    return passkey;
+  },
+
+  async getPasskeysByUserId(userId: string): Promise<Passkey[]> {
+    return await db.select().from(passkeys).where(eq(passkeys.userId, userId));
+  },
+
+  async updatePasskeyCounter(credentialId: string, counter: string): Promise<void> {
+    await db.update(passkeys)
+      .set({ counter })
+      .where(eq(passkeys.credentialId, credentialId));
+  },
+
+  async deletePasskey(id: string): Promise<boolean> {
+    await db.delete(passkeys).where(eq(passkeys.id, id));
+    return true;
+  },
+
+  async hasPasskey(userId: string): Promise<boolean> {
+    const userPasskeys = await db.select().from(passkeys).where(eq(passkeys.userId, userId));
+    return userPasskeys.length > 0;
   },
 };

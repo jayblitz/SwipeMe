@@ -147,8 +147,26 @@ export const waitlistSignups = pgTable("waitlist_signups", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const passkeys = pgTable("passkeys", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  credentialId: text("credential_id").notNull().unique(),
+  publicKey: text("public_key").notNull(),
+  deviceName: text("device_name"),
+  counter: text("counter").default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const waitlistSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
 });
 
+export const verify2FASchema = z.object({
+  userId: z.string(),
+  code: z.string().length(6, "Code must be 6 digits"),
+});
+
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
+export type Passkey = typeof passkeys.$inferSelect;
