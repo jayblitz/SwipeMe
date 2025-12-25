@@ -103,6 +103,8 @@ SwipeMe is a WeChat-inspired super app MVP combining end-to-end encrypted messag
 - Passkey login bypasses 2FA (passkey is strong authentication)
 - AuthContext updated with verify2FA and signInWithPasskey functions
 - signIn now returns LoginResult type with requires2FA flag
+- Passkey management UI in Profile settings (view, add, delete passkeys)
+- Passkey registration uses react-native-passkeys on native development builds
 
 ## Project Architecture
 

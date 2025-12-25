@@ -307,6 +307,272 @@ function AppearanceModal({ visible, onClose, currentMode, onSelect }: Appearance
   );
 }
 
+interface PasskeyModalProps {
+  visible: boolean;
+  onClose: () => void;
+  userId?: string;
+}
+
+interface PasskeyItem {
+  id: string;
+  deviceName: string;
+  createdAt: string;
+}
+
+function PasskeyModal({ visible, onClose, userId }: PasskeyModalProps) {
+  const { theme } = useTheme();
+  const [passkeys, setPasskeys] = useState<PasskeyItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deviceName, setDeviceName] = useState("");
+  const [showRegister, setShowRegister] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      loadPasskeys();
+      setShowRegister(false);
+      setDeviceName("");
+      setError(null);
+    }
+  }, [visible]);
+
+  const loadPasskeys = async () => {
+    setLoading(true);
+    try {
+      const response = await apiRequest("GET", "/api/auth/passkeys");
+      const data = await response.json();
+      setPasskeys(data.passkeys || []);
+    } catch (err) {
+      console.error("Failed to load passkeys:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegisterPasskey = async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Not Available", "Passkey registration is only available in the mobile app");
+      return;
+    }
+
+    if (!deviceName.trim()) {
+      setError("Please enter a device name");
+      return;
+    }
+
+    setRegistering(true);
+    setError(null);
+
+    try {
+      // Step 1: Get registration options from server
+      const optionsRes = await apiRequest("POST", "/api/auth/passkey/register/options");
+      const options = await optionsRes.json();
+
+      // Step 2: Create credentials using react-native-passkeys
+      const rnPasskeys = await import("react-native-passkeys");
+      
+      const credential = await rnPasskeys.default.create({
+        challenge: options.challenge,
+        rp: {
+          id: options.rp.id,
+          name: options.rp.name,
+        },
+        user: {
+          id: options.user.id,
+          name: options.user.name,
+          displayName: options.user.displayName,
+        },
+        pubKeyCredParams: options.pubKeyCredParams,
+        authenticatorSelection: options.authenticatorSelection,
+        timeout: options.timeout,
+      });
+
+      if (!credential) {
+        setError("Failed to create passkey credential");
+        return;
+      }
+
+      // Step 3: Send credential to server
+      await apiRequest("POST", "/api/auth/passkey/register/complete", {
+        credentialId: credential.id,
+        publicKey: credential.response.publicKey,
+        deviceName: deviceName.trim(),
+      });
+
+      Alert.alert("Success", "Passkey registered successfully");
+      setShowRegister(false);
+      setDeviceName("");
+      loadPasskeys();
+    } catch (err: any) {
+      console.error("Passkey registration error:", err);
+      if (err.message?.includes("cancelled") || err.message?.includes("canceled")) {
+        setError("Registration cancelled");
+      } else {
+        setError("Failed to register passkey. Please try again.");
+      }
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleDeletePasskey = async (passkeyId: string) => {
+    Alert.alert(
+      "Delete Passkey",
+      "Are you sure you want to remove this passkey? You will no longer be able to sign in with it.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await apiRequest("DELETE", `/api/auth/passkey/${passkeyId}`);
+              setPasskeys(passkeys.filter(p => p.id !== passkeyId));
+              Alert.alert("Success", "Passkey removed");
+            } catch (err) {
+              Alert.alert("Error", "Failed to remove passkey");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, { 
+      year: "numeric", 
+      month: "short", 
+      day: "numeric" 
+    });
+  };
+
+  const renderPasskeyList = () => (
+    <>
+      <View style={styles.passkeyHeader}>
+        <View style={[styles.passkeyIcon, { backgroundColor: Colors.light.primaryLight }]}>
+          <Feather name="lock" size={32} color={Colors.light.primary} />
+        </View>
+        <ThemedText type="h4" style={styles.passkeyTitle}>Passkeys</ThemedText>
+        <ThemedText style={[styles.passkeyDescription, { color: theme.textSecondary }]}>
+          Sign in faster with passkeys. They're more secure than passwords and work with Face ID, Touch ID, or your device PIN.
+        </ThemedText>
+      </View>
+
+      {loading ? (
+        <View style={styles.passkeyLoadingContainer}>
+          <ThemedText style={{ color: theme.textSecondary }}>Loading...</ThemedText>
+        </View>
+      ) : passkeys.length > 0 ? (
+        <View style={styles.passkeyList}>
+          {passkeys.map((passkey) => (
+            <View 
+              key={passkey.id} 
+              style={[styles.passkeyItem, { backgroundColor: theme.backgroundSecondary }]}
+            >
+              <View style={styles.passkeyItemIcon}>
+                <Feather name="smartphone" size={20} color={theme.primary} />
+              </View>
+              <View style={styles.passkeyItemContent}>
+                <ThemedText style={styles.passkeyItemName}>{passkey.deviceName}</ThemedText>
+                <ThemedText style={[styles.passkeyItemDate, { color: theme.textSecondary }]}>
+                  Added {formatDate(passkey.createdAt)}
+                </ThemedText>
+              </View>
+              <Pressable onPress={() => handleDeletePasskey(passkey.id)} style={styles.passkeyDeleteButton}>
+                <Feather name="trash-2" size={18} color={theme.error} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.passkeyEmptyContainer}>
+          <Feather name="key" size={40} color={theme.textSecondary} />
+          <ThemedText style={[styles.passkeyEmptyText, { color: theme.textSecondary }]}>
+            No passkeys registered yet
+          </ThemedText>
+        </View>
+      )}
+
+      {Platform.OS !== "web" ? (
+        <Button onPress={() => setShowRegister(true)} style={styles.passkeyButton}>
+          Add Passkey
+        </Button>
+      ) : (
+        <View style={[styles.passkeyWebNote, { backgroundColor: theme.backgroundSecondary }]}>
+          <Feather name="info" size={16} color={theme.textSecondary} />
+          <ThemedText style={[styles.passkeyWebNoteText, { color: theme.textSecondary }]}>
+            Passkey registration requires the mobile app
+          </ThemedText>
+        </View>
+      )}
+    </>
+  );
+
+  const renderRegisterForm = () => (
+    <>
+      <View style={styles.passkeyHeader}>
+        <ThemedText type="h4" style={styles.passkeyTitle}>Add New Passkey</ThemedText>
+        <ThemedText style={[styles.passkeyDescription, { color: theme.textSecondary }]}>
+          Give this passkey a name to help you identify it later.
+        </ThemedText>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <ThemedText style={[styles.inputLabel, { color: theme.textSecondary }]}>
+          Device Name
+        </ThemedText>
+        <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <TextInput
+            style={[styles.input, { color: theme.text }]}
+            placeholder="e.g., My iPhone, Work Phone"
+            placeholderTextColor={theme.textSecondary}
+            value={deviceName}
+            onChangeText={setDeviceName}
+            autoFocus
+          />
+        </View>
+      </View>
+
+      {error ? (
+        <ThemedText style={[styles.errorText, { color: theme.error }]}>{error}</ThemedText>
+      ) : null}
+
+      <View style={styles.passkeyButtons}>
+        <Button 
+          onPress={handleRegisterPasskey} 
+          disabled={registering || !deviceName.trim()} 
+          style={styles.passkeyButton}
+        >
+          {registering ? "Registering..." : "Register Passkey"}
+        </Button>
+        <Pressable onPress={() => { setShowRegister(false); setError(null); }} style={styles.passkeyCancelButton}>
+          <ThemedText style={{ color: theme.textSecondary }}>Cancel</ThemedText>
+        </Pressable>
+      </View>
+    </>
+  );
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <ThemedView style={styles.passkeyFullContainer}>
+        <View style={styles.modalHeader}>
+          <Pressable onPress={onClose} style={styles.modalCloseButton}>
+            <Feather name="x" size={24} color={theme.text} />
+          </Pressable>
+          <ThemedText type="h4">Security</ThemedText>
+          <View style={{ width: 40 }} />
+        </View>
+        
+        <KeyboardAwareScrollViewCompat contentContainerStyle={styles.passkeyScrollContent}>
+          {showRegister ? renderRegisterForm() : renderPasskeyList()}
+        </KeyboardAwareScrollViewCompat>
+      </ThemedView>
+    </Modal>
+  );
+}
+
 interface TwoFAModalProps {
   visible: boolean;
   onClose: () => void;
@@ -595,6 +861,7 @@ export default function ProfileScreen() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showAppearance, setShowAppearance] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
+  const [showPasskeys, setShowPasskeys] = useState(false);
 
   useEffect(() => {
     checkBiometrics();
@@ -768,6 +1035,13 @@ export default function ProfileScreen() {
             subtitle={twoFAEnabled ? "Enabled" : "Disabled"}
             onPress={() => setShow2FA(true)}
           />
+          <View style={[styles.menuSeparator, { backgroundColor: theme.border }]} />
+          <MenuItem
+            icon="lock"
+            title="Passkeys"
+            subtitle="Sign in with Face ID or Touch ID"
+            onPress={() => setShowPasskeys(true)}
+          />
         </Card>
 
         <Card style={styles.section} elevation={1}>
@@ -859,6 +1133,12 @@ export default function ProfileScreen() {
         onClose={() => setShow2FA(false)}
         isEnabled={twoFAEnabled}
         onToggle={handle2FAToggle}
+        userId={user?.id}
+      />
+
+      <PasskeyModal
+        visible={showPasskeys}
+        onClose={() => setShowPasskeys(false)}
         userId={user?.id}
       />
     </ThemedView>
@@ -1140,5 +1420,96 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     marginBottom: Spacing.md,
+  },
+  passkeyFullContainer: {
+    flex: 1,
+  },
+  passkeyScrollContent: {
+    padding: Spacing.lg,
+  },
+  passkeyHeader: {
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  passkeyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.md,
+  },
+  passkeyTitle: {
+    marginBottom: Spacing.sm,
+  },
+  passkeyDescription: {
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  passkeyLoadingContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing.xl,
+  },
+  passkeyList: {
+    marginBottom: Spacing.lg,
+  },
+  passkeyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.sm,
+  },
+  passkeyItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.md,
+  },
+  passkeyItemContent: {
+    flex: 1,
+  },
+  passkeyItemName: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  passkeyItemDate: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  passkeyDeleteButton: {
+    padding: Spacing.sm,
+  },
+  passkeyEmptyContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing.xl,
+    marginBottom: Spacing.lg,
+  },
+  passkeyEmptyText: {
+    marginTop: Spacing.md,
+    fontSize: 14,
+  },
+  passkeyButton: {
+    width: "100%",
+  },
+  passkeyButtons: {
+    gap: Spacing.sm,
+  },
+  passkeyCancelButton: {
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+  },
+  passkeyWebNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    gap: Spacing.sm,
+  },
+  passkeyWebNoteText: {
+    fontSize: 14,
+    flex: 1,
   },
 });
