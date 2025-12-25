@@ -5,6 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import ChatsScreen from "@/screens/ChatsScreen";
 import ChatScreen from "@/screens/ChatScreen";
 import ContactDetailsScreen from "@/screens/ContactDetailsScreen";
+import VideoCallScreen from "@/screens/VideoCallScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useTheme } from "@/hooks/useTheme";
@@ -13,6 +14,7 @@ export type ChatsStackParamList = {
   ChatsList: undefined;
   Chat: { chatId: string; name: string; peerAddress?: string; avatarId?: string };
   ContactDetails: { chatId: string; name: string; peerAddress?: string; avatarId?: string };
+  VideoCall: { chatId: string; contactName: string; contactAvatar?: string; isVideoCall: boolean };
 };
 
 const Stack = createNativeStackNavigator<ChatsStackParamList>();
@@ -51,6 +53,15 @@ export default function ChatsStackNavigator() {
           ...opaqueOptions,
           headerTitle: route.params.name,
         })}
+      />
+      <Stack.Screen
+        name="VideoCall"
+        component={VideoCallScreen}
+        options={{
+          headerShown: false,
+          presentation: "fullScreenModal",
+          animation: "fade",
+        }}
       />
     </Stack.Navigator>
   );

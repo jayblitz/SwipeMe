@@ -209,11 +209,21 @@ export default function ContactDetailsScreen() {
   };
   
   const handleVoiceCall = () => {
-    Alert.alert("Coming Soon", "Voice calling will be available in a future update.");
+    navigation.navigate("VideoCall", {
+      chatId,
+      contactName: name,
+      contactAvatar: avatarId,
+      isVideoCall: false,
+    });
   };
   
   const handleVideoCall = () => {
-    Alert.alert("Coming Soon", "Video calling will be available in a future update.");
+    navigation.navigate("VideoCall", {
+      chatId,
+      contactName: name,
+      contactAvatar: avatarId,
+      isVideoCall: true,
+    });
   };
   
   const handleSearch = () => {

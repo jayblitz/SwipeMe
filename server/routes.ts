@@ -8,6 +8,7 @@ import { z } from "zod";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from "@simplewebauthn/server";
+import jwt from "jsonwebtoken";
 import { 
   generateWallet, 
   importWalletFromMnemonic, 
@@ -1121,6 +1122,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Delete passkey error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // VideoSDK endpoints for voice/video calling
+  app.post("/api/videosdk/token", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const apiKey = process.env.VIDEOSDK_API_KEY;
+      const secretKey = process.env.VIDEOSDK_SECRET_KEY;
+      
+      if (!apiKey || !secretKey) {
+        return res.status(500).json({ error: "VideoSDK credentials not configured" });
+      }
+
+      const { roomId, participantId } = req.body;
+
+      const payload: Record<string, any> = {
+        apikey: apiKey,
+        permissions: ['allow_join', 'allow_mod'],
+        version: 2,
+      };
+
+      if (roomId) {
+        payload.roomId = roomId;
+      }
+      if (participantId) {
+        payload.participantId = participantId;
+      }
+
+      const token = jwt.sign(payload, secretKey, {
+        expiresIn: '2h',
+        algorithm: 'HS256',
+      });
+
+      res.json({ token });
+    } catch (error) {
+      console.error("VideoSDK token generation error:", error);
+      res.status(500).json({ error: "Failed to generate token" });
+    }
+  });
+
+  app.post("/api/videosdk/room", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const apiKey = process.env.VIDEOSDK_API_KEY;
+      const secretKey = process.env.VIDEOSDK_SECRET_KEY;
+      
+      if (!apiKey || !secretKey) {
+        return res.status(500).json({ error: "VideoSDK credentials not configured" });
+      }
+
+      // Generate token for API call
+      const token = jwt.sign({
+        apikey: apiKey,
+        permissions: ['allow_join', 'allow_mod'],
+        version: 2,
+      }, secretKey, {
+        expiresIn: '2h',
+        algorithm: 'HS256',
+      });
+
+      // Create room via VideoSDK API
+      const response = await fetch('https://api.videosdk.live/v2/rooms', {
+        method: 'POST',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("VideoSDK room creation error:", errorData);
+        return res.status(500).json({ error: "Failed to create room" });
+      }
+
+      const data = await response.json();
+      res.json({ roomId: data.roomId });
+    } catch (error) {
+      console.error("VideoSDK room creation error:", error);
+      res.status(500).json({ error: "Failed to create room" });
     }
   });
 

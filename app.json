@@ -41,7 +41,14 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@videosdk.live/expo-config-plugin",
+        {
+          "cameraPermission": "SwipeMe needs camera access for video calls",
+          "microphonePermission": "SwipeMe needs microphone access for voice and video calls"
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true
