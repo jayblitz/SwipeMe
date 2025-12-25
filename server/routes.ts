@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
+import { randomBytes } from "crypto";
 import { storage, verifyPassword } from "./storage";
 import { sendVerificationEmail } from "./email";
 import { signupSchema, verifyCodeSchema, setPasswordSchema, loginSchema, waitlistSchema, verify2FASchema } from "@shared/schema";
@@ -764,6 +765,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: "2FA disabled successfully" });
     } catch (error) {
       console.error("2FA disable error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Passkey endpoints
+  app.post("/api/auth/passkey/check", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.json({ hasPasskey: false });
+      }
+      
+      const hasPasskey = await storage.hasPasskey(user.id);
+      res.json({ hasPasskey, userId: hasPasskey ? user.id : null });
+    } catch (error) {
+      console.error("Passkey check error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/passkey/register/options", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      const user = await storage.getUserById(userId!);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Generate challenge for WebAuthn
+      const challenge = Buffer.from(randomBytes(32)).toString("base64url");
+      
+      // Store challenge in session for verification
+      req.session.passkeyChallenge = challenge;
+      
+      res.json({
+        success: true,
+        options: {
+          challenge,
+          rp: {
+            name: "SwipeMe",
+            id: process.env.REPLIT_DEV_DOMAIN || "localhost",
+          },
+          user: {
+            id: Buffer.from(user.id).toString("base64url"),
+            name: user.email,
+            displayName: user.displayName || user.email,
+          },
+          pubKeyCredParams: [
+            { type: "public-key", alg: -7 },   // ES256
+            { type: "public-key", alg: -257 }, // RS256
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: "platform",
+            userVerification: "required",
+            residentKey: "required",
+          },
+          timeout: 60000,
+        }
+      });
+    } catch (error) {
+      console.error("Passkey register options error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/passkey/register/complete", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      const { credentialId, publicKey, deviceName } = req.body;
+      
+      if (!credentialId || !publicKey) {
+        return res.status(400).json({ error: "Missing credential data" });
+      }
+      
+      // Store the passkey
+      const passkey = await storage.createPasskey(
+        userId!,
+        credentialId,
+        publicKey,
+        deviceName || "Device"
+      );
+      
+      // Clear the challenge
+      delete req.session.passkeyChallenge;
+      
+      res.json({
+        success: true,
+        message: "Passkey registered successfully",
+        passkey: {
+          id: passkey.id,
+          deviceName: passkey.deviceName,
+          createdAt: passkey.createdAt,
+        }
+      });
+    } catch (error) {
+      console.error("Passkey register complete error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/passkey/login", async (req: Request, res: Response) => {
+    try {
+      const { credentialId, userId } = req.body;
+      
+      if (!credentialId) {
+        return res.status(400).json({ error: "Missing credential ID" });
+      }
+      
+      // Find the passkey
+      const passkey = await storage.getPasskeyByCredentialId(credentialId);
+      if (!passkey) {
+        return res.status(401).json({ error: "Passkey not recognized" });
+      }
+      
+      // Get the user
+      const user = await storage.getUserById(passkey.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Create session - passkey login bypasses 2FA (passkey is already strong auth)
+      req.session.userId = user.id;
+      req.session.email = user.email;
+      
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          profileImage: user.profileImage,
+          themePreference: user.themePreference,
+          biometricEnabled: user.biometricEnabled,
+          twoFactorEnabled: user.twoFactorEnabled,
+        }
+      });
+    } catch (error) {
+      console.error("Passkey login error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/auth/passkeys", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      const passkeys = await storage.getPasskeysByUserId(userId!);
+      
+      res.json({
+        passkeys: passkeys.map(p => ({
+          id: p.id,
+          deviceName: p.deviceName,
+          createdAt: p.createdAt,
+        }))
+      });
+    } catch (error) {
+      console.error("Get passkeys error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/auth/passkey/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const passkeyId = req.params.id;
+      await storage.deletePasskey(passkeyId);
+      res.json({ success: true, message: "Passkey deleted successfully" });
+    } catch (error) {
+      console.error("Delete passkey error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

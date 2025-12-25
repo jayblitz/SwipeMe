@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Image, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
+import { View, StyleSheet, Image, TextInput, Pressable, ActivityIndicator, Alert, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
@@ -10,18 +10,26 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 
-type AuthStep = "login" | "signup-email" | "signup-verify" | "signup-password";
+type AuthStep = 
+  | "login-email" 
+  | "login-password" 
+  | "login-2fa"
+  | "signup-email" 
+  | "signup-verify" 
+  | "signup-password";
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { signIn, startSignUp, verifyCode, completeSignUp, isLoading } = useAuth();
+  const { signIn, verify2FA, signInWithPasskey, startSignUp, verifyCode, completeSignUp, isLoading } = useAuth();
   
-  const [step, setStep] = useState<AuthStep>("login");
+  const [step, setStep] = useState<AuthStep>("login-email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
+  const [twoFACode, setTwoFACode] = useState("");
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
@@ -29,7 +37,7 @@ export default function AuthScreen() {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  const handleLogin = async () => {
+  const handleEmailContinue = () => {
     setError("");
     
     if (!email.trim()) {
@@ -42,15 +50,64 @@ export default function AuthScreen() {
       return;
     }
     
+    setStep("login-password");
+  };
+
+  const handleLogin = async () => {
+    setError("");
+    
     if (!password) {
       setError("Please enter your password");
       return;
     }
     
     try {
-      await signIn(email.trim(), password);
+      const result = await signIn(email.trim(), password);
+      
+      if (result.requires2FA && result.userId) {
+        setPendingUserId(result.userId);
+        setStep("login-2fa");
+      }
     } catch (err: any) {
       setError(err.message || "Incorrect email or password");
+    }
+  };
+
+  const handle2FAVerify = async () => {
+    setError("");
+    
+    if (twoFACode.length !== 6) {
+      setError("Please enter the 6-digit code");
+      return;
+    }
+    
+    if (!pendingUserId) {
+      setError("Session expired. Please login again.");
+      setStep("login-email");
+      return;
+    }
+    
+    try {
+      await verify2FA(pendingUserId, twoFACode);
+    } catch (err: any) {
+      setError(err.message || "Invalid verification code");
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Not Available", "Passkey login requires the mobile app");
+      return;
+    }
+    
+    try {
+      Alert.alert(
+        "Passkey Login",
+        "Passkey authentication will be available after you set up a passkey in your profile settings.",
+        [{ text: "OK" }]
+      );
+    } catch (err: any) {
+      setError(err.message || "Passkey login failed");
     }
   };
 
@@ -126,43 +183,137 @@ export default function AuthScreen() {
     setError("");
     setPassword("");
     setVerificationCode("");
+    setTwoFACode("");
+    setPendingUserId(null);
   };
 
   const switchToLogin = () => {
-    setStep("login");
+    setStep("login-email");
     setError("");
     setPassword("");
     setVerificationCode("");
+    setTwoFACode("");
+    setPendingUserId(null);
   };
 
   const goBack = () => {
-    if (step === "signup-verify") {
+    setError("");
+    if (step === "login-password") {
+      setStep("login-email");
+      setPassword("");
+    } else if (step === "login-2fa") {
+      setStep("login-password");
+      setTwoFACode("");
+    } else if (step === "signup-verify") {
       setStep("signup-email");
     } else if (step === "signup-password") {
       setStep("signup-verify");
     } else {
-      setStep("login");
+      setStep("login-email");
     }
-    setError("");
   };
 
-  const renderLoginForm = () => (
+  const renderLoginEmailForm = () => (
     <>
+      <View style={styles.header}>
+        <Image
+          source={require("../../assets/images/icon.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <ThemedText type="h2" style={styles.title}>Log in</ThemedText>
+      </View>
+
       <View style={styles.form}>
+        <ThemedText style={[styles.inputLabel, { color: theme.textSecondary }]}>Email</ThemedText>
         <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: error ? Colors.light.error : theme.border }]}>
-          <Feather name="mail" size={20} color={theme.textSecondary} style={styles.inputIcon} />
           <TextInput
             style={[styles.input, { color: theme.text }]}
-            placeholder="Email"
+            placeholder="Enter your email"
             placeholderTextColor={theme.textSecondary}
             value={email}
             onChangeText={(text) => { setEmail(text); setError(""); }}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            autoFocus
           />
+          {email.length > 0 ? (
+            <Pressable onPress={() => setEmail("")} style={styles.clearButton}>
+              <Feather name="x" size={18} color={theme.textSecondary} />
+            </Pressable>
+          ) : null}
         </View>
 
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Feather name="alert-circle" size={16} color={Colors.light.error} />
+            <ThemedText style={styles.errorText}>{error}</ThemedText>
+          </View>
+        ) : null}
+
+        <Button onPress={handleEmailContinue} disabled={isLoading} style={styles.continueButton}>
+          Continue
+        </Button>
+
+        <View style={styles.dividerContainer}>
+          <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+          <ThemedText style={[styles.dividerText, { color: theme.textSecondary }]}>or</ThemedText>
+          <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+        </View>
+
+        <Pressable 
+          style={[styles.alternativeButton, { borderColor: theme.border }]} 
+          onPress={handlePasskeyLogin}
+        >
+          <Feather name="key" size={20} color={theme.text} />
+          <ThemedText style={styles.alternativeButtonText}>Continue with Passkey</ThemedText>
+        </Pressable>
+      </View>
+
+      <View style={styles.footer}>
+        <Pressable onPress={switchToSignUp}>
+          <ThemedText style={{ color: Colors.light.primary }}>Create a SwipeMe Account</ThemedText>
+        </Pressable>
+      </View>
+
+      <View style={styles.features}>
+        <View style={styles.featureItem}>
+          <View style={[styles.featureIcon, { backgroundColor: Colors.light.primaryLight }]}>
+            <Feather name="shield" size={18} color={Colors.light.primary} />
+          </View>
+          <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>End-to-end encrypted</ThemedText>
+        </View>
+        <View style={styles.featureItem}>
+          <View style={[styles.featureIcon, { backgroundColor: Colors.light.primaryLight }]}>
+            <Feather name="zap" size={18} color={Colors.light.primary} />
+          </View>
+          <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>Instant payments</ThemedText>
+        </View>
+        <View style={styles.featureItem}>
+          <View style={[styles.featureIcon, { backgroundColor: Colors.light.primaryLight }]}>
+            <Feather name="lock" size={18} color={Colors.light.primary} />
+          </View>
+          <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>Self-custodial wallet</ThemedText>
+        </View>
+      </View>
+    </>
+  );
+
+  const renderLoginPasswordForm = () => (
+    <>
+      <View style={styles.stepHeader}>
+        <Pressable onPress={goBack} style={styles.backButton}>
+          <Feather name="arrow-left" size={24} color={theme.text} />
+        </Pressable>
+      </View>
+
+      <ThemedText type="h3" style={styles.stepTitle}>Enter your password</ThemedText>
+      <ThemedText style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+        {email}
+      </ThemedText>
+
+      <View style={styles.form}>
         <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: error ? Colors.light.error : theme.border }]}>
           <Feather name="lock" size={20} color={theme.textSecondary} style={styles.inputIcon} />
           <TextInput
@@ -173,6 +324,7 @@ export default function AuthScreen() {
             onChangeText={(text) => { setPassword(text); setError(""); }}
             secureTextEntry={!showPassword}
             autoCapitalize="none"
+            autoFocus
           />
           <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
             <Feather name={showPassword ? "eye-off" : "eye"} size={20} color={theme.textSecondary} />
@@ -187,15 +339,56 @@ export default function AuthScreen() {
         ) : null}
 
         <Button onPress={handleLogin} disabled={isLoading} style={styles.submitButton}>
-          {isLoading ? <ActivityIndicator color="#FFFFFF" /> : "Sign In"}
+          {isLoading ? <ActivityIndicator color="#FFFFFF" /> : "Log In"}
         </Button>
       </View>
+    </>
+  );
 
-      <View style={styles.footer}>
-        <ThemedText style={{ color: theme.textSecondary }}>Don't have an account? </ThemedText>
-        <Pressable onPress={switchToSignUp}>
-          <ThemedText type="link">Sign Up</ThemedText>
+  const renderLogin2FAForm = () => (
+    <>
+      <View style={styles.stepHeader}>
+        <Pressable onPress={goBack} style={styles.backButton}>
+          <Feather name="arrow-left" size={24} color={theme.text} />
         </Pressable>
+      </View>
+
+      <View style={styles.securityIconContainer}>
+        <View style={[styles.securityIcon, { backgroundColor: Colors.light.primaryLight }]}>
+          <Feather name="shield" size={32} color={Colors.light.primary} />
+        </View>
+      </View>
+
+      <ThemedText type="h3" style={[styles.stepTitle, { textAlign: "center" }]}>Two-Factor Authentication</ThemedText>
+      <ThemedText style={[styles.stepSubtitle, { color: theme.textSecondary, textAlign: "center" }]}>
+        Enter the 6-digit code from your authenticator app
+      </ThemedText>
+
+      <View style={styles.form}>
+        <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: error ? Colors.light.error : theme.border }]}>
+          <Feather name="hash" size={20} color={theme.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={[styles.input, styles.codeInput, { color: theme.text }]}
+            placeholder="000000"
+            placeholderTextColor={theme.textSecondary}
+            value={twoFACode}
+            onChangeText={(text) => { setTwoFACode(text.replace(/[^0-9]/g, "").slice(0, 6)); setError(""); }}
+            keyboardType="number-pad"
+            maxLength={6}
+            autoFocus
+          />
+        </View>
+
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Feather name="alert-circle" size={16} color={Colors.light.error} />
+            <ThemedText style={styles.errorText}>{error}</ThemedText>
+          </View>
+        ) : null}
+
+        <Button onPress={handle2FAVerify} disabled={isLoading || twoFACode.length !== 6} style={styles.submitButton}>
+          {isLoading ? <ActivityIndicator color="#FFFFFF" /> : "Verify"}
+        </Button>
       </View>
     </>
   );
@@ -251,7 +444,7 @@ export default function AuthScreen() {
       <View style={styles.footer}>
         <ThemedText style={{ color: theme.textSecondary }}>Already have an account? </ThemedText>
         <Pressable onPress={switchToLogin}>
-          <ThemedText type="link">Sign In</ThemedText>
+          <ThemedText type="link">Log In</ThemedText>
         </Pressable>
       </View>
     </>
@@ -369,8 +562,12 @@ export default function AuthScreen() {
 
   const renderCurrentStep = () => {
     switch (step) {
-      case "login":
-        return renderLoginForm();
+      case "login-email":
+        return renderLoginEmailForm();
+      case "login-password":
+        return renderLoginPasswordForm();
+      case "login-2fa":
+        return renderLogin2FAForm();
       case "signup-email":
         return renderSignUpEmailForm();
       case "signup-verify":
@@ -391,44 +588,7 @@ export default function AuthScreen() {
           },
         ]}
       >
-        {step === "login" ? (
-          <View style={styles.header}>
-            <Image
-              source={require("../../assets/images/icon.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <ThemedText type="h2" style={styles.title}>SwipeMe</ThemedText>
-            <ThemedText style={[styles.tagline, { color: Colors.light.primary }]}>
-              Just SwipeMe – instant money, straight from your chat
-            </ThemedText>
-          </View>
-        ) : null}
-
         {renderCurrentStep()}
-
-        {step === "login" ? (
-          <View style={styles.features}>
-            <View style={styles.featureItem}>
-              <View style={[styles.featureIcon, { backgroundColor: Colors.light.primaryLight }]}>
-                <Feather name="shield" size={18} color={Colors.light.primary} />
-              </View>
-              <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>End-to-end encrypted</ThemedText>
-            </View>
-            <View style={styles.featureItem}>
-              <View style={[styles.featureIcon, { backgroundColor: Colors.light.primaryLight }]}>
-                <Feather name="zap" size={18} color={Colors.light.primary} />
-              </View>
-              <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>Instant payments</ThemedText>
-            </View>
-            <View style={styles.featureItem}>
-              <View style={[styles.featureIcon, { backgroundColor: Colors.light.primaryLight }]}>
-                <Feather name="lock" size={18} color={Colors.light.primary} />
-              </View>
-              <ThemedText style={[styles.featureText, { color: theme.textSecondary }]}>Self-custodial wallet</ThemedText>
-            </View>
-          </View>
-        ) : null}
       </KeyboardAwareScrollViewCompat>
     </ThemedView>
   );
@@ -456,14 +616,9 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: Spacing.xs,
   },
-  subtitle: {
-    textAlign: "center",
-  },
-  tagline: {
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "500",
-    marginTop: Spacing.sm,
+  inputLabel: {
+    fontSize: 14,
+    marginBottom: Spacing.xs,
   },
   stepHeader: {
     flexDirection: "row",
@@ -508,6 +663,17 @@ const styles = StyleSheet.create({
   stepSubtitle: {
     marginBottom: Spacing.xl,
   },
+  securityIconContainer: {
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  securityIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   form: {
     gap: Spacing.md,
   },
@@ -532,6 +698,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
+  clearButton: {
+    padding: Spacing.xs,
+  },
   eyeButton: {
     padding: Spacing.xs,
   },
@@ -544,8 +713,36 @@ const styles = StyleSheet.create({
     color: Colors.light.error,
     fontSize: 14,
   },
+  continueButton: {
+    marginTop: Spacing.sm,
+  },
   submitButton: {
     marginTop: Spacing.sm,
+  },
+  dividerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: Spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    marginHorizontal: Spacing.md,
+    fontSize: 14,
+  },
+  alternativeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: Spacing.inputHeight,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  alternativeButtonText: {
+    fontSize: 16,
   },
   resendButton: {
     alignItems: "center",

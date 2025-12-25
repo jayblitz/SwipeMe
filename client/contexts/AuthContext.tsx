@@ -15,12 +15,21 @@ export interface User {
   twoFactorEnabled?: boolean;
 }
 
+export interface LoginResult {
+  success: boolean;
+  requires2FA?: boolean;
+  userId?: string;
+  user?: User;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isInitializing: boolean;
   isAuthenticated: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<LoginResult>;
+  verify2FA: (userId: string, code: string) => Promise<void>;
+  signInWithPasskey: (credentialId: string) => Promise<void>;
   startSignUp: (email: string) => Promise<void>;
   verifyCode: (email: string, code: string) => Promise<void>;
   completeSignUp: (email: string, code: string, password: string) => Promise<void>;
@@ -55,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     setIsLoading(true);
     try {
       const response = await apiRequest("POST", "/api/auth/login", { email, password });
@@ -65,14 +74,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(data.error || "Login failed");
       }
       
+      if (data.requires2FA) {
+        return {
+          success: true,
+          requires2FA: true,
+          userId: data.userId,
+        };
+      }
+      
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
       setUser(data.user);
+      
+      return {
+        success: true,
+        requires2FA: false,
+        user: data.user,
+      };
     } catch (error: any) {
       console.error("Sign in failed:", error);
       if (error.message.includes("401")) {
         throw new Error("Incorrect email or password");
       }
       throw new Error(error.message || "Sign in failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const verify2FA = useCallback(async (userId: string, code: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const response = await apiRequest("POST", "/api/auth/verify-2fa", { userId, code });
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || "Verification failed");
+      }
+      
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+      setUser(data.user);
+    } catch (error: any) {
+      console.error("2FA verification failed:", error);
+      throw new Error(error.message || "Invalid verification code");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const signInWithPasskey = useCallback(async (credentialId: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const response = await apiRequest("POST", "/api/auth/passkey/login", { credentialId });
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || "Passkey login failed");
+      }
+      
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+      setUser(data.user);
+    } catch (error: any) {
+      console.error("Passkey login failed:", error);
+      throw new Error(error.message || "Passkey login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -191,6 +254,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isInitializing,
         isAuthenticated: !!user,
         signIn,
+        verify2FA,
+        signInWithPasskey,
         startSignUp,
         verifyCode,
         completeSignUp,
