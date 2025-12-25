@@ -18,6 +18,7 @@ import { Button } from "@/components/Button";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWallet } from "@/contexts/WalletContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, sendAudioMessage, getChats, Message, Chat, getContactWalletAddress, getChatBackground, setChatBackground, PRESET_BACKGROUNDS, ChatBackground } from "@/lib/storage";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
@@ -861,6 +862,7 @@ export default function ChatScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { wallet } = useWallet();
   const route = useRoute<RouteProp<ChatsStackParamList, "Chat">>();
   const navigation = useNavigation<NativeStackNavigationProp<ChatsStackParamList>>();
   const { chatId, name, peerAddress } = route.params;
@@ -884,7 +886,6 @@ export default function ChatScreen() {
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>(
     TEMPO_TOKENS.map(token => ({ token, balance: "0", balanceFormatted: "0", balanceUsd: 0 }))
   );
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [chat, setChat] = useState<Chat | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
@@ -939,23 +940,15 @@ export default function ChatScreen() {
       if (currentChat) setChat(currentChat);
     }
     
-    if (user?.id) {
+    if (wallet?.address) {
       try {
-        const baseUrl = getApiUrl();
-        const walletRes = await fetch(new URL(`/api/wallet/${user.id}`, baseUrl));
-        if (walletRes.ok) {
-          const walletData = await walletRes.json();
-          if (walletData.wallet?.address) {
-            setWalletAddress(walletData.wallet.address);
-            const balances = await fetchTokenBalances(walletData.wallet.address);
-            setTokenBalances(balances);
-          }
-        }
+        const balances = await fetchTokenBalances(wallet.address);
+        setTokenBalances(balances);
       } catch (error) {
-        console.error("Failed to fetch wallet/balances:", error);
+        console.error("Failed to fetch balances:", error);
       }
     }
-  }, [chatId, user?.id, useXMTPMode, peerAddress, client?.inboxId]);
+  }, [chatId, user?.id, useXMTPMode, peerAddress, client?.inboxId, wallet?.address]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1172,8 +1165,8 @@ export default function ChatScreen() {
       setMessages(prev => [message, ...prev]);
       
       // Refresh balances
-      if (walletAddress) {
-        const balances = await fetchTokenBalances(walletAddress);
+      if (wallet?.address) {
+        const balances = await fetchTokenBalances(wallet.address);
         setTokenBalances(balances);
       }
       

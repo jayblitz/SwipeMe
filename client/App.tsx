@@ -12,6 +12,7 @@ import { queryClient } from "@/lib/query-client";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { WalletProvider } from "@/contexts/WalletContext";
 import { XMTPProvider } from "@/contexts/XMTPContext";
 import { PrivyProvider } from "@/contexts/PrivyContext";
 import { ThemeProvider } from "@/hooks/useTheme";
@@ -22,7 +23,8 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <PrivyProvider>
           <AuthProvider>
-            <XMTPProvider>
+            <WalletProvider>
+              <XMTPProvider>
               <ThemeProvider>
                 <SafeAreaProvider>
                   <GestureHandlerRootView style={styles.root}>
@@ -35,7 +37,8 @@ export default function App() {
                   </GestureHandlerRootView>
                 </SafeAreaProvider>
               </ThemeProvider>
-            </XMTPProvider>
+              </XMTPProvider>
+            </WalletProvider>
           </AuthProvider>
         </PrivyProvider>
       </QueryClientProvider>

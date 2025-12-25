@@ -13,18 +13,12 @@ import { Avatar } from "@/components/Avatar";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWallet, Wallet } from "@/contexts/WalletContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { Transaction, getTransactions } from "@/lib/storage";
 import { getApiUrl, apiRequest } from "@/lib/query-client";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS } from "@/lib/tempo-tokens";
 import WalletSetupScreen from "./WalletSetupScreen";
-
-interface Wallet {
-  id: string;
-  address: string;
-  isImported: boolean;
-  createdAt: string;
-}
 
 function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
@@ -258,8 +252,8 @@ export default function WalletScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { wallet, isLoading: isLoadingWallet, refreshWallet, setWallet, clearWallet } = useWallet();
   
-  const [wallet, setWallet] = useState<Wallet | null | undefined>(undefined);
   const initialBalances: TokenBalance[] = TEMPO_TOKENS.map(token => ({
     token,
     balance: "0",
@@ -270,30 +264,9 @@ export default function WalletScreen() {
   const [totalBalance, setTotalBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [isLoadingWallet, setIsLoadingWallet] = useState(true);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
-
-  const loadWallet = useCallback(async () => {
-    if (!user) return;
-    
-    try {
-      const baseUrl = getApiUrl();
-      const response = await fetch(new URL(`/api/wallet/${user.id}`, baseUrl), {
-        credentials: "include",
-      });
-      const data = await response.json();
-      setWallet(data.wallet);
-      return data.wallet;
-    } catch (error) {
-      console.error("Failed to load wallet:", error);
-      setWallet(null);
-      return null;
-    } finally {
-      setIsLoadingWallet(false);
-    }
-  }, [user]);
 
   const loadBalances = useCallback(async (walletAddress: string) => {
     if (!walletAddress) return;
@@ -323,21 +296,20 @@ export default function WalletScreen() {
   useFocusEffect(
     useCallback(() => {
       const init = async () => {
-        const loadedWallet = await loadWallet();
-        if (loadedWallet?.address) {
-          loadBalances(loadedWallet.address);
+        if (wallet?.address) {
+          loadBalances(wallet.address);
         }
         loadData();
       };
       init();
-    }, [loadWallet, loadData, loadBalances])
+    }, [wallet?.address, loadData, loadBalances])
   );
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const loadedWallet = await loadWallet();
-    if (loadedWallet?.address) {
-      await loadBalances(loadedWallet.address);
+    const refreshedWallet = await refreshWallet();
+    if (refreshedWallet?.address) {
+      await loadBalances(refreshedWallet.address);
     }
     await loadData();
     setRefreshing(false);
@@ -355,8 +327,8 @@ export default function WalletScreen() {
     Alert.alert("Enter Address", "Manual address entry will be available soon.");
   };
 
-  const handleWalletCreated = (newWallet: { address: string }) => {
-    setWallet(newWallet as Wallet);
+  const handleWalletCreated = async (newWallet: { address: string }) => {
+    await refreshWallet();
     if (newWallet.address) {
       loadBalances(newWallet.address);
     }
@@ -392,7 +364,7 @@ export default function WalletScreen() {
       const data = await response.json();
       
       if (data.success) {
-        setWallet(null);
+        await clearWallet();
         Alert.alert(
           "Wallet Removed",
           "Your wallet has been removed. You can add a new wallet or import your existing one using your recovery phrase."

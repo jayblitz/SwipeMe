@@ -12,24 +12,11 @@ import { Card } from "@/components/Card";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePrivyContext } from "@/contexts/PrivyContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import { generateMnemonic, english, mnemonicToAccount } from "viem/accounts";
 
-let usePrivy: any = null;
-let useLoginWithEmail: any = null;
-let useEmbeddedEthereumWallet: any = null;
-
-if (Platform.OS !== "web") {
-  try {
-    const privyExpo = require("@privy-io/expo");
-    usePrivy = privyExpo.usePrivy;
-    useLoginWithEmail = privyExpo.useLoginWithEmail;
-    useEmbeddedEthereumWallet = privyExpo.useEmbeddedEthereumWallet;
-  } catch (e) {
-    console.log("Privy SDK not available");
-  }
-}
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
@@ -58,10 +45,10 @@ export default function WalletSetupScreen({ onWalletCreated }: WalletSetupScreen
   const [privyOtp, setPrivyOtp] = useState("");
   const [privyOtpSent, setPrivyOtpSent] = useState(false);
 
-  const privyAvailable = Platform.OS !== "web" && usePrivy !== null;
-  const privy = privyAvailable && usePrivy ? usePrivy() : null;
-  const loginWithEmail = privyAvailable && useLoginWithEmail ? useLoginWithEmail() : null;
-  const embeddedWallet = privyAvailable && useEmbeddedEthereumWallet ? useEmbeddedEthereumWallet() : null;
+  const { privyAvailable } = usePrivyContext();
+  
+  const loginWithEmail: any = null;
+  const embeddedWallet: any = null;
 
   const translateX = useSharedValue(0);
 

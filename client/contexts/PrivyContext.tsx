@@ -1,16 +1,14 @@
-import React, { createContext, useContext, ReactNode } from "react";
+import React, { createContext, useContext, ReactNode, useMemo } from "react";
 import { Platform } from "react-native";
-import { PrivyProvider as PrivyProviderSDK } from "@privy-io/expo";
-
-const PRIVY_APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID || "";
-const PRIVY_CLIENT_ID = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID || "";
 
 interface PrivyContextType {
   isNative: boolean;
+  privyAvailable: boolean;
 }
 
 const PrivyContext = createContext<PrivyContextType>({
   isNative: Platform.OS !== "web",
+  privyAvailable: false,
 });
 
 export function usePrivyContext() {
@@ -23,29 +21,48 @@ interface PrivyProviderProps {
 
 export function PrivyProvider({ children }: PrivyProviderProps) {
   const isNative = Platform.OS !== "web";
+  const privyAvailable = isNative;
 
-  if (!isNative) {
-    return (
-      <PrivyContext.Provider value={{ isNative: false }}>
-        {children}
-      </PrivyContext.Provider>
-    );
-  }
+  const contextValue = useMemo(() => ({
+    isNative,
+    privyAvailable,
+  }), [isNative, privyAvailable]);
 
-  if (!PRIVY_APP_ID || !PRIVY_CLIENT_ID) {
-    console.warn("Privy credentials not configured");
-    return (
-      <PrivyContext.Provider value={{ isNative: true }}>
-        {children}
-      </PrivyContext.Provider>
-    );
+  if (isNative) {
+    try {
+      const { PrivyProvider: NativePrivyProvider } = require("@privy-io/expo");
+      const appId = process.env.EXPO_PUBLIC_PRIVY_APP_ID || "";
+      const clientId = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID_MOBILE || "";
+
+      if (!appId) {
+        console.warn("Privy: EXPO_PUBLIC_PRIVY_APP_ID not set, falling back to non-Privy mode");
+        return (
+          <PrivyContext.Provider value={{ ...contextValue, privyAvailable: false }}>
+            {children}
+          </PrivyContext.Provider>
+        );
+      }
+
+      return (
+        <NativePrivyProvider appId={appId} clientId={clientId}>
+          <PrivyContext.Provider value={contextValue}>
+            {children}
+          </PrivyContext.Provider>
+        </NativePrivyProvider>
+      );
+    } catch (error) {
+      console.warn("Privy SDK not available on this platform:", error);
+      return (
+        <PrivyContext.Provider value={{ ...contextValue, privyAvailable: false }}>
+          {children}
+        </PrivyContext.Provider>
+      );
+    }
   }
 
   return (
-    <PrivyProviderSDK appId={PRIVY_APP_ID} clientId={PRIVY_CLIENT_ID}>
-      <PrivyContext.Provider value={{ isNative: true }}>
-        {children}
-      </PrivyContext.Provider>
-    </PrivyProviderSDK>
+    <PrivyContext.Provider value={contextValue}>
+      {children}
+    </PrivyContext.Provider>
   );
 }
