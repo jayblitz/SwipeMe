@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform, ActivityIndicator, Modal, ScrollView, Image, Linking } from "react-native";
+import { View, StyleSheet, Pressable, RefreshControl, Alert, ActionSheetIOS, Platform, ActivityIndicator, Modal, ScrollView, Image, Linking, TextInput } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
@@ -18,6 +18,8 @@ import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { Transaction, getTransactions } from "@/lib/storage";
 import { getApiUrl, apiRequest } from "@/lib/query-client";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS } from "@/lib/tempo-tokens";
+import { parseApiError, ErrorCodes } from "@/lib/errors";
+import { parseUnits, formatUnits } from "viem";
 import WalletSetupScreen from "./WalletSetupScreen";
 
 function formatDate(timestamp: number): string {
@@ -232,6 +234,264 @@ function ReceiveModal({ visible, onClose, address }: ReceiveModalProps) {
   );
 }
 
+interface SendToAddressModalProps {
+  visible: boolean;
+  onClose: () => void;
+  tokenBalances: TokenBalance[];
+  userId: string;
+  onSuccess: () => void;
+}
+
+function SendToAddressModal({ visible, onClose, tokenBalances, userId, onSuccess }: SendToAddressModalProps) {
+  const { theme } = useTheme();
+  const [recipientAddress, setRecipientAddress] = useState("");
+  const [amount, setAmount] = useState("");
+  const [selectedTokenIndex, setSelectedTokenIndex] = useState(0);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [txResult, setTxResult] = useState<{ txHash: string; explorer: string } | null>(null);
+
+  const selectedToken = TEMPO_TOKENS[selectedTokenIndex];
+  const selectedBalance = tokenBalances[selectedTokenIndex];
+
+  const resetForm = () => {
+    setRecipientAddress("");
+    setAmount("");
+    setSelectedTokenIndex(0);
+    setError(null);
+    setTxResult(null);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const validateAddress = (address: string): boolean => {
+    return /^0x[a-fA-F0-9]{40}$/.test(address);
+  };
+
+  const handleSend = async () => {
+    setError(null);
+
+    if (!recipientAddress.trim()) {
+      setError("Please enter a recipient address");
+      return;
+    }
+
+    if (!validateAddress(recipientAddress)) {
+      setError("Invalid wallet address format");
+      return;
+    }
+
+    const amountStr = amount.trim();
+    if (!/^\d+(\.\d+)?$/.test(amountStr)) {
+      setError("Please enter a valid amount (numbers only)");
+      return;
+    }
+
+    let amountInBaseUnits: bigint;
+    try {
+      amountInBaseUnits = parseUnits(amountStr, selectedToken.decimals);
+    } catch {
+      setError("Please enter a valid amount");
+      return;
+    }
+
+    if (amountInBaseUnits <= 0n) {
+      setError("Amount must be greater than zero");
+      return;
+    }
+
+    const balanceInBaseUnits = BigInt(selectedBalance.balance);
+    if (amountInBaseUnits > balanceInBaseUnits) {
+      setError(`Insufficient ${selectedToken.symbol} balance (${selectedBalance.balanceFormatted} available)`);
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(new URL(`/api/wallet/${userId}/transfer`, baseUrl), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          tokenAddress: selectedToken.address,
+          toAddress: recipientAddress,
+          amount: amountStr,
+          decimals: selectedToken.decimals,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Transfer failed");
+      }
+
+      setTxResult({ txHash: data.txHash, explorer: data.explorer });
+      onSuccess();
+    } catch (err) {
+      const appError = parseApiError(err);
+      setError(appError.message);
+      
+      if (appError.code === ErrorCodes.UNAUTHORIZED) {
+        Alert.alert("Session Expired", "Please sign in again to continue.");
+      }
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleOpenExplorer = () => {
+    if (txResult?.explorer) {
+      Linking.openURL(txResult.explorer);
+    }
+  };
+
+  if (txResult) {
+    return (
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+        <Pressable style={styles.modalOverlay} onPress={handleClose}>
+          <Pressable style={[styles.sendAddressModalContainer, { backgroundColor: theme.backgroundRoot }]} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.successContainer}>
+              <View style={[styles.successIcon, { backgroundColor: theme.success + "20" }]}>
+                <Feather name="check-circle" size={48} color={theme.success} />
+              </View>
+              <ThemedText type="h4" style={styles.successTitle}>Transfer Sent</ThemedText>
+              <ThemedText style={[styles.successAmount, { color: theme.textSecondary }]}>
+                {amount} {selectedToken.symbol}
+              </ThemedText>
+              <Pressable
+                onPress={handleOpenExplorer}
+                style={[styles.explorerButton, { backgroundColor: theme.backgroundSecondary }]}
+              >
+                <Feather name="external-link" size={16} color={theme.primary} />
+                <ThemedText style={[styles.explorerButtonText, { color: theme.primary }]}>
+                  View on Explorer
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={handleClose}
+                style={[styles.doneButton, { backgroundColor: theme.primary }]}
+              >
+                <ThemedText style={styles.doneButtonText}>Done</ThemedText>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+      <Pressable style={styles.modalOverlay} onPress={handleClose}>
+        <Pressable style={[styles.sendAddressModalContainer, { backgroundColor: theme.backgroundRoot }]} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.sendModalHeader}>
+            <ThemedText type="h4">Send to Address</ThemedText>
+            <Pressable onPress={handleClose} style={styles.modalCloseButton}>
+              <Feather name="x" size={24} color={theme.text} />
+            </Pressable>
+          </View>
+
+          <View style={styles.sendAddressForm}>
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.inputLabel, { color: theme.textSecondary }]}>Recipient Address</ThemedText>
+              <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+                <TextInput
+                  style={[styles.textInput, { color: theme.text }]}
+                  placeholder="0x..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={recipientAddress}
+                  onChangeText={setRecipientAddress}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.inputLabel, { color: theme.textSecondary }]}>Token</ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tokenSelector}>
+                {TEMPO_TOKENS.map((token, index) => (
+                  <Pressable
+                    key={token.symbol}
+                    onPress={() => setSelectedTokenIndex(index)}
+                    style={[
+                      styles.tokenOption,
+                      { 
+                        backgroundColor: selectedTokenIndex === index ? token.color + "20" : theme.backgroundDefault,
+                        borderColor: selectedTokenIndex === index ? token.color : theme.border,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.tokenDot, { backgroundColor: token.color }]} />
+                    <ThemedText style={styles.tokenOptionSymbol}>{token.symbol}</ThemedText>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <ThemedText style={[styles.balanceHint, { color: theme.textSecondary }]}>
+                Balance: {parseFloat(selectedBalance?.balanceFormatted || "0").toLocaleString()} {selectedToken.symbol}
+              </ThemedText>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.inputLabel, { color: theme.textSecondary }]}>Amount</ThemedText>
+              <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+                <TextInput
+                  style={[styles.textInput, { color: theme.text }]}
+                  placeholder="0.00"
+                  placeholderTextColor={theme.textSecondary}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                />
+                <Pressable
+                  onPress={() => setAmount(selectedBalance?.balanceFormatted || "0")}
+                  style={[styles.maxButton, { backgroundColor: theme.primary + "20" }]}
+                >
+                  <ThemedText style={[styles.maxButtonText, { color: theme.primary }]}>MAX</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+
+            {error ? (
+              <View style={[styles.errorContainer, { backgroundColor: theme.error + "20" }]}>
+                <Feather name="alert-circle" size={16} color={theme.error} />
+                <ThemedText style={[styles.errorText, { color: theme.error }]}>{error}</ThemedText>
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={handleSend}
+              disabled={isSending}
+              style={({ pressed }) => [
+                styles.sendButton,
+                { 
+                  backgroundColor: isSending ? theme.textSecondary : theme.primary,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              {isSending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Feather name="send" size={18} color="#FFFFFF" />
+                  <ThemedText style={styles.sendButtonText}>Send {selectedToken.symbol}</ThemedText>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 function TransactionHistoryEmpty() {
   const { theme } = useTheme();
 
@@ -267,6 +527,7 @@ export default function WalletScreen() {
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [showSendAddressModal, setShowSendAddressModal] = useState(false);
 
   const loadBalances = useCallback(async (walletAddress: string) => {
     if (!walletAddress) return;
@@ -324,7 +585,14 @@ export default function WalletScreen() {
   };
 
   const handleEnterAddress = () => {
-    Alert.alert("Enter Address", "Manual address entry will be available soon.");
+    setShowSendAddressModal(true);
+  };
+
+  const handleTransferSuccess = () => {
+    if (wallet?.address) {
+      loadBalances(wallet.address);
+    }
+    loadData();
   };
 
   const handleWalletCreated = async (newWallet: { address: string }) => {
@@ -620,6 +888,14 @@ export default function WalletScreen() {
         visible={showReceiveModal}
         onClose={() => setShowReceiveModal(false)}
         address={wallet.address || ""}
+      />
+
+      <SendToAddressModal
+        visible={showSendAddressModal}
+        onClose={() => setShowSendAddressModal(false)}
+        tokenBalances={tokenBalances}
+        userId={user?.id || ""}
+        onSuccess={handleTransferSuccess}
       />
     </ThemedView>
   );
@@ -1016,5 +1292,139 @@ const styles = StyleSheet.create({
   },
   networkLabel: {
     fontSize: 12,
+  },
+  sendAddressModalContainer: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+  },
+  sendAddressForm: {
+    gap: Spacing.lg,
+  },
+  inputGroup: {
+    gap: Spacing.xs,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    height: 48,
+    paddingHorizontal: Spacing.md,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    height: "100%",
+  },
+  tokenSelector: {
+    flexGrow: 0,
+    marginTop: Spacing.xs,
+  },
+  tokenOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginRight: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  tokenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  tokenOptionSymbol: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  balanceHint: {
+    fontSize: 12,
+    marginTop: Spacing.xs,
+  },
+  maxButton: {
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+  },
+  maxButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    gap: Spacing.sm,
+  },
+  errorText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  sendButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 52,
+    borderRadius: BorderRadius.button,
+    gap: Spacing.sm,
+  },
+  sendButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  successContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing.xl,
+  },
+  successIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  successTitle: {
+    marginBottom: Spacing.xs,
+  },
+  successAmount: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: Spacing.xl,
+  },
+  explorerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  explorerButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  doneButton: {
+    width: "100%",
+    height: 48,
+    borderRadius: BorderRadius.button,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  doneButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
