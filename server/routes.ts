@@ -42,6 +42,26 @@ function requireSameUser(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Digital Asset Links for Android passkey association with swipeme.org
+  // This file proves the app is authorized to create passkeys for this domain
+  app.get("/.well-known/assetlinks.json", (req: Request, res: Response) => {
+    res.setHeader("Content-Type", "application/json");
+    res.json([{
+      "relation": [
+        "delegate_permission/common.handle_all_urls",
+        "delegate_permission/common.get_login_creds"
+      ],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.swipeme.app",
+        "sha256_cert_fingerprints": [
+          // TODO: Replace with actual SHA-256 fingerprint from production build
+          "PLACEHOLDER_SHA256_FINGERPRINT"
+        ]
+      }
+    }]);
+  });
+
   app.post("/api/auth/signup/start", async (req: Request, res: Response) => {
     try {
       const { email } = signupSchema.parse(req.body);
@@ -904,9 +924,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store challenge in session for verification
       req.session.passkeyChallenge = challenge;
       
-      const rpId = process.env.REPLIT_DEV_DOMAIN 
-        ? process.env.REPLIT_DEV_DOMAIN.split(".").slice(-2).join(".")
-        : "localhost";
+      // Use swipeme.org as the RP ID for passkeys (requires assetlinks.json on that domain)
+      const rpId = "swipeme.org";
       
       res.json({
         success: true,
@@ -984,9 +1003,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.passkeyLoginChallenge = challenge;
       req.session.passkeyLoginChallengeExpiry = Date.now() + 60000; // 60 seconds
       
-      const rpId = process.env.REPLIT_DEV_DOMAIN 
-        ? process.env.REPLIT_DEV_DOMAIN.split(".").slice(-2).join(".")
-        : "localhost";
+      // Use swipeme.org as the RP ID for passkeys (requires assetlinks.json on that domain)
+      const rpId = "swipeme.org";
       
       res.json({
         success: true,
@@ -1056,15 +1074,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         authenticatorAttachment: "platform",
       };
       
-      // Get the RP ID from environment - must match the registrable domain used in options
-      const rpID = process.env.REPLIT_DEV_DOMAIN 
-        ? process.env.REPLIT_DEV_DOMAIN.split(".").slice(-2).join(".")
-        : "localhost";
-      // Origin must match what the authenticator returns
-      // Native authenticators use "http://localhost" (no port) for local development
-      const origin = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : "http://localhost";
+      // Use swipeme.org as the RP ID for passkeys (must match registration options)
+      const rpID = "swipeme.org";
+      // Origin must match the app's associated domain
+      const origin = "https://swipeme.org";
       
       // Verify the authentication response cryptographically
       let verification;
