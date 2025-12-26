@@ -1,0 +1,213 @@
+cd /Users/jerry/SwipeMe && npx expo install --check
+The following packages should be updated for best compatibility with the installed expo version:
+  expo@54.0.25 - expected version: ~54.0.30
+  expo-blur@15.0.7 - expected version: ~15.0.8
+  expo-font@14.0.9 - expected version: ~14.0.10
+  expo-glass-effect@0.1.7 - expected version: ~0.1.8
+  expo-haptics@15.0.7 - expected version: ~15.0.8
+  expo-image@3.0.10 - expected version: ~3.0.11
+  expo-linking@8.0.9 - expected version: ~8.0.11
+  expo-splash-screen@31.0.11 - expected version: ~31.0.13
+  expo-status-bar@3.0.8 - expected version: ~3.0.9
+  expo-symbols@1.0.7 - expected version: ~1.0.8
+  expo-system-ui@6.0.8 - expected version: ~6.0.9
+  expo-web-browser@15.0.9 - expected version: ~15.0.10
+  react-native-get-random-values@2.0.0 - expected version: ~1.11.0
+  react-native-webview@13.16.0 - expected version: 13.15.0
+Your project may not work correctly until you install the expected versions of the packages.
+Found outdated dependencies
+$ cd /Users/jerry/SwipeMe && npx expo install expo@~54.0.30 expo-blur@~15.0.8 expo-font@~14.0.10 expo-glass-effect@~0.1.8 expo-haptics@~15.0.8 expo-image@~3.0.11 expo-linking@~8.0.11 expo-splash-screen@~31.0.13 expo-status-bar@~3.0.9 expo-symbols@~1.0.8 expo-system-ui@~6.0.9 expo-web-browser@~15.0.10 react-native-get-random-values@~1.11.0 react-native-webview@13.15.0
+› Installing 14 other packages using npm
+› Using ~54.0.30 instead of ~54.0.30 for expo, ~15.0.8 instead of ~15.0.8 for expo-blur, ~14.0.10 instead of ~14.0.10 for expo-font, ~0.1.8 instead of ~0.1.8 for expo-glass-effect, ~15.0.8 instead of ~15.0.8 for expo-haptics, ~3.0.11 instead of ~3.0.11 for expo-image, ~8.0.11 instead of ~8.0.11 for expo-linking, ~31.0.13 instead of ~31.0.13 for expo-splash-screen, ~3.0.9 instead of ~3.0.9 for expo-status-bar, ~1.0.8 instead of ~1.0.8 for expo-symbols, and 4 others because these versions was explicitly provided. Packages excluded from dependency validation should be listed in expo.install.exclude in package.json. Learn more: https://docs.expo.dev/more/expo-cli/#configuring-dependency-validation
+> npm install
+
+added 35 packages, removed 14 packages, changed 19 packages, and audited 1549 packages in 22s
+
+243 packages are looking for funding
+  run `npm fund` for details
+
+4 vulnerabilities (2 moderate, 2 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+› Running npx expo install under the updated expo version
+> expo install expo-blur@~15.0.8 expo-font@~14.0.10 expo-glass-effect@~0.1.8 expo-haptics@~15.0.8 expo-image@~3.0.11 expo-linking@~8.0.11 expo-splash-screen@~31.0.13 expo-status-bar@~3.0.9 expo-symbols@~1.0.8 expo-system-ui@~6.0.9 expo-web-browser@~15.0.10 react-native-get-random-values@~1.11.0 react-native-webview@13.15.0
+› Installing 13 other packages using npm
+› Using ~15.0.8 instead of ~15.0.8 for expo-blur, ~14.0.10 instead of ~14.0.10 for expo-font, ~0.1.8 instead of ~0.1.8 for expo-glass-effect, ~15.0.8 instead of ~15.0.8 for expo-haptics, ~3.0.11 instead of ~3.0.11 for expo-image, ~8.0.11 instead of ~8.0.11 for expo-linking, ~31.0.13 instead of ~31.0.13 for expo-splash-screen, ~3.0.9 instead of ~3.0.9 for expo-status-bar, ~1.0.8 instead of ~1.0.8 for expo-symbols, ~6.0.9 instead of ~6.0.9 for expo-system-ui, and 3 others because these versions was explicitly provided. Packages excluded from dependency validation should be listed in expo.install.exclude in package.json. Learn more: https://docs.expo.dev/more/expo-cli/#configuring-dependency-validation
+> npm install
+
+changed 12 packages, and audited 1549 packages in 13s
+
+243 packages are looking for funding
+  run `npm fund` for details
+
+4 vulnerabilities (2 moderate, 2 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+› Added config plugin: expo-font
+$ cd /Users/jerry/SwipeMe && git pull
+From https://github.com/jayblitz/SwipeMe
+   103d44b..a2a0b1b  main       -> origin/main
+Updating 103d44b..a2a0b1b
+error: Your local changes to the following files would be overwritten by merge:
+        app.json
+        package-lock.json
+        package.json
+Please commit your changes or stash them before you merge.
+Aborting
+$ cd /Users/jerry/SwipeMe && git stash && git pull
+Saved working directory and index state WIP on main: 103d44b Add development build tools for creating mobile application versions
+Updating 103d44b..a2a0b1b
+Fast-forward
+ app.json          | 12 +++++++++++-
+ client/index.js   | 10 ++++++++++
+ metro.config.js   | 20 ++++++++++++++++++++
+ package-lock.json |  1 +
+ package.json      |  1 +
+ 5 files changed, 43 insertions(+), 1 deletion(-)
+$ cd /Users/jerry/SwipeMe && rm -rf node_modules && npm install
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated lodash.get@4.4.2: This package is deprecated. Use the optional chaining (?.) operator instead.
+npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+npm warn deprecated rimraf@2.4.5: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated @oclif/screen@3.0.8: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@6.0.4: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated sudo-prompt@9.1.1: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated @xmldom/xmldom@0.7.13: this version is no longer supported, please update to at least 0.8.*
+npm warn deprecated text-encoding@0.7.0: no longer maintained
+
+added 1501 packages, and audited 1502 packages in 40s
+
+239 packages are looking for funding
+  run `npm fund` for details
+
+8 vulnerabilities (4 moderate, 4 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+$ cd /Users/jerry/SwipeMe && npx eas build --profile development --platform android --clear-cache
+Found eas-cli in your project dependencies.
+It's recommended to use the "cli.version" field in eas.json to enforce the eas-cli version for your project.
+Learn more: https://github.com/expo/eas-cli#enforcing-eas-cli-version-for-your-project
+
+Resolved "development" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "development" environment on EAS.
+
+
+
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+- Compressing project files
+- Uploading to EAS Build (0 / 95.3 MB)
+✔ Uploaded to EAS 31s
+- Computing project fingerprint
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/crypto4eva/projects/swipeme/builds/070fedef-2cf3-4695-bea1-ec618489d8e3
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+- Waiting for build to complete.
+✖ Build failed
+
+🤖 Android build failed:
+Gradle build failed with unknown error. See logs for the "Run gradlew" (https://expo.dev/accounts/crypto4eva/projects/swipeme/builds/070fedef-2cf3-4695-bea1-ec618489d8e3#run-gradlew) phase for more information.
+$ cd /Users/jerry/SwipeMe && npx expo-doctor
+Running 17 checks on your project...
+12/17 checks passed. 5 checks failed. Possible issues detected:
+Use the --verbose flag to see more details about passed checks.
+
+✖ Check Expo config (app.json/ app.config.js) schema
+Error validating asset fields in /Users/jerry/SwipeMe/app.json:
+ Field: Android.adaptiveIcon.foregroundImage - the file extension should match the content, but the file extension is .png while the file content at './assets/images/android-icon-foreground.png' is of type jpg.
+ Field: Android.adaptiveIcon.foregroundImage - field 'Android.adaptiveIcon.foregroundImage' should point to .png image but the file at './assets/images/android-icon-foreground.png' has type jpg.
+ Field: icon - the file extension should match the content, but the file extension is .png while the file content at './assets/images/icon.png' is of type jpg.
+ Field: icon - field 'icon' should point to .png image but the file at './assets/images/icon.png' has type jpg.
+Advice:
+Resolve schema errors in your app config. Learn more: https://docs.expo.dev/workflow/configuration/
+
+✖ Check for legacy global CLI installed locally
+EAS CLI should not be installed in your project. Instead, install it globally or use "npx", "pnpx", or "bunx" depending on your preferred package manager.
+Advice:
+Remove eas-cli from your project dependencies.
+
+✖ Check that required peer dependencies are installed
+Missing peer dependency: expo-apple-authentication
+Required by: @privy-io/expo
+Missing peer dependency: expo-application
+Required by: @privy-io/expo
+Missing peer dependency: expo-crypto
+Required by: @privy-io/expo
+Missing peer dependency: expo-asset
+Required by: expo-audio
+Advice:
+Install missing required peer dependencies with "npx expo install expo-apple-authentication expo-application expo-crypto expo-asset"
+Your app may crash outside of Expo Go without these dependencies. Native module peer dependencies must be installed directly.
+
+✖ Validate packages against React Native Directory package metadata
+The following issues were found when validating your dependencies against React Native Directory:
+  Untested on New Architecture: @xmtp/react-native-sdk
+  No metadata available: @privy-io/expo-native-extensions, @videosdk.live/react-native-incallmanager, react-native-passkeys, @videosdk.live/react-native-webrtc
+Advice:
+Use libraries that are actively maintained and support the New Architecture. Find alternative libraries with https://reactnative.directory.
+Add packages to expo.doctor.reactNativeDirectoryCheck.exclude in package.json to selectively skip validations, if the warning is not relevant.
+Update React Native Directory to include metadata for unknown packages. Alternatively, set expo.doctor.reactNativeDirectoryCheck.listUnknownPackages in package.json to false to skip warnings about packages with no metadata, if the warning is not relevant.
+
+✖ Check that packages match versions required by installed Expo SDK
+
+❗ Major version mismatches
+package                         expected  found    
+react-native-get-random-values  ~1.11.0   2.0.0    
+
+⚠️ Minor version mismatches
+package                         expected  found    
+react-native-webview            13.15.0   13.16.0  
+
+🔧 Patch version mismatches
+package                         expected  found    
+expo                            ~54.0.30  54.0.25  
+expo-blur                       ~15.0.8   15.0.7   
+expo-constants                  ~18.0.12  18.0.10  
+expo-font                       ~14.0.10  14.0.9   
+expo-glass-effect               ~0.1.8    0.1.7    
+expo-haptics                    ~15.0.8   15.0.7   
+expo-image                      ~3.0.11   3.0.10   
+expo-linking                    ~8.0.11   8.0.9    
+expo-splash-screen              ~31.0.13  31.0.11  
+expo-status-bar                 ~3.0.9    3.0.8    
+expo-symbols                    ~1.0.8    1.0.7    
+expo-system-ui                  ~6.0.9    6.0.8    
+expo-web-browser                ~15.0.10  15.0.9   
+
+Changelogs:
+- expo-blur → https://github.com/expo/expo/blob/sdk-54/packages/expo-blur/CHANGELOG.md
+- expo-constants → https://github.com/expo/expo/blob/sdk-54/packages/expo-constants/CHANGELOG.md
+- expo-font → https://github.com/expo/expo/blob/sdk-54/packages/expo-font/CHANGELOG.md
+- expo-glass-effect → https://github.com/expo/expo/blob/sdk-54/packages/expo-glass-effect/CHANGELOG.md
+- expo-haptics → https://github.com/expo/expo/blob/sdk-54/packages/expo-haptics/CHANGELOG.md
+- expo-image → https://github.com/expo/expo/blob/sdk-54/packages/expo-image/CHANGELOG.md
+- expo-linking → https://github.com/expo/expo/blob/sdk-54/packages/expo-linking/CHANGELOG.md
+- expo-splash-screen → https://github.com/expo/expo/blob/sdk-54/packages/expo-splash-screen/CHANGELOG.md
+- expo-status-bar → https://github.com/expo/expo/blob/sdk-54/packages/expo-status-bar/CHANGELOG.md
+- expo-symbols → https://github.com/expo/expo/blob/sdk-54/packages/expo-symbols/CHANGELOG.md
+- expo-system-ui → https://github.com/expo/expo/blob/sdk-54/packages/expo-system-ui/CHANGELOG.md
+- expo-web-browser → https://github.com/expo/expo/blob/sdk-54/packages/expo-web-browser/CHANGELOG.md
+
+15 packages out of date.
+Advice:
+Use 'npx expo install --check' to review and upgrade your dependencies.
+To ignore specific packages, add them to "expo.install.exclude" in package.json. Learn more: https://expo.fyi/dependency-validation
+
+5 checks failed, indicating possible issues with the project.
