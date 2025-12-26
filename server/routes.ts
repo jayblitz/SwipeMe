@@ -55,8 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "namespace": "android_app",
         "package_name": "com.swipeme.app",
         "sha256_cert_fingerprints": [
-          // TODO: Replace with actual SHA-256 fingerprint from production build
-          "PLACEHOLDER_SHA256_FINGERPRINT"
+          "58:53:7D:CA:D7:0C:9E:E5:A8:CE:23:D5:B4:77:3B:BB:8F:47:EA:5E:3A:4E:71:05:B0:B3:1C:A5:61:43:94:3E"
         ]
       }
     }]);
