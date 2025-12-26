@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Modal, FlatList, Alert, Dimensions } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Modal, FlatList, Alert, Dimensions, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -141,6 +141,24 @@ interface MediaItem {
   timestamp: number;
 }
 
+interface LinkItem {
+  id: string;
+  url: string;
+  title?: string;
+  timestamp: number;
+}
+
+interface DocumentItem {
+  id: string;
+  name: string;
+  uri: string;
+  mimeType?: string;
+  size?: number;
+  timestamp: number;
+}
+
+type MediaTabType = "media" | "links" | "docs";
+
 export default function ContactDetailsScreen() {
   const route = useRoute<ContactDetailsRouteProp>();
   const navigation = useNavigation<ContactDetailsNavigationProp>();
@@ -153,6 +171,9 @@ export default function ContactDetailsScreen() {
   const [showDisappearingModal, setShowDisappearingModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [linkItems, setLinkItems] = useState<LinkItem[]>([]);
+  const [documentItems, setDocumentItems] = useState<DocumentItem[]>([]);
+  const [activeMediaTab, setActiveMediaTab] = useState<MediaTabType>("media");
   const [payments, setPayments] = useState<Transaction[]>([]);
   const [nickname, setNickname] = useState<string>("");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
@@ -174,6 +195,12 @@ export default function ContactDetailsScreen() {
     if (background) setChatBackgroundState(background);
     
     const media: MediaItem[] = [];
+    const links: LinkItem[] = [];
+    const docs: DocumentItem[] = [];
+    
+    const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/g;
+    const cleanUrl = (url: string) => url.replace(/[.,;:!?)]+$/, '');
+    
     messages.forEach(msg => {
       if (msg.imageAttachment?.uri) {
         media.push({
@@ -183,8 +210,35 @@ export default function ContactDetailsScreen() {
           timestamp: msg.timestamp,
         });
       }
+      
+      if (msg.documentAttachment?.uri) {
+        docs.push({
+          id: msg.id,
+          name: msg.documentAttachment.name || "Document",
+          uri: msg.documentAttachment.uri,
+          mimeType: msg.documentAttachment.mimeType,
+          size: msg.documentAttachment.size,
+          timestamp: msg.timestamp,
+        });
+      }
+      
+      if (msg.content && msg.type !== "payment" && msg.type !== "system") {
+        const foundUrls = msg.content.match(urlRegex);
+        if (foundUrls) {
+          foundUrls.forEach((url, idx) => {
+            links.push({
+              id: `${msg.id}_link_${idx}`,
+              url: cleanUrl(url),
+              timestamp: msg.timestamp,
+            });
+          });
+        }
+      }
     });
+    
     setMediaItems(media.sort((a, b) => b.timestamp - a.timestamp));
+    setLinkItems(links.sort((a, b) => b.timestamp - a.timestamp));
+    setDocumentItems(docs.sort((a, b) => b.timestamp - a.timestamp));
     
     const contactPayments = transactions.filter(tx => {
       if (tx.contactId && chatId) {
@@ -335,35 +389,152 @@ export default function ContactDetailsScreen() {
           />
         </View>
         
-        <SectionHeader title="All Media" />
+        <View style={[styles.mediaTabs, { backgroundColor: theme.backgroundRoot }]}>
+          <Pressable 
+            style={[styles.mediaTab, activeMediaTab === "media" ? { borderBottomColor: theme.primary } : { borderBottomColor: "transparent" }]}
+            onPress={() => setActiveMediaTab("media")}
+          >
+            <ThemedText style={[styles.mediaTabText, { color: activeMediaTab === "media" ? theme.primary : theme.textSecondary }]}>
+              Media ({mediaItems.length})
+            </ThemedText>
+          </Pressable>
+          <Pressable 
+            style={[styles.mediaTab, activeMediaTab === "links" ? { borderBottomColor: theme.primary } : { borderBottomColor: "transparent" }]}
+            onPress={() => setActiveMediaTab("links")}
+          >
+            <ThemedText style={[styles.mediaTabText, { color: activeMediaTab === "links" ? theme.primary : theme.textSecondary }]}>
+              Links ({linkItems.length})
+            </ThemedText>
+          </Pressable>
+          <Pressable 
+            style={[styles.mediaTab, activeMediaTab === "docs" ? { borderBottomColor: theme.primary } : { borderBottomColor: "transparent" }]}
+            onPress={() => setActiveMediaTab("docs")}
+          >
+            <ThemedText style={[styles.mediaTabText, { color: activeMediaTab === "docs" ? theme.primary : theme.textSecondary }]}>
+              Docs ({documentItems.length})
+            </ThemedText>
+          </Pressable>
+        </View>
+        
         <View style={[styles.section, { backgroundColor: theme.backgroundRoot }]}>
-          {mediaItems.length > 0 ? (
-            <View style={styles.mediaGrid}>
-              {mediaItems.slice(0, 6).map((item) => (
-                <Pressable key={item.id} style={[styles.mediaItem, { width: mediaGridSize, height: mediaGridSize }]}>
-                  <Image 
-                    source={{ uri: item.uri }} 
-                    style={styles.mediaImage}
-                    contentFit="cover"
-                  />
-                </Pressable>
-              ))}
-              {mediaItems.length > 6 ? (
-                <Pressable 
-                  style={[styles.mediaItem, styles.mediaViewAll, { width: mediaGridSize, height: mediaGridSize, backgroundColor: theme.backgroundTertiary }]}
-                  onPress={() => Alert.alert("View All", `${mediaItems.length} total media items`)}
-                >
-                  <ThemedText style={styles.mediaViewAllText}>+{mediaItems.length - 6}</ThemedText>
-                </Pressable>
-              ) : null}
-            </View>
+          {activeMediaTab === "media" ? (
+            mediaItems.length > 0 ? (
+              <View style={styles.mediaGrid}>
+                {mediaItems.slice(0, 6).map((item) => (
+                  <Pressable key={item.id} style={[styles.mediaItem, { width: mediaGridSize, height: mediaGridSize }]}>
+                    <Image 
+                      source={{ uri: item.uri }} 
+                      style={styles.mediaImage}
+                      contentFit="cover"
+                    />
+                  </Pressable>
+                ))}
+                {mediaItems.length > 6 ? (
+                  <Pressable 
+                    style={[styles.mediaItem, styles.mediaViewAll, { width: mediaGridSize, height: mediaGridSize, backgroundColor: theme.backgroundTertiary }]}
+                    onPress={() => Alert.alert("View All", `${mediaItems.length} total media items`)}
+                  >
+                    <ThemedText style={styles.mediaViewAllText}>+{mediaItems.length - 6}</ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Feather name="image" size={32} color={theme.textSecondary} />
+                <ThemedText style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                  No shared media yet
+                </ThemedText>
+              </View>
+            )
+          ) : activeMediaTab === "links" ? (
+            linkItems.length > 0 ? (
+              <View style={styles.linksList}>
+                {linkItems.slice(0, 5).map((link) => (
+                  <Pressable 
+                    key={link.id} 
+                    style={[styles.linkRow, { borderBottomColor: theme.border }]}
+                    onPress={async () => {
+                      try {
+                        const canOpen = await Linking.canOpenURL(link.url);
+                        if (canOpen) {
+                          await Linking.openURL(link.url);
+                        } else {
+                          Alert.alert("Cannot Open", "This link cannot be opened.");
+                        }
+                      } catch {
+                        Alert.alert("Error", "Failed to open this link.");
+                      }
+                    }}
+                  >
+                    <View style={[styles.linkIcon, { backgroundColor: theme.backgroundTertiary }]}>
+                      <Feather name="link" size={16} color={theme.primary} />
+                    </View>
+                    <View style={styles.linkContent}>
+                      <ThemedText style={styles.linkUrl} numberOfLines={1}>
+                        {link.url}
+                      </ThemedText>
+                      <ThemedText style={[styles.linkDate, { color: theme.textSecondary }]}>
+                        {new Date(link.timestamp).toLocaleDateString()}
+                      </ThemedText>
+                    </View>
+                    <Feather name="external-link" size={16} color={theme.textSecondary} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Feather name="link" size={32} color={theme.textSecondary} />
+                <ThemedText style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                  No shared links yet
+                </ThemedText>
+              </View>
+            )
           ) : (
-            <View style={styles.emptyState}>
-              <Feather name="image" size={32} color={theme.textSecondary} />
-              <ThemedText style={[styles.emptyStateText, { color: theme.textSecondary }]}>
-                No shared media yet
-              </ThemedText>
-            </View>
+            documentItems.length > 0 ? (
+              <View style={styles.docsList}>
+                {documentItems.slice(0, 5).map((doc) => (
+                  <Pressable 
+                    key={doc.id} 
+                    style={[styles.docRow, { borderBottomColor: theme.border }]}
+                    onPress={async () => {
+                      try {
+                        if (doc.uri.startsWith("file://")) {
+                          Alert.alert("Document", `${doc.name}\n\nLocal documents can be viewed in the chat.`);
+                          return;
+                        }
+                        const canOpen = await Linking.canOpenURL(doc.uri);
+                        if (canOpen) {
+                          await Linking.openURL(doc.uri);
+                        } else {
+                          Alert.alert("Cannot Open", "This document cannot be opened.");
+                        }
+                      } catch {
+                        Alert.alert("Error", "Failed to open this document.");
+                      }
+                    }}
+                  >
+                    <View style={[styles.docIcon, { backgroundColor: theme.backgroundTertiary }]}>
+                      <Feather name="file-text" size={20} color={theme.primary} />
+                    </View>
+                    <View style={styles.docContent}>
+                      <ThemedText style={styles.docName} numberOfLines={1}>
+                        {doc.name}
+                      </ThemedText>
+                      <ThemedText style={[styles.docMeta, { color: theme.textSecondary }]}>
+                        {doc.size ? `${(doc.size / 1024).toFixed(1)} KB` : "Document"} - {new Date(doc.timestamp).toLocaleDateString()}
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Feather name="file" size={32} color={theme.textSecondary} />
+                <ThemedText style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                  No shared documents yet
+                </ThemedText>
+              </View>
+            )
           )}
         </View>
         
@@ -728,5 +899,80 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: Spacing.xs,
+  },
+  mediaTabs: {
+    flexDirection: "row",
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  mediaTab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 2,
+  },
+  mediaTabText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  linksList: {
+    paddingHorizontal: Spacing.sm,
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  linkIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+  linkContent: {
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  linkUrl: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  linkDate: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  docsList: {
+    paddingHorizontal: Spacing.sm,
+  },
+  docRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  docIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+  docContent: {
+    flex: 1,
+  },
+  docName: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  docMeta: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });

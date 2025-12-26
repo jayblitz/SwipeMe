@@ -8,6 +8,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
@@ -166,7 +167,29 @@ function EditProfileModal({ visible, onClose, onSave, initialData }: Omit<EditPr
     }
 
     if (!result.canceled && result.assets[0]) {
-      setPendingProfileImage(result.assets[0].uri);
+      try {
+        const base64 = await FileSystem.readAsStringAsync(result.assets[0].uri, {
+          encoding: "base64",
+        });
+        
+        const sizeInBytes = (base64.length * 3) / 4;
+        const maxSizeBytes = 500 * 1024;
+        
+        if (sizeInBytes > maxSizeBytes) {
+          Alert.alert(
+            "Image Too Large", 
+            "Please choose a smaller image (under 500KB) or try a lower quality photo."
+          );
+          return;
+        }
+        
+        const mimeType = result.assets[0].mimeType || "image/jpeg";
+        const dataUri = `data:${mimeType};base64,${base64}`;
+        setPendingProfileImage(dataUri);
+      } catch (error) {
+        console.error("Failed to convert image to base64:", error);
+        Alert.alert("Error", "Failed to process image. Please try again.");
+      }
     }
   };
 
