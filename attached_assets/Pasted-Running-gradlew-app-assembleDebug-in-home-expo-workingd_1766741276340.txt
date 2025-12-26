@@ -1,0 +1,356 @@
+Running 'gradlew :app:assembleDebug' in /home/expo/workingdir/build/android
+Downloading https://services.gradle.org/distributions/gradle-8.14.3-bin.zip
+10%
+20%.
+30%.
+40%.
+50%.
+60%
+70
+%.
+80%
+90
+%.
+100%
+Welcome to Gradle 8.14.3!
+Here are the highlights of this release:
+ - Java 24 support
+ - GraalVM Native Image toolchain selection
+ - Enhancements to test reporting
+ - Build Authoring improvements
+For more details see https://docs.gradle.org/8.14.3/release-notes.html
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+> Configure project :expo-gradle-plugin:expo-autolinking-plugin
+w: file:///home/expo/workingdir/build/node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-autolinking-plugin/build.gradle.kts:25:3: 'kotlinOptions(KotlinJvmOptionsDeprecated /* = KotlinJvmOptions */.() -> Unit): Unit' is deprecated. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln
+> Configure project :expo-gradle-plugin:expo-autolinking-settings-plugin
+w: file:///home/expo/workingdir/build/node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-autolinking-settings-plugin/build.gradle.kts:30:3: 'kotlinOptions(KotlinJvmOptionsDeprecated /* = KotlinJvmOptions */.() -> Unit): Unit' is deprecated. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:pluginDescriptors
+> Task :gradle-plugin:settings-plugin:pluginDescriptors
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:processResources
+> Task :gradle-plugin:settings-plugin:processResources
+> Task :gradle-plugin:shared:processResources NO-SOURCE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:compileKotlin
+> Task :gradle-plugin:shared:compileJava NO-SOURCE
+> Task :gradle-plugin:shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:jar
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:compileKotlin
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:compileJava
+NO-SOURCE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:classes UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:jar
+> Task :gradle-plugin:settings-plugin:compileKotlin
+> Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:settings-plugin:classes
+> Task :gradle-plugin:settings-plugin:jar
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:compileKotlin
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:compileJava NO-SOURCE
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:classes
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:jar
+> Configure project :expo-dev-launcher-gradle-plugin
+w: file:///home/expo/workingdir/build/node_modules/expo-dev-launcher/expo-dev-launcher-gradle-plugin/build.gradle.kts:25:3: 'kotlinOptions(KotlinJvmOptionsDeprecated /* = KotlinJvmOptions */.() -> Unit): Unit' is deprecated. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln
+> Configure project :expo-module-gradle-plugin
+w: file:///home/expo/workingdir/build/node_modules/expo-modules-core/expo-module-gradle-plugin/build.gradle.kts:58:3: 'kotlinOptions(KotlinJvmOptionsDeprecated /* = KotlinJvmOptions */.() -> Unit): Unit' is deprecated. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln
+> Task :gradle-plugin:react-native-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-gradle-plugin:expo-autolinking-plugin:checkKotlinGradlePluginConfigurationErrors
+SKIPPED
+> Task :expo-dev-launcher-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-module-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-dev-launcher-gradle-plugin:pluginDescriptors
+> Task :expo-module-gradle-plugin:pluginDescriptors
+> Task :expo-dev-launcher-gradle-plugin:processResources
+> Task :expo-module-gradle-plugin:processResources
+> Task :expo-gradle-plugin:expo-autolinking-plugin:pluginDescriptors
+> Task :expo-gradle-plugin:expo-autolinking-plugin:processResources
+> Task :gradle-plugin:react-native-gradle-plugin:pluginDescriptors
+> Task :gradle-plugin:react-native-gradle-plugin:processResources
+> Task :expo-gradle-plugin:expo-autolinking-plugin:compileKotlin
+> Task :expo-gradle-plugin:expo-autolinking-plugin:compileJava NO-SOURCE
+> Task :expo-gradle-plugin:expo-autolinking-plugin:classes
+> Task :expo-gradle-plugin:expo-autolinking-plugin:jar
+> Task :gradle-plugin:react-native-gradle-plugin:compileKotlin
+> Task :gradle-plugin:react-native-gradle-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:react-native-gradle-plugin:classes
+> Task :gradle-plugin:react-native-gradle-plugin:jar
+> Task :expo-dev-launcher-gradle-plugin:compileKotlin
+> Task :expo-dev-launcher-gradle-plugin:compileJava NO-SOURCE
+> Task :expo-dev-launcher-gradle-plugin:classes
+> Task :expo-dev-launcher-gradle-plugin:jar
+> Task :expo-module-gradle-plugin:compileKotlin
+w: file:///home/expo/workingdir/build/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/android/AndroidLibraryExtension.kt:9:24 'var targetSdk: Int?' is deprecated. Will be removed from library DSL in v9.0. Use testOptions.targetSdk or/and lint.targetSdk instead.
+> Task :expo-module-gradle-plugin:compileJava NO-SOURCE
+> Task :expo-module-gradle-plugin:classes
+> Task :expo-module-gradle-plugin:jar
+> Configure project :
+[ExpoRootProject] Using the following versions:
+- buildTools:  36.0.0
+  - minSdk:      24
+  - compileSdk:  36
+  - targetSdk:   36
+  - ndk:         27.1.12297006
+  - kotlin:      2.1.20
+  - ksp:         2.1.20-2.0.1
+> Configure project :app
+ℹ️  Applying gradle plugin 'expo-dev-launcher-gradle-plugin'
+> Configure project :xmtp-react-native-sdk
+w: ⚠️ Android Publication 'release' Misconfigured for Variant 'release'
+Android Publication 'release' for variant 'release' was not configured properly:
+To avoid this warning, please create and configure Android publication variant with name 'release'.
+Example:
+```
+android {
+    publishing {
+        singleVariant("release") {}
+    }
+}
+```
+Please configure Android publication 'release' for variant 'release'.
+See https://kotl.in/oe70nr for more details.
+> Configure project :expo
+Using expo modules
+  - privy-io-expo-native-extensions (0.1.0)
+  - xmtp-react-native-sdk (0.1.0)
+  - expo-constants (18.0.12)
+- expo-dev-client (6.0.20)
+- expo-dev-launcher (6.0.20)
+- expo-dev-menu (7.0.18)
+- expo-dev-menu-interface (2.0.0)
+- expo-json-utils (0.15.0)
+- expo-manifests (1.0.10)
+- expo-modules-core (3.0.29)
+- expo-updates-interface (2.0.0)
+- react-native-passkeys (0.1.0)
+- [📦] expo-application (7.0.8)
+  - [📦] expo-asset (12.0.12)
+  - [📦] expo-audio (1.1.1)
+  - [📦] expo-blur (15.0.8)
+  - [📦] expo-clipboard (8.0.8)
+  - [📦] expo-contacts (15.0.11)
+- [📦] expo-crypto (15.0.8)
+- [📦] expo-document-picker (14.0.8)
+  - [📦] expo-file-system (19.0.21)
+  - [📦] expo-font (14.0.10)
+  - [📦] expo-haptics (15.0.8)
+- [📦] expo-image (3.0.11)
+  - [📦] expo-image-loader (6.0.0)
+  - [📦] expo-image-picker (17.0.10)
+  - [📦] expo-keep-awake (15.0.8)
+- [📦] expo-linking (8.0.11)
+  - [📦] expo-local-authentication (17.0.8)
+  - [📦] expo-location (19.0.8)
+  - [📦] expo-secure-store (15.0.8)
+  - [📦] expo-splash-screen (31.0.13)
+  - [📦] expo-system-ui (6.0.9)
+  - [📦] expo-web-browser (15.0.10)
+Checking the license for package Android SDK Build-Tools 36 in /home/expo/Android/Sdk/licenses
+License for package Android SDK Build-Tools 36 accepted.
+Preparing "Install Android SDK Build-Tools 36 v.36.0.0".
+"Install Android SDK Build-Tools 36 v.36.0.0" ready.
+Installing Android SDK Build-Tools 36 in /home/expo/Android/Sdk/build-tools/36.0.0
+"Install Android SDK Build-Tools 36 v.36.0.0" complete.
+"Install Android SDK Build-Tools 36 v.36.0.0" finished.
+[=======================================] 100% Fetch remote repository...       
+> Task :expo-dev-client:preBuild UP-TO-DATE
+> Task :expo-dev-launcher:preBuild UP-TO-DATE
+> Task :expo-dev-menu:preBuild UP-TO-DATE
+> Task :expo-dev-menu-interface:preBuild
+UP-TO-DATE
+> Task :expo-json-utils:preBuild UP-TO-DATE
+> Task :expo-manifests:preBuild UP-TO-DATE
+> Task :expo-modules-core:preBuild UP-TO-DATE
+> Task :expo-updates-interface:preBuild UP-TO-DATE
+> Task :privy-io-expo-native-extensions:preBuild UP-TO-DATE
+> Task :expo-constants:createExpoConfig
+> Task :expo-constants:preBuild
+The NODE_ENV environment variable is required but was not specified. Ensure the project is bundled with Expo CLI or NODE_ENV is set. Using only .env.local and .env
+> Task :react-native-async-storage_async-storage:generateCodegenSchemaFromJavaScript
+> Task :react-native-gesture-handler:generateCodegenSchemaFromJavaScript
+> Task :react-native-async-storage_async-storage:generateCodegenArtifactsFromSchema
+> Task :react-native-async-storage_async-storage:preBuild
+> Task :react-native-get-random-values:preBuild UP-TO-DATE
+> Task :expo:generatePackagesList
+> Task :expo:preBuild
+> Task :react-native-passkeys:preBuild UP-TO-DATE
+> Task :react-native-gesture-handler:generateCodegenArtifactsFromSchema
+> Task :react-native-gesture-handler:preBuild
+> Task :react-native-reanimated:assertMinimalReactNativeVersionTask
+> Task :react-native-reanimated:assertNewArchitectureEnabledTask SKIPPED
+> Task :react-native-keyboard-controller:generateCodegenSchemaFromJavaScript
+> Task :react-native-reanimated:assertWorkletsVersionTask
+> Task :react-native-safe-area-context:generateCodegenSchemaFromJavaScript
+> Task :react-native-keyboard-controller:generateCodegenArtifactsFromSchema
+> Task :react-native-keyboard-controller:preBuild
+> Task :react-native-reanimated:generateCodegenSchemaFromJavaScript
+> Task :react-native-safe-area-context:generateCodegenArtifactsFromSchema
+> Task :react-native-safe-area-context:preBuild
+> Task :react-native-screens:generateCodegenSchemaFromJavaScript
+> Task :react-native-reanimated:generateCodegenArtifactsFromSchema
+> Task :react-native-webview:generateCodegenSchemaFromJavaScript
+> Task :react-native-reanimated:prepareReanimatedHeadersForPrefabs
+> Task :react-native-reanimated:preBuild
+> Task :react-native-worklets:assertMinimalReactNativeVersionTask
+> Task :react-native-worklets:assertNewArchitectureEnabledTask SKIPPED
+> Task :react-native-screens:generateCodegenArtifactsFromSchema
+> Task :react-native-screens:preBuild
+> Task :rnwebrtc:preBuild UP-TO-DATE
+> Task :videosdk.live_react-native-incallmanager:preBuild UP-TO-DATE
+> Task :videosdk.live_react-native-webrtc:preBuild UP-TO-DATE
+> Task :xmtp-react-native-sdk:preBuild UP-TO-DATE
+> Task :expo:preDebugBuild
+> Task :react-native-webview:generateCodegenArtifactsFromSchema
+> Task :react-native-webview:preBuild
+> Task :expo-constants:preDebugBuild
+> Task :react-native-worklets:generateCodegenSchemaFromJavaScript
+> Task :expo:writeDebugAarMetadata
+> Task :expo-dev-client:preDebugBuild UP-TO-DATE
+> Task :expo-dev-client:writeDebugAarMetadata
+> Task :expo-constants:writeDebugAarMetadata
+> Task :expo-dev-launcher:preDebugBuild UP-TO-DATE
+> Task :expo-dev-launcher:writeDebugAarMetadata
+> Task :react-native-worklets:generateCodegenArtifactsFromSchema
+> Task :react-native-worklets:prepareWorkletsHeadersForPrefabs
+> Task :react-native-worklets:preBuild
+> Task :expo-dev-menu:preDebugBuild UP-TO-DATE
+> Task :expo-dev-menu:writeDebugAarMetadata
+> Task :expo-dev-menu-interface:preDebugBuild UP-TO-DATE
+> Task :expo-dev-menu-interface:writeDebugAarMetadata
+> Task :expo-json-utils:preDebugBuild UP-TO-DATE
+> Task :expo-json-utils:writeDebugAarMetadata
+> Task :expo-manifests:preDebugBuild UP-TO-DATE
+> Task :expo-manifests:writeDebugAarMetadata
+> Task :expo-modules-core:preDebugBuild UP-TO-DATE
+> Task :expo-modules-core:writeDebugAarMetadata
+> Task :expo-updates-interface:preDebugBuild UP-TO-DATE
+> Task :expo-updates-interface:writeDebugAarMetadata
+> Task :privy-io-expo-native-extensions:preDebugBuild UP-TO-DATE
+> Task :privy-io-expo-native-extensions:writeDebugAarMetadata
+> Task :react-native-async-storage_async-storage:preDebugBuild
+> Task :react-native-async-storage_async-storage:writeDebugAarMetadata
+> Task :react-native-gesture-handler:preDebugBuild
+> Task :react-native-gesture-handler:writeDebugAarMetadata
+> Task :react-native-get-random-values:preDebugBuild UP-TO-DATE
+> Task :react-native-get-random-values:writeDebugAarMetadata
+> Task :react-native-keyboard-controller:preDebugBuild
+> Task :react-native-keyboard-controller:writeDebugAarMetadata
+> Task :react-native-passkeys:preDebugBuild UP-TO-DATE
+> Task :react-native-passkeys:writeDebugAarMetadata
+> Task :react-native-reanimated:preDebugBuild
+> Task :react-native-reanimated:writeDebugAarMetadata
+> Task :react-native-safe-area-context:preDebugBuild
+> Task :react-native-safe-area-context:writeDebugAarMetadata
+> Task :react-native-screens:preDebugBuild
+> Task :react-native-screens:writeDebugAarMetadata
+> Task :react-native-webview:preDebugBuild
+> Task :react-native-webview:writeDebugAarMetadata
+> Task :react-native-worklets:preDebugBuild
+> Task :react-native-worklets:writeDebugAarMetadata
+> Task :rnwebrtc:preDebugBuild UP-TO-DATE
+> Task :rnwebrtc:writeDebugAarMetadata
+> Task :videosdk.live_react-native-incallmanager:preDebugBuild UP-TO-DATE
+> Task :videosdk.live_react-native-incallmanager:writeDebugAarMetadata
+> Task :videosdk.live_react-native-webrtc:preDebugBuild UP-TO-DATE
+> Task :videosdk.live_react-native-webrtc:writeDebugAarMetadata
+> Task :xmtp-react-native-sdk:preDebugBuild UP-TO-DATE
+> Task :xmtp-react-native-sdk:writeDebugAarMetadata
+> Task :expo:generateDebugResValues
+> Task :expo:generateDebugResources
+> Task :expo:packageDebugResources
+> Task :expo-constants:generateDebugResValues
+> Task :expo-constants:generateDebugResources
+> Task :expo-constants:packageDebugResources
+> Task :expo-dev-client:generateDebugResValues
+> Task :expo-dev-client:generateDebugResources
+> Task :expo-dev-client:packageDebugResources
+> Task :expo-dev-launcher:generateDebugResValues
+> Task :expo-dev-launcher:generateDebugResources
+> Task :expo-dev-launcher:packageDebugResources
+> Task :expo-dev-menu:generateDebugResValues
+> Task :expo-dev-menu:generateDebugResources
+> Task :expo-dev-menu:packageDebugResources
+> Task :expo-dev-menu-interface:generateDebugResValues
+> Task :expo-dev-menu-interface:generateDebugResources
+> Task :expo-dev-menu-interface:packageDebugResources
+> Task :expo-json-utils:generateDebugResValues
+> Task :expo-json-utils:generateDebugResources
+> Task :expo-json-utils:packageDebugResources
+> Task :expo-manifests:generateDebugResValues
+> Task :expo-manifests:generateDebugResources
+> Task :expo-manifests:packageDebugResources
+> Task :expo-modules-core:generateDebugResValues
+> Task :expo-modules-core:generateDebugResources
+> Task :expo-modules-core:packageDebugResources
+> Task :expo-updates-interface:generateDebugResValues
+> Task :expo-updates-interface:generateDebugResources
+> Task :expo-updates-interface:packageDebugResources
+> Task :privy-io-expo-native-extensions:generateDebugResValues
+> Task :privy-io-expo-native-extensions:generateDebugResources
+> Task :privy-io-expo-native-extensions:packageDebugResources
+> Task :react-native-async-storage_async-storage:generateDebugResValues
+> Task :react-native-async-storage_async-storage:generateDebugResources
+> Task :react-native-async-storage_async-storage:packageDebugResources
+> Task :react-native-gesture-handler:generateDebugResValues
+> Task :react-native-gesture-handler:generateDebugResources
+> Task :react-native-gesture-handler:packageDebugResources
+> Task :react-native-get-random-values:generateDebugResValues
+> Task :react-native-get-random-values:generateDebugResources
+> Task :react-native-get-random-values:packageDebugResources
+> Task :react-native-keyboard-controller:generateDebugResValues
+> Task :react-native-keyboard-controller:generateDebugResources
+> Task :react-native-keyboard-controller:packageDebugResources
+> Task :react-native-passkeys:generateDebugResValues
+> Task :react-native-passkeys:generateDebugResources
+> Task :react-native-passkeys:packageDebugResources
+> Task :react-native-reanimated:generateDebugResValues
+> Task :react-native-reanimated:generateDebugResources
+> Task :react-native-reanimated:packageDebugResources
+> Task :react-native-safe-area-context:generateDebugResValues
+> Task :react-native-safe-area-context:generateDebugResources
+> Task :react-native-safe-area-context:packageDebugResources
+> Task :react-native-screens:generateDebugResValues
+> Task :react-native-screens:generateDebugResources
+> Task :react-native-screens:packageDebugResources
+> Task :react-native-webview:generateDebugResValues
+> Task :react-native-webview:generateDebugResources
+> Task :react-native-webview:packageDebugResources
+> Task :react-native-worklets:generateDebugResValues
+> Task :react-native-worklets:generateDebugResources
+> Task :react-native-worklets:packageDebugResources
+> Task :rnwebrtc:generateDebugResValues
+> Task :rnwebrtc:generateDebugResources
+> Task :rnwebrtc:packageDebugResources
+> Task :videosdk.live_react-native-incallmanager:generateDebugResValues
+> Task :videosdk.live_react-native-incallmanager:generateDebugResources
+> Task :videosdk.live_react-native-incallmanager:packageDebugResources
+> Task :videosdk.live_react-native-webrtc:generateDebugResValues
+> Task :videosdk.live_react-native-webrtc:generateDebugResources
+> Task :videosdk.live_react-native-webrtc:packageDebugResources FAILED
+[Incubating] Problems report is available at: file:///home/expo/workingdir/build/android/build/reports/problems/problems-report.html
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+148 actionable tasks: 148 executed
+FAILURE: Build failed with an exception.
+* What went wrong:
+A problem was found with the configuration of task ':videosdk.live_react-native-webrtc:packageDebugResources' (type 'MergeResources').
+  - Gradle detected a problem with the following location: '/home/expo/workingdir/build/node_modules/@videosdk.live/react-native-webrtc/android/build/generated/res/resValues/debug'.
+    
+    Reason: Task ':videosdk.live_react-native-webrtc:packageDebugResources' uses this output of task ':rnwebrtc:generateDebugResValues' without declaring an explicit or implicit dependency. This can lead to incorrect results being produced, depending on what order the tasks are executed.
+    
+    Possible solutions:
+      1. Declare task ':rnwebrtc:generateDebugResValues' as an input of ':videosdk.live_react-native-webrtc:packageDebugResources'.
+      2. Declare an explicit dependency on ':rnwebrtc:generateDebugResValues' from ':videosdk.live_react-native-webrtc:packageDebugResources' using Task#dependsOn.
+      3. Declare an explicit dependency on ':rnwebrtc:generateDebugResValues' from ':videosdk.live_react-native-webrtc:packageDebugResources' using Task#mustRunAfter.
+    
+    For more information, please refer to https://docs.gradle.org/8.14.3/userguide/validation_problems.html#implicit_dependency in the Gradle documentation.
+* Try:
+> Declare task ':rnwebrtc:generateDebugResValues' as an input of ':videosdk.live_react-native-webrtc:packageDebugResources'
+> Declare an explicit dependency on ':rnwebrtc:generateDebugResValues' from ':videosdk.live_react-native-webrtc:packageDebugResources' using Task#dependsOn
+> Declare an explicit dependency on ':rnwebrtc:generateDebugResValues' from ':videosdk.live_react-native-webrtc:packageDebugResources' using Task#mustRunAfter
+> Run with --scan to get full insights.
+BUILD FAILED in 2m 12s
+Error: Gradle build failed with unknown error. See logs for the "Run gradlew" phase for more information.

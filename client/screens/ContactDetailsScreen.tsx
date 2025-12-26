@@ -208,24 +208,6 @@ export default function ContactDetailsScreen() {
     setShowThemeModal(false);
   };
   
-  const handleVoiceCall = () => {
-    navigation.navigate("VideoCall", {
-      chatId,
-      contactName: name,
-      contactAvatar: avatarId,
-      isVideoCall: false,
-    });
-  };
-  
-  const handleVideoCall = () => {
-    navigation.navigate("VideoCall", {
-      chatId,
-      contactName: name,
-      contactAvatar: avatarId,
-      isVideoCall: true,
-    });
-  };
-  
   const handleSearch = () => {
     Alert.alert("Coming Soon", "In-chat search will be available in a future update.");
   };
@@ -276,8 +258,6 @@ export default function ContactDetailsScreen() {
         </View>
         
         <View style={styles.quickActionsRow}>
-          <QuickActionButton icon="phone" label="Voice" onPress={handleVoiceCall} />
-          <QuickActionButton icon="video" label="Video" onPress={handleVideoCall} />
           <QuickActionButton 
             icon={notificationsMuted ? "bell-off" : "bell"} 
             label={notificationsMuted ? "Unmute" : "Mute"} 
