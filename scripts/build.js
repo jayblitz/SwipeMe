@@ -151,38 +151,54 @@ async function startMetro(expoPublicDomain) {
   process.exit(1);
 }
 
-async function downloadFile(url, outputPath) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 120_000);
+async function downloadFile(url, outputPath, retries = 3) {
+  const timeoutMs = 300_000; // 5 minutes timeout
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  try {
-    console.log(`Downloading: ${url}`);
-    const response = await fetch(url, { signal: controller.signal });
+    try {
+      console.log(`Downloading: ${url}${attempt > 1 ? ` (attempt ${attempt}/${retries})` : ''}`);
+      const response = await fetch(url, { signal: controller.signal });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const file = fs.createWriteStream(outputPath);
+      await pipeline(Readable.fromWeb(response.body), file);
+
+      const fileSize = fs.statSync(outputPath).size;
+
+      if (fileSize === 0) {
+        fs.unlinkSync(outputPath);
+        throw new Error("Downloaded file is empty");
+      }
+      
+      return; // Success
+    } catch (error) {
+      if (fs.existsSync(outputPath)) {
+        fs.unlinkSync(outputPath);
+      }
+
+      const isLastAttempt = attempt === retries;
+      
+      if (error.name === "AbortError") {
+        if (isLastAttempt) {
+          throw new Error(`Download timeout after 5m: ${url}`);
+        }
+        console.log(`Timeout on attempt ${attempt}, retrying...`);
+        continue;
+      }
+      
+      if (isLastAttempt) {
+        throw error;
+      }
+      console.log(`Error on attempt ${attempt}: ${error.message}, retrying...`);
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const file = fs.createWriteStream(outputPath);
-    await pipeline(Readable.fromWeb(response.body), file);
-
-    const fileSize = fs.statSync(outputPath).size;
-
-    if (fileSize === 0) {
-      fs.unlinkSync(outputPath);
-      throw new Error("Downloaded file is empty");
-    }
-  } catch (error) {
-    if (fs.existsSync(outputPath)) {
-      fs.unlinkSync(outputPath);
-    }
-
-    if (error.name === "AbortError") {
-      throw new Error(`Download timeout after 2m: ${url}`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 
@@ -508,7 +524,7 @@ async function main() {
 
   await startMetro(domain);
 
-  const downloadTimeout = 300000;
+  const downloadTimeout = 600000; // 10 minutes for overall download
   const downloadPromise = downloadBundlesAndManifests(timestamp);
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => {
