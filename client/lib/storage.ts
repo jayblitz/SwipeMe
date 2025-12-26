@@ -29,7 +29,7 @@ export interface Chat {
   disappearingMessagesTimer?: DisappearingTimer; // null = off, "24h" = 24 hours, "7d" = 7 days, "30d" = 30 days
 }
 
-export type MessageType = "text" | "payment" | "image" | "location" | "contact" | "document" | "audio";
+export type MessageType = "text" | "payment" | "image" | "location" | "contact" | "document" | "audio" | "system";
 
 export interface ImageAttachment {
   uri: string;
@@ -549,12 +549,46 @@ export async function setChatDisappearingTimer(chatId: string, timer: Disappeari
     const chats = await getChats();
     const chatIndex = chats.findIndex(c => c.id === chatId);
     if (chatIndex !== -1) {
+      const oldTimer = chats[chatIndex].disappearingMessagesTimer;
       chats[chatIndex].disappearingMessagesTimer = timer;
       await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+      
+      if (oldTimer !== timer) {
+        const content = timer 
+          ? `You turned on disappearing messages. New messages will disappear from this chat ${getTimerLabel(timer).toLowerCase()} after they're sent.`
+          : "You turned off disappearing messages.";
+        await sendSystemMessage(chatId, content);
+      }
     }
   } catch (error) {
     console.error("Failed to set disappearing timer:", error);
   }
+}
+
+export async function sendSystemMessage(chatId: string, content: string): Promise<Message> {
+  const now = Date.now();
+  const newMessage: Message = {
+    id: `sys${now}`,
+    chatId,
+    senderId: "system",
+    content,
+    timestamp: now,
+    type: "system",
+  };
+  
+  try {
+    const messages = await AsyncStorage.getItem(MESSAGES_KEY);
+    const allMessages = messages ? JSON.parse(messages) : {};
+    if (!allMessages[chatId]) {
+      allMessages[chatId] = [];
+    }
+    allMessages[chatId].push(newMessage);
+    await AsyncStorage.setItem(MESSAGES_KEY, JSON.stringify(allMessages));
+  } catch (error) {
+    console.error("Failed to send system message:", error);
+  }
+  
+  return newMessage;
 }
 
 export async function getChatDisappearingTimer(chatId: string): Promise<DisappearingTimer> {

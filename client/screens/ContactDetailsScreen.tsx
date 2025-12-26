@@ -5,6 +5,7 @@ import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
@@ -155,6 +156,7 @@ export default function ContactDetailsScreen() {
   const [payments, setPayments] = useState<Transaction[]>([]);
   const [nickname, setNickname] = useState<string>("");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   
   useEffect(() => {
     loadContactData();
@@ -217,14 +219,38 @@ export default function ContactDetailsScreen() {
   };
   
   const handleBlockUser = () => {
-    Alert.alert(
-      "Block User",
-      `Are you sure you want to block ${name}? They will no longer be able to send you messages.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Block", style: "destructive", onPress: () => Alert.alert("Blocked", `${name} has been blocked.`) }
-      ]
-    );
+    if (isBlocked) {
+      Alert.alert(
+        "Unblock User",
+        `Are you sure you want to unblock ${name}? They will be able to send you messages again.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Unblock", 
+            onPress: () => {
+              setIsBlocked(false);
+              Alert.alert("Unblocked", `${name} has been unblocked.`);
+            }
+          }
+        ]
+      );
+    } else {
+      Alert.alert(
+        "Block User",
+        `Are you sure you want to block ${name}? They will no longer be able to send you messages.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Block", 
+            style: "destructive", 
+            onPress: () => {
+              setIsBlocked(true);
+              Alert.alert("Blocked", `${name} has been blocked.`);
+            }
+          }
+        ]
+      );
+    }
   };
   
   const handleReportSpam = () => {
@@ -233,9 +259,27 @@ export default function ContactDetailsScreen() {
       `Report ${name} as spam? This will also block them.`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Report", style: "destructive", onPress: () => Alert.alert("Reported", "Thank you for your report.") }
+        { 
+          text: "Report", 
+          style: "destructive", 
+          onPress: () => {
+            setIsBlocked(true);
+            Alert.alert("Reported", "Thank you for your report. This user has been blocked.");
+          }
+        }
       ]
     );
+  };
+  
+  const handlePickWallpaper = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      handleBackgroundChange({ type: "image", value: result.assets[0].uri });
+    }
   };
   
   const screenWidth = Dimensions.get("window").width;
@@ -368,12 +412,12 @@ export default function ContactDetailsScreen() {
         
         <View style={[styles.section, { backgroundColor: theme.backgroundRoot, marginTop: Spacing.lg }]}>
           <SettingsRow
-            icon="slash"
-            label="Block User"
+            icon={isBlocked ? "user-check" : "slash"}
+            label={isBlocked ? "Unblock User" : "Block User"}
             onPress={handleBlockUser}
             showChevron={false}
-            iconColor={theme.error}
-            labelColor={theme.error}
+            iconColor={isBlocked ? theme.primary : theme.error}
+            labelColor={isBlocked ? theme.primary : theme.error}
           />
           <SettingsRow
             icon="alert-circle"
@@ -428,6 +472,18 @@ export default function ContactDetailsScreen() {
           <View style={[styles.modalSheet, { backgroundColor: theme.backgroundRoot, paddingBottom: insets.bottom + Spacing.lg }]}>
             <View style={styles.modalHandle} />
             <ThemedText style={styles.modalTitle}>Chat Color & Wallpaper</ThemedText>
+            
+            <Pressable
+              style={[styles.galleryButton, { backgroundColor: theme.backgroundSecondary }]}
+              onPress={handlePickWallpaper}
+            >
+              <Feather name="image" size={20} color={theme.text} />
+              <ThemedText style={styles.galleryButtonText}>Choose from Gallery</ThemedText>
+            </Pressable>
+            
+            <ThemedText style={[styles.colorSectionLabel, { color: theme.textSecondary }]}>
+              Preset Colors
+            </ThemedText>
             
             <View style={styles.colorGrid}>
               {PRESET_BACKGROUNDS.map((bg) => (
@@ -652,5 +708,25 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
+  },
+  galleryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
+  },
+  galleryButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  colorSectionLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: Spacing.xs,
   },
 });

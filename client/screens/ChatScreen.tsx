@@ -558,6 +558,17 @@ function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
     );
   }
 
+  if (message.type === "system") {
+    return (
+      <View style={[styles.systemMessageContainer, { backgroundColor: theme.backgroundTertiary }]}>
+        <Feather name="clock" size={14} color={theme.textSecondary} style={{ marginRight: 6 }} />
+        <ThemedText style={[styles.systemMessageText, { color: theme.textSecondary }]}>
+          {message.content}
+        </ThemedText>
+      </View>
+    );
+  }
+
   return (
     <View style={[
       styles.messageBubble,
@@ -2594,5 +2605,20 @@ const styles = StyleSheet.create({
   disappearingWarningText: {
     flex: 1,
     fontSize: 13,
+  },
+  systemMessageContainer: {
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    marginVertical: Spacing.sm,
+    maxWidth: "90%",
+  },
+  systemMessageText: {
+    flex: 1,
+    fontSize: 13,
+    textAlign: "center",
   },
 });

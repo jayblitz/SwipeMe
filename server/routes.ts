@@ -904,16 +904,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store challenge in session for verification
       req.session.passkeyChallenge = challenge;
       
+      const rpId = process.env.REPLIT_DEV_DOMAIN 
+        ? process.env.REPLIT_DEV_DOMAIN.split(".").slice(-2).join(".")
+        : "localhost";
+      
       res.json({
         success: true,
         options: {
           challenge,
           rp: {
             name: "SwipeMe",
-            id: process.env.REPLIT_DEV_DOMAIN || "localhost",
+            id: rpId,
           },
           user: {
-            id: Buffer.from(user.id).toString("base64url"),
+            id: user.id,
             name: user.email,
             displayName: user.displayName || user.email,
           },
@@ -978,12 +982,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.passkeyLoginChallenge = challenge;
       req.session.passkeyLoginChallengeExpiry = Date.now() + 60000; // 60 seconds
       
+      const rpId = process.env.REPLIT_DEV_DOMAIN 
+        ? process.env.REPLIT_DEV_DOMAIN.split(".").slice(-2).join(".")
+        : "localhost";
+      
       res.json({
         success: true,
         options: {
           challenge,
           timeout: 60000,
-          rpId: process.env.REPLIT_DEV_DOMAIN || "localhost",
+          rpId,
           userVerification: "required",
         }
       });
