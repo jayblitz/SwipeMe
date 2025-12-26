@@ -1054,9 +1054,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         authenticatorAttachment: "platform",
       };
       
-      // Get the RP ID from environment
-      const rpID = process.env.REPLIT_DEV_DOMAIN || "localhost";
-      const origin = `https://${rpID}`;
+      // Get the RP ID from environment - must match the registrable domain used in options
+      const rpID = process.env.REPLIT_DEV_DOMAIN 
+        ? process.env.REPLIT_DEV_DOMAIN.split(".").slice(-2).join(".")
+        : "localhost";
+      // Origin must match what the authenticator returns
+      // Native authenticators use "http://localhost" (no port) for local development
+      const origin = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : "http://localhost";
       
       // Verify the authentication response cryptographically
       let verification;
