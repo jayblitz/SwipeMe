@@ -917,7 +917,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: rpId,
           },
           user: {
-            id: user.id,
+            // Android Credential Manager requires user.id to be base64url-encoded binary
+            // Convert UUID hex to binary bytes, then encode as base64url
+            id: Buffer.from(user.id.replace(/-/g, ""), "hex").toString("base64url"),
             name: user.email,
             displayName: user.displayName || user.email,
           },
