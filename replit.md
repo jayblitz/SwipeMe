@@ -1,7 +1,10 @@
 # SwipeMe - WeChat-Style Super App
 
 ## Overview
-SwipeMe is a WeChat-inspired super app MVP that integrates end-to-end encrypted messaging with blockchain-based P2P payments. Its core purpose is to provide "instant money, straight from your chat" by combining secure communication with seamless crypto transactions. The project aims to deliver a cross-platform mobile experience using Expo (React Native). Key capabilities include robust authentication (email verification, 2FA, passkeys), secure wallet management (creation, import, encryption), real-time multi-asset display and transfers on the Tempo testnet, and end-to-end encrypted messaging powered by XMTP. Future ambitions include real-time message streaming, advanced XMTP content types, gas-sponsored transactions, and fiat on-ramp integration.
+SwipeMe is a WeChat-inspired super app that integrates end-to-end encrypted messaging with blockchain-based P2P payments. Its core purpose is to provide "instant money, straight from your chat" by combining secure communication with seamless crypto transactions. The project delivers a cross-platform mobile experience using Expo (React Native). Key capabilities include robust authentication (email verification, 2FA, passkeys), secure wallet management (creation, import, encryption), real-time multi-asset display and transfers on the Tempo testnet, and end-to-end encrypted messaging powered by XMTP. Future ambitions include real-time message streaming, advanced XMTP content types, gas-sponsored transactions, and fiat on-ramp integration.
+
+## Project Status
+Transitioned from MVP stage to production build phase. Focus is on stability, polished UX, and EAS build compatibility.
 
 ## User Preferences
 - iOS 26 liquid glass UI design aesthetic
@@ -25,8 +28,7 @@ The application is built with an Expo/React Native frontend and an Express.js ba
 - **P2P Payments:** Real-time token balance fetching for Tempo testnet assets (pathUSD, AlphaUSD, BetaUSD, ThetaUSD). P2P token transfers within chats with server-side transaction signing and encrypted wallet decryption.
 - **Messaging:** End-to-end encrypted messaging via XMTP React Native SDK v3. Secure remote signing architecture ensures private keys remain encrypted on the server. Web platform gracefully falls back to mock data due to XMTP's native module requirements. Unified chat persistence combines XMTP conversations and local AsyncStorage chats.
 - **Disappearing Messages:** Signal-style disappearing messages with user-selectable timers (24 hours, 7 days, 30 days) per chat, automatically deleting expired messages on chat load.
-- **Contact Details Screen:** Signal/WhatsApp-style contact profile accessible by tapping name in chat header. Features quick action buttons (Voice, Video, Mute, Search), settings (disappearing messages, nickname, chat theme), shared media gallery, payment history, groups in common, and safety options (block/report).
-- **Voice/Video Calling:** Real-time voice and video calling powered by VideoSDK. Full-screen call UI with mute, video toggle, speaker controls, and call duration timer. Call buttons accessible from chat header and contact details screen. Web platform shows graceful fallback directing users to Expo Go.
+- **Contact Details Screen:** Signal/WhatsApp-style contact profile accessible by tapping name in chat header. Features quick action buttons (Mute, Search), settings (disappearing messages, nickname, chat theme), shared media gallery, payment history, groups in common, and safety options (block/report).
 - **Attachments:** Full attachment system supporting photos, camera, location, contacts, and documents.
 - **Permissions:** Handles contacts, microphone, and biometric permissions with user-friendly prompts and settings redirects.
 
@@ -45,3 +47,8 @@ The application is built with an Expo/React Native frontend and an Express.js ba
 - **react-native-passkeys:** For WebAuthn passkey authentication on native platforms.
 - **Google Forms:** For waitlist signups on the marketing landing page.
 - **EAS (Expo Application Services):** For building and distributing native development builds.
+
+## Build Notes
+- Voice/Video calling was removed due to WebRTC native module conflicts between XMTP SDK and VideoSDK. May be re-added in future with compatible solution.
+- Android development build is the primary target. iOS support deferred.
+- expo-doctor passes 16/17 checks (only warning is third-party library metadata for XMTP, Privy, Passkeys).
