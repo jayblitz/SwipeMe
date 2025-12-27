@@ -7,8 +7,10 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
+  // In production/preview builds, EXPO_PUBLIC_DOMAIN may not be set
+  // Use swipeme.org as the production API domain
   if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
+    host = "swipeme.org";
   }
 
   let url = new URL(`https://${host}`);
