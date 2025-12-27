@@ -1,11 +1,11 @@
 {
-  "id": "aa2becb3-f427-48f1-9f15-c06f9b2c3315",
-  "createdAt": "2025-12-27T12:13:26.775Z",
+  "id": "112bec2a-84fc-4bbc-8ac7-48cea2419e09",
+  "createdAt": "2025-12-27T12:42:00.573Z",
   "runtimeVersion": "1.0.1",
   "launchAsset": {
-    "key": "bundle-1766837606775-20837",
+    "key": "bundle-1766839320573-24592",
     "contentType": "application/javascript",
-    "url": "https://392cbe44-8262-4a5f-9c16-1f168fc7b4f3-00-2rh5cb0ulvgbz.riker.replit.dev/1766837606775-20837/_expo/static/js/ios/bundle.js"
+    "url": "https://swipeme.org/1766839320573-24592/_expo/static/js/ios/bundle.js"
   },
   "assets": [],
   "metadata": {},
@@ -107,10 +107,10 @@
         "backgroundColor": "#0066FF"
       },
       "iconUrl": "http://127.0.0.1:8081/assets/./assets/images/icon.png",
-      "hostUri": "392cbe44-8262-4a5f-9c16-1f168fc7b4f3-00-2rh5cb0ulvgbz.riker.replit.dev/ios"
+      "hostUri": "swipeme.org/ios"
     },
     "expoGo": {
-      "debuggerHost": "392cbe44-8262-4a5f-9c16-1f168fc7b4f3-00-2rh5cb0ulvgbz.riker.replit.dev/ios",
+      "debuggerHost": "swipeme.org/ios",
       "developer": {
         "tool": "expo-cli",
         "projectRoot": "/home/runner/workspace"

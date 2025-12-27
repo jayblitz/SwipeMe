@@ -1,11 +1,11 @@
 {
-  "id": "c3885fa8-5406-45ee-a454-69d3536fa10f",
-  "createdAt": "2025-12-27T12:13:26.775Z",
+  "id": "819b6655-c3d9-4a4f-969c-3b4f322cb6b0",
+  "createdAt": "2025-12-27T12:42:00.573Z",
   "runtimeVersion": "1.0.1",
   "launchAsset": {
-    "key": "bundle-1766837606775-20837",
+    "key": "bundle-1766839320573-24592",
     "contentType": "application/javascript",
-    "url": "https://392cbe44-8262-4a5f-9c16-1f168fc7b4f3-00-2rh5cb0ulvgbz.riker.replit.dev/1766837606775-20837/_expo/static/js/android/bundle.js"
+    "url": "https://swipeme.org/1766839320573-24592/_expo/static/js/android/bundle.js"
   },
   "assets": [],
   "metadata": {},
@@ -107,10 +107,10 @@
         "backgroundColor": "#0066FF"
       },
       "iconUrl": "http://127.0.0.1:8081/assets/./assets/images/icon.png",
-      "hostUri": "392cbe44-8262-4a5f-9c16-1f168fc7b4f3-00-2rh5cb0ulvgbz.riker.replit.dev/android"
+      "hostUri": "swipeme.org/android"
     },
     "expoGo": {
-      "debuggerHost": "392cbe44-8262-4a5f-9c16-1f168fc7b4f3-00-2rh5cb0ulvgbz.riker.replit.dev/android",
+      "debuggerHost": "swipeme.org/android",
       "developer": {
         "tool": "expo-cli",
         "projectRoot": "/home/runner/workspace"
