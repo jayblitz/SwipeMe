@@ -5,12 +5,20 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
  * @returns {string} The API base URL
  */
 export function getApiUrl(): string {
+  // Production domain - hardcoded for EAS builds where env vars aren't available
+  const PRODUCTION_DOMAIN = "swipeme.org";
+  
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
-  // In production/preview builds, EXPO_PUBLIC_DOMAIN may not be set
-  // Use swipeme.org as the production API domain
-  if (!host) {
-    host = "swipeme.org";
+  // In EAS/production builds, EXPO_PUBLIC_DOMAIN is not set at runtime
+  // Use the hardcoded production domain
+  if (!host || host === "undefined" || host === "") {
+    host = PRODUCTION_DOMAIN;
+  }
+
+  // Handle the case where env var might have port suffix from dev environment
+  if (host.includes(":5000")) {
+    host = host.replace(":5000", "");
   }
 
   let url = new URL(`https://${host}`);

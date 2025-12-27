@@ -27,13 +27,19 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "swipeme.org"
+      },
       "android": {
         "buildType": "apk",
         "credentialsSource": "remote"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "swipeme.org"
+      }
     }
   },
   "submit": {
