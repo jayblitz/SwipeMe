@@ -561,6 +561,18 @@ async function main() {
   console.log("Updating manifests and creating landing page...");
   updateManifests(manifests, timestamp, baseUrl, assetsByHash);
 
+  // Create server_dist/package.json with type: module for ESM support
+  // This ensures Node.js treats the esbuild output as ES modules
+  const serverDistPath = path.join(process.cwd(), "server_dist");
+  if (!fs.existsSync(serverDistPath)) {
+    fs.mkdirSync(serverDistPath, { recursive: true });
+  }
+  fs.writeFileSync(
+    path.join(serverDistPath, "package.json"),
+    JSON.stringify({ type: "module" }, null, 2)
+  );
+  console.log("Created server_dist/package.json for ESM support");
+
   console.log("Build complete! Deploy to:", baseUrl);
 
   if (metroProcess) {
