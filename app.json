@@ -2,7 +2,8 @@
   "expo": {
     "name": "SwipeMe",
     "slug": "swipeme",
-    "version": "1.0.0",
+    "version": "1.0.1",
+    "runtimeVersion": "1.0.1",
     "description": "Just SwipeMe – instant money, straight from your chat",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
