@@ -1,0 +1,125 @@
+{
+  "id": "aa2becb3-f427-48f1-9f15-c06f9b2c3315",
+  "createdAt": "2025-12-27T12:13:26.775Z",
+  "runtimeVersion": "1.0.1",
+  "launchAsset": {
+    "key": "bundle-1766837606775-20837",
+    "contentType": "application/javascript",
+    "url": "https://392cbe44-8262-4a5f-9c16-1f168fc7b4f3-00-2rh5cb0ulvgbz.riker.replit.dev/1766837606775-20837/_expo/static/js/ios/bundle.js"
+  },
+  "assets": [],
+  "metadata": {},
+  "extra": {
+    "eas": {
+      "projectId": "26540cf7-4cc6-4892-881f-a4070c21b3f2"
+    },
+    "expoClient": {
+      "name": "SwipeMe",
+      "slug": "swipeme",
+      "version": "1.0.1",
+      "runtimeVersion": "1.0.1",
+      "description": "Just SwipeMe – instant money, straight from your chat",
+      "orientation": "portrait",
+      "icon": "./assets/images/icon.png",
+      "scheme": "swipeme",
+      "userInterfaceStyle": "automatic",
+      "newArchEnabled": true,
+      "ios": {
+        "supportsTablet": true,
+        "bundleIdentifier": "com.swipeme.app"
+      },
+      "android": {
+        "adaptiveIcon": {
+          "backgroundColor": "#0066FF",
+          "foregroundImage": "./assets/images/android-icon-foreground.png",
+          "backgroundImage": "./assets/images/android-icon-background.png",
+          "monochromeImage": "./assets/images/android-icon-monochrome.png",
+          "foregroundImageUrl": "http://127.0.0.1:8081/assets/./assets/images/android-icon-foreground.png",
+          "monochromeImageUrl": "http://127.0.0.1:8081/assets/./assets/images/android-icon-monochrome.png",
+          "backgroundImageUrl": "http://127.0.0.1:8081/assets/./assets/images/android-icon-background.png"
+        },
+        "edgeToEdgeEnabled": true,
+        "predictiveBackGestureEnabled": false,
+        "package": "com.swipeme.app",
+        "permissions": [
+          "android.permission.ACCESS_NETWORK_STATE",
+          "android.permission.BLUETOOTH",
+          "android.permission.CAMERA",
+          "android.permission.INTERNET",
+          "android.permission.MODIFY_AUDIO_SETTINGS",
+          "android.permission.RECORD_AUDIO",
+          "android.permission.SYSTEM_ALERT_WINDOW",
+          "android.permission.WAKE_LOCK"
+        ]
+      },
+      "web": {
+        "output": "single",
+        "favicon": "./assets/images/favicon.png"
+      },
+      "plugins": [
+        [
+          "expo-splash-screen",
+          {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 200,
+            "resizeMode": "contain",
+            "backgroundColor": "#0066FF",
+            "dark": {
+              "backgroundColor": "#1F2123"
+            }
+          }
+        ],
+        "expo-web-browser"
+      ],
+      "experiments": {
+        "reactCompiler": true
+      },
+      "extra": {
+        "eas": {
+          "projectId": "26540cf7-4cc6-4892-881f-a4070c21b3f2"
+        }
+      },
+      "owner": "crypto4eva",
+      "_internal": {
+        "isDebug": false,
+        "projectRoot": "/home/runner/workspace",
+        "dynamicConfigPath": {},
+        "staticConfigPath": "/home/runner/workspace/app.json",
+        "packageJsonPath": "/home/runner/workspace/package.json",
+        "pluginHistory": {
+          "expo-splash-screen": {
+            "name": "expo-splash-screen",
+            "version": "31.0.13"
+          },
+          "expo-web-browser": {
+            "name": "expo-web-browser",
+            "version": "15.0.10"
+          }
+        }
+      },
+      "sdkVersion": "54.0.0",
+      "platforms": [
+        "ios",
+        "android",
+        "web"
+      ],
+      "androidStatusBar": {
+        "backgroundColor": "#0066FF"
+      },
+      "iconUrl": "http://127.0.0.1:8081/assets/./assets/images/icon.png",
+      "hostUri": "392cbe44-8262-4a5f-9c16-1f168fc7b4f3-00-2rh5cb0ulvgbz.riker.replit.dev/ios"
+    },
+    "expoGo": {
+      "debuggerHost": "392cbe44-8262-4a5f-9c16-1f168fc7b4f3-00-2rh5cb0ulvgbz.riker.replit.dev/ios",
+      "developer": {
+        "tool": "expo-cli",
+        "projectRoot": "/home/runner/workspace"
+      },
+      "packagerOpts": {
+        "dev": false
+      },
+      "mainModuleName": "client/index"
+    },
+    "scopeKey": "@anonymous/swipeme-a7b74771-5f46-4d55-b51f-76be0c3d5878"
+  }
+}
