@@ -9,7 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as Contacts from "expo-contacts";
 import * as DocumentPicker from "expo-document-picker";
-import { useAudioRecorder, AudioModule, RecordingPresets, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import { AudioModule, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
@@ -21,7 +21,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, sendAudioMessage, getChats, Message, Chat, getContactWalletAddress, getChatBackground, setChatBackground, PRESET_BACKGROUNDS, ChatBackground, DisappearingTimer, getChatDisappearingTimer, setChatDisappearingTimer, getTimerLabel, cleanupExpiredMessages } from "@/lib/storage";
+import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, Message, Chat, getContactWalletAddress, getChatBackground, setChatBackground, PRESET_BACKGROUNDS, ChatBackground, DisappearingTimer, getChatDisappearingTimer, setChatDisappearingTimer, getTimerLabel, cleanupExpiredMessages } from "@/lib/storage";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
 import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
@@ -914,10 +914,6 @@ export default function ChatScreen() {
   const [chatBackground, setChatBackgroundState] = useState<ChatBackground | null>(null);
   const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [sending, setSending] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>(
     TEMPO_TOKENS.map(token => ({ token, balance: "0", balanceFormatted: "0", balanceUsd: 0 }))
   );
@@ -1069,28 +1065,6 @@ export default function ChatScreen() {
     };
   }, [useXMTPMode, xmtpDm, client?.inboxId, chatId]);
 
-  const isRecordingRef = useRef(false);
-  
-  useEffect(() => {
-    isRecordingRef.current = isRecording;
-  }, [isRecording]);
-  
-  useEffect(() => {
-    return () => {
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      if (isRecordingRef.current) {
-        try {
-          audioRecorder.stop();
-        } catch (e) {
-          // Recorder may already be stopped
-        }
-      }
-    };
-  }, []);
-
   const handleSend = async () => {
     if (!inputText.trim()) return;
     
@@ -1118,111 +1092,6 @@ export default function ChatScreen() {
       const newMessage = await sendMessage(chatId, messageText);
       setMessages(prev => [newMessage, ...prev]);
     }
-  };
-
-  const handleMicrophonePress = async () => {
-    if (Platform.OS === "web") {
-      Alert.alert("Voice Messages", "Voice messages work best in the mobile app. Try using Expo Go to test this feature.");
-      return;
-    }
-    
-    try {
-      const hasPermission = await AudioModule.requestRecordingPermissionsAsync();
-      if (!hasPermission.granted) {
-        if (!hasPermission.canAskAgain) {
-          Alert.alert(
-            "Microphone Access Required",
-            "Please enable microphone access in your device settings to record voice messages.",
-            [
-              { text: "Cancel", style: "cancel" },
-              { 
-                text: "Open Settings", 
-                onPress: async () => {
-                  if (Platform.OS !== "web") {
-                    try {
-                      await Linking.openSettings();
-                    } catch (e) {
-                      // Settings not available
-                    }
-                  }
-                }
-              }
-            ]
-          );
-        } else {
-          Alert.alert("Permission Denied", "Microphone permission is required to record voice messages.");
-        }
-        return;
-      }
-      
-      await AudioModule.setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
-      });
-      
-      setIsRecording(true);
-      setRecordingTime(0);
-      audioRecorder.record();
-      
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-    } catch (error) {
-      console.error("Recording error:", error);
-      await AudioModule.setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-      });
-      Alert.alert("Error", "Failed to start recording. Please try again.");
-    }
-  };
-  
-  const handleCancelRecording = async () => {
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-    audioRecorder.stop();
-    await AudioModule.setAudioModeAsync({
-      allowsRecording: false,
-      playsInSilentMode: true,
-    });
-    setIsRecording(false);
-    setRecordingTime(0);
-  };
-  
-  const handleSendRecording = async () => {
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-    
-    const duration = recordingTime;
-    setIsRecording(false);
-    setRecordingTime(0);
-    
-    try {
-      await audioRecorder.stop();
-      await AudioModule.setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-      });
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const uri = audioRecorder.uri;
-      if (uri) {
-        const newMessage = await sendAudioMessage(chatId, uri, duration);
-        setMessages(prev => [newMessage, ...prev]);
-      }
-    } catch (error) {
-      console.error("Failed to save recording:", error);
-      Alert.alert("Error", "Failed to save voice message.");
-    }
-  };
-  
-  const formatRecordingTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleSendPayment = async (amount: number, memo: string, selectedToken: TempoToken) => {
@@ -1636,109 +1505,57 @@ export default function ChatScreen() {
             keyboardShouldPersistTaps="handled"
           />
         
-        {isRecording ? (
+        <View style={[
+          styles.inputContainer, 
+          { 
+            backgroundColor: theme.backgroundRoot,
+            paddingBottom: Math.max(insets.bottom, Spacing.md),
+            borderTopColor: theme.border,
+          }
+        ]}>
+          <Pressable 
+            onPress={() => setShowAttachments(true)}
+            style={[styles.attachButton, { backgroundColor: theme.backgroundSecondary }]}
+          >
+            <Feather name="plus" size={22} color={theme.text} />
+          </Pressable>
+          
           <View style={[
-            styles.recordingBar, 
+            styles.textInputContainer, 
             { 
-              backgroundColor: theme.backgroundRoot,
-              paddingBottom: Math.max(insets.bottom, Spacing.md),
-              borderTopColor: theme.border,
+              backgroundColor: theme.backgroundSecondary, 
+              borderColor: theme.textSecondary,
+              borderWidth: 1.5,
             }
           ]}>
-            <View style={styles.recordingTopRow}>
-              <ThemedText style={styles.recordingTimer}>
-                {formatRecordingTime(recordingTime)}
-              </ThemedText>
-              <View style={styles.waveformContainer}>
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <View 
-                    key={i} 
-                    style={[
-                      styles.waveformBar,
-                      { 
-                        backgroundColor: theme.textSecondary,
-                        height: 4 + Math.random() * 20,
-                        opacity: i < recordingTime % 20 ? 1 : 0.3,
-                      }
-                    ]} 
-                  />
-                ))}
-              </View>
-              <View style={styles.recordingSpeed}>
-                <Feather name="clock" size={14} color={theme.textSecondary} />
-                <ThemedText style={[styles.recordingSpeedText, { color: theme.textSecondary }]}>
-                  1x
-                </ThemedText>
-              </View>
-            </View>
-            <View style={styles.recordingBottomRow}>
-              <Pressable 
-                onPress={handleCancelRecording}
-                style={[styles.recordingActionButton, { backgroundColor: "transparent" }]}
-              >
-                <Feather name="trash-2" size={24} color={theme.textSecondary} />
-              </Pressable>
-              <View style={styles.recordingIndicatorWrapper} />
-              <Pressable 
-                onPress={handleSendRecording}
-                style={[styles.recordingSendButton, { backgroundColor: "#25D366" }]}
-              >
-                <Feather name="send" size={20} color="#FFFFFF" />
-              </Pressable>
-            </View>
+            <TextInput
+              style={[styles.textInput, { color: theme.text }]}
+              placeholder="Type a message..."
+              placeholderTextColor={theme.textSecondary}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={1000}
+            />
           </View>
-        ) : (
-          <View style={[
-            styles.inputContainer, 
-            { 
-              backgroundColor: theme.backgroundRoot,
-              paddingBottom: Math.max(insets.bottom, Spacing.md),
-              borderTopColor: theme.border,
-            }
-          ]}>
-            <Pressable 
-              onPress={() => setShowAttachments(true)}
-              style={[styles.attachButton, { backgroundColor: theme.backgroundSecondary }]}
-            >
-              <Feather name="plus" size={22} color={theme.text} />
-            </Pressable>
-            
-            <View style={[
-              styles.textInputContainer, 
+          
+          <Pressable 
+            onPress={handleSend}
+            disabled={!inputText.trim()}
+            style={[
+              styles.sendButton,
               { 
-                backgroundColor: theme.backgroundSecondary, 
-                borderColor: theme.textSecondary,
-                borderWidth: 1.5,
+                backgroundColor: inputText.trim() ? theme.primary : theme.backgroundSecondary,
               }
-            ]}>
-              <TextInput
-                style={[styles.textInput, { color: theme.text }]}
-                placeholder="Type a message..."
-                placeholderTextColor={theme.textSecondary}
-                value={inputText}
-                onChangeText={setInputText}
-                multiline
-                maxLength={1000}
-              />
-            </View>
-            
-            <Pressable 
-              onPress={inputText.trim() ? handleSend : handleMicrophonePress}
-              style={[
-                styles.sendButton,
-                { 
-                  backgroundColor: inputText.trim() ? theme.primary : theme.backgroundSecondary,
-                }
-              ]}
-            >
-              <Feather 
-                name={inputText.trim() ? "send" : "mic"} 
-                size={inputText.trim() ? 18 : 20} 
-                color={inputText.trim() ? "#FFFFFF" : theme.text} 
-              />
-            </Pressable>
-          </View>
-        )}
+            ]}
+          >
+            <Feather 
+              name="send" 
+              size={18} 
+              color={inputText.trim() ? "#FFFFFF" : theme.textSecondary} 
+            />
+          </Pressable>
+        </View>
         </KeyboardAvoidingView>
       </View>
 
@@ -2629,71 +2446,6 @@ const styles = StyleSheet.create({
   playbackSpeedText: {
     fontSize: 12,
     fontWeight: "600",
-  },
-  recordingBar: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-  },
-  recordingTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  recordingTimer: {
-    fontSize: 16,
-    fontWeight: "500",
-    minWidth: 50,
-  },
-  waveformContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-    height: 32,
-    marginHorizontal: Spacing.md,
-  },
-  waveformBar: {
-    width: 3,
-    borderRadius: 2,
-  },
-  recordingSpeed: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  recordingSpeedText: {
-    fontSize: 12,
-  },
-  recordingBottomRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: Spacing.sm,
-  },
-  recordingActionButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recordingIndicatorWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recordingDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  recordingSendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
   },
   disappearingDescription: {
     fontSize: 14,
