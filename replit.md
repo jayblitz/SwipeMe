@@ -35,7 +35,17 @@ The application is built with an Expo/React Native frontend and an Express.js ba
 **System Design Choices:**
 - **Frontend:** Expo (React Native) for cross-platform mobile development. `AuthContext`, `WalletContext`, and `XMTPContext` for global state management. `React Query` for API data fetching.
 - **Backend:** Express.js API server. `Drizzle ORM` for database interactions with PostgreSQL.
-- **Security:** AES-256-GCM encryption for sensitive wallet data. `requireAuth` and `requireSameUser` middleware for API protection.
+- **Security:** 
+  - AES-256-GCM encryption for sensitive wallet data
+  - `requireAuth` and `requireSameUser` middleware for API protection
+  - Helmet middleware with CSP headers for Express server
+  - Rate limiting: global (100/15min), auth (5/5min), OTP send (3/hour), OTP verify (5/5min)
+  - Zod validation schemas for all wallet operations (create, import, transfer, sign)
+  - Winston security logging for failed logins, 2FA attempts, wallet operations (success and failure)
+  - Password strength validation (8+ chars, uppercase, lowercase, number, special character)
+  - Secure OTP generation with crypto.randomBytes and 10-minute expiration
+  - CSP meta tag on landing page
+  - XMTP encryption keys stored in expo-secure-store
 - **Database:** PostgreSQL with schemas for users, wallets, chats, messages, transactions, and authentication-related data (verification codes, passkeys).
 
 ## External Dependencies
