@@ -450,6 +450,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/users/:userId/public", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const wallet = await storage.getWalletByUserId(userId);
+      
+      res.json({
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        profileImage: user.profileImage,
+        walletAddress: wallet?.address || null,
+      });
+    } catch (error) {
+      console.error("Get user public profile error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/contacts/invite", requireAuth, async (req: Request, res: Response) => {
     try {
       const { email, name } = req.body;

@@ -11,6 +11,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius, Typography } from "@/constants/theme";
+import { getApiUrl } from "@/lib/query-client";
 import { 
   getMessages, 
   Message, 
@@ -162,7 +163,7 @@ type MediaTabType = "media" | "links" | "docs";
 export default function ContactDetailsScreen() {
   const route = useRoute<ContactDetailsRouteProp>();
   const navigation = useNavigation<ContactDetailsNavigationProp>();
-  const { chatId, name, peerAddress, avatarId } = route.params;
+  const { chatId, name, peerAddress, avatarId, contactId } = route.params;
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   
@@ -178,10 +179,12 @@ export default function ContactDetailsScreen() {
   const [nickname, setNickname] = useState<string>("");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [contactEmail, setContactEmail] = useState<string>("");
+  const [contactProfileImage, setContactProfileImage] = useState<string | null>(null);
   
   useEffect(() => {
     loadContactData();
-  }, [chatId]);
+  }, [chatId, contactId]);
   
   const loadContactData = useCallback(async () => {
     const [timer, background, messages, transactions] = await Promise.all([
@@ -193,6 +196,25 @@ export default function ContactDetailsScreen() {
     
     setDisappearingTimer(timer);
     if (background) setChatBackgroundState(background);
+    
+    if (contactId) {
+      try {
+        const baseUrl = getApiUrl();
+        const response = await fetch(new URL(`/api/users/${contactId}/public`, baseUrl), {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          if (userData.email) setContactEmail(userData.email);
+          if (userData.profileImage) setContactProfileImage(userData.profileImage);
+        }
+      } catch (error) {
+        console.error("Failed to fetch contact profile:", error);
+      }
+    }
     
     const media: MediaItem[] = [];
     const links: LinkItem[] = [];
@@ -346,8 +368,13 @@ export default function ContactDetailsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.profileHeader, { backgroundColor: theme.backgroundRoot }]}>
-          <Avatar avatarId={avatarId || "coral"} size={100} />
+          <Avatar avatarId={avatarId || "coral"} imageUri={contactProfileImage} size={100} />
           <ThemedText style={styles.profileName}>{name}</ThemedText>
+          {contactEmail ? (
+            <ThemedText style={[styles.profileEmail, { color: theme.textSecondary }]}>
+              {contactEmail}
+            </ThemedText>
+          ) : null}
           {peerAddress ? (
             <ThemedText style={[styles.profileAddress, { color: theme.textSecondary }]}>
               {peerAddress.slice(0, 8)}...{peerAddress.slice(-6)}
@@ -693,9 +720,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: Spacing.md,
   },
-  profileAddress: {
+  profileEmail: {
     fontSize: 14,
     marginTop: Spacing.xs,
+  },
+  profileAddress: {
+    fontSize: 12,
+    marginTop: 4,
+    fontFamily: "monospace",
   },
   quickActionsRow: {
     flexDirection: "row",

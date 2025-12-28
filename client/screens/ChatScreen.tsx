@@ -25,7 +25,7 @@ import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoT
 import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 import { useXMTP } from "@/contexts/XMTPContext";
-import { findOrCreateDm, sendXMTPMessage, getMessages as getXMTPMessages, type XMTPConversation } from "@/lib/xmtp";
+import { findOrCreateDm, sendXMTPMessage, getMessages as getXMTPMessages, streamMessages, type XMTPConversation } from "@/lib/xmtp";
 
 interface AttachmentOption {
   id: string;
@@ -876,7 +876,7 @@ export default function ChatScreen() {
   const { wallet } = useWallet();
   const route = useRoute<RouteProp<ChatsStackParamList, "Chat">>();
   const navigation = useNavigation<NativeStackNavigationProp<ChatsStackParamList>>();
-  const { chatId, name, peerAddress, avatarId } = route.params;
+  const { chatId, name, peerAddress, avatarId, contactId } = route.params;
   const { client, isSupported } = useXMTP();
   const [xmtpDm, setXmtpDm] = useState<XMTPConversation | null>(null);
   const useXMTPMode = Platform.OS !== "web" && isSupported && client && peerAddress;
@@ -901,10 +901,12 @@ export default function ChatScreen() {
   );
   const [chat, setChat] = useState<Chat | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const streamCancelRef = useRef<(() => void) | null>(null);
 
   const handleOpenContactDetails = useCallback(() => {
-    navigation.navigate("ContactDetails", { chatId, name, peerAddress, avatarId });
-  }, [navigation, chatId, name, peerAddress, avatarId]);
+    const participantId = contactId || chat?.participants?.[0]?.id;
+    navigation.navigate("ContactDetails", { chatId, name, peerAddress, avatarId, contactId: participantId });
+  }, [navigation, chatId, name, peerAddress, avatarId, contactId, chat?.participants]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -983,6 +985,67 @@ export default function ChatScreen() {
       loadData();
     }, [loadData])
   );
+
+  useEffect(() => {
+    if (!useXMTPMode || !xmtpDm) return;
+
+    let isCancelled = false;
+    let localCancelStream: (() => void) | null = null;
+
+    const setupStream = async () => {
+      try {
+        if (streamCancelRef.current) {
+          streamCancelRef.current();
+          streamCancelRef.current = null;
+        }
+
+        const cancelStream = await streamMessages(xmtpDm, (msg) => {
+          if (isCancelled) return;
+          if (msg.senderInboxId === client?.inboxId) return;
+          
+          const content = msg.content;
+          const contentStr = typeof content === "string" ? content : String(content || "");
+          const newMessage: Message = {
+            id: msg.id || `xmtp-stream-${Date.now()}`,
+            chatId: chatId,
+            senderId: msg.senderInboxId || "unknown",
+            content: contentStr,
+            timestamp: msg.sentNs ? Number(msg.sentNs) / 1000000 : Date.now(),
+            type: "text" as const,
+          };
+          
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [newMessage, ...prev].sort((a, b) => b.timestamp - a.timestamp);
+          });
+        });
+        
+        if (isCancelled) {
+          cancelStream();
+        } else {
+          localCancelStream = cancelStream;
+          streamCancelRef.current = cancelStream;
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Failed to setup message stream:", error);
+        }
+      }
+    };
+
+    setupStream();
+
+    return () => {
+      isCancelled = true;
+      if (localCancelStream) {
+        localCancelStream();
+      }
+      if (streamCancelRef.current) {
+        streamCancelRef.current();
+        streamCancelRef.current = null;
+      }
+    };
+  }, [useXMTPMode, xmtpDm, client?.inboxId, chatId]);
 
   const isRecordingRef = useRef(false);
   
@@ -1147,10 +1210,26 @@ export default function ChatScreen() {
     try {
       const participant = chat.participants[0];
       
-      // Get wallet address from source of truth first, fall back to cached data
-      const recipientWalletAddress = getContactWalletAddress(participant.id) || participant.walletAddress;
+      let recipientWalletAddress = participant.walletAddress;
       
-      // For MVP, we need the recipient's wallet address
+      if (!recipientWalletAddress && participant.id) {
+        try {
+          const baseUrl = getApiUrl();
+          const userResponse = await fetch(new URL(`/api/users/${participant.id}/public`, baseUrl), {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+          });
+          
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            recipientWalletAddress = userData.walletAddress;
+          }
+        } catch (fetchError) {
+          console.error("Failed to fetch recipient wallet:", fetchError);
+        }
+      }
+      
       if (!recipientWalletAddress) {
         Alert.alert(
           "Recipient Wallet Required",

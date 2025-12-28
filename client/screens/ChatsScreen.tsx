@@ -264,6 +264,7 @@ export default function ChatsScreen() {
       chatId: chat.id, 
       name: chat.isGroup ? (chat.name || "Group") : participant.name,
       avatarId: participant?.avatarId,
+      contactId: participant?.id,
     });
   };
 

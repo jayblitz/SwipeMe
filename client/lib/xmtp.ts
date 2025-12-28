@@ -157,3 +157,20 @@ export async function canMessage(peerAddress: string): Promise<boolean> {
 export function isXMTPSupported(): boolean {
   return Platform.OS !== "web";
 }
+
+export async function streamMessages(
+  dm: Dm,
+  onMessage: (message: DecodedMessage) => void | Promise<void>
+): Promise<() => void> {
+  const cancelStream = await dm.streamMessages(async (message) => {
+    await Promise.resolve(onMessage(message));
+  });
+  return cancelStream;
+}
+
+export async function syncConversations(): Promise<void> {
+  if (!xmtpClient) {
+    throw new Error("XMTP client not initialized");
+  }
+  await xmtpClient.conversations.sync();
+}
