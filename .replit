@@ -51,9 +51,7 @@ waitForPort = 5000
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run expo:dev"
-waitForPort = 8081
-ensurePreviewReachable = "/status"
+args = "npm run expo:bash scripts/start-expo.sh"
 
 [userenv]
 
