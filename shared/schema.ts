@@ -232,3 +232,13 @@ export const transferSchema = z.object({
 export const signMessageSchema = z.object({
   message: z.string().min(1, "Message is required").max(10000, "Message too long"),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+export const resetPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  code: z.string().length(6, "Code must be 6 digits"),
+  newPassword: passwordSchema,
+});

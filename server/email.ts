@@ -41,9 +41,9 @@ export async function getResendClient() {
   };
 }
 
-export async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
+export async function sendVerificationEmail(email: string, code: string, type: string = "signup"): Promise<boolean> {
   try {
-    console.log(`Sending verification email to: ${email}`);
+    console.log(`Sending ${type} email to: ${email}`);
     const { client, fromEmail } = await getResendClient();
     console.log(`Using from email: ${fromEmail}`);
     
@@ -51,22 +51,32 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     
     console.log(`Sending from: ${senderEmail}`);
     
+    const isPasswordReset = type === "password_reset";
+    const subject = isPasswordReset ? 'Reset your password' : 'Confirm your email address';
+    const heading = isPasswordReset ? 'Reset your password' : 'Confirm your email address';
+    const description = isPasswordReset 
+      ? 'We received a request to reset your SwipeMe password. Use the code below to reset your password.'
+      : 'There\'s one quick step you need to complete before creating your SwipeMe account. Let\'s make sure this is the right email address for you — please confirm this is the right address to use for your new account.';
+    const actionText = isPasswordReset 
+      ? 'Please enter this code to reset your password:'
+      : 'Please enter this verification code to get started on SwipeMe:';
+    
     const result = await client.emails.send({
       from: senderEmail,
       to: email,
-      subject: 'Confirm your email address',
+      subject,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
           <h1 style="color: #000000; font-size: 23px; font-weight: 700; margin: 0 0 24px 0; line-height: 1.3;">
-            Confirm your email address
+            ${heading}
           </h1>
           
           <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0 0 24px 0;">
-            There's one quick step you need to complete before creating your SwipeMe account. Let's make sure this is the right email address for you — please confirm this is the right address to use for your new account.
+            ${description}
           </p>
           
           <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0 0 16px 0;">
-            Please enter this verification code to get started on SwipeMe:
+            ${actionText}
           </p>
           
           <div style="background: #f7f9f9; border-radius: 4px; padding: 20px; text-align: center; margin: 0 0 24px 0;">
@@ -76,7 +86,7 @@ export async function sendVerificationEmail(email: string, code: string): Promis
           </div>
           
           <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0 0 24px 0;">
-            Verification codes expire after 10 minutes.
+            ${isPasswordReset ? 'If you didn\'t request this, you can safely ignore this email.' : ''} Verification codes expire after 10 minutes.
           </p>
           
           <p style="color: #536471; font-size: 15px; line-height: 1.5; margin: 0;">

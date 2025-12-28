@@ -13,7 +13,9 @@ import {
   walletCreateSchema,
   walletImportSchema,
   transferSchema,
-  signMessageSchema
+  signMessageSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { logFailedLogin, logSuccessfulLogin, log2FAAttempt, logWalletAction } from "./logger";
@@ -208,6 +210,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Login error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Password reset - request reset code
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    try {
+      const { email } = forgotPasswordSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(email);
+      
+      // Always return success to prevent email enumeration
+      if (!user) {
+        return res.json({ 
+          success: true, 
+          message: "If an account exists with this email, a reset code has been sent" 
+        });
+      }
+      
+      // Create verification code for password reset
+      const code = await storage.createVerificationCode(email, "password_reset");
+      
+      await sendVerificationEmail(email, code, "password_reset");
+      
+      res.json({ 
+        success: true, 
+        message: "If an account exists with this email, a reset code has been sent" 
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "Failed to send reset code" });
+    }
+  });
+
+  // Password reset - verify code and set new password
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { email, code, newPassword } = resetPasswordSchema.parse(req.body);
+      
+      // Verify the reset code
+      const isValid = await storage.verifyCode(email, code, "password_reset", true);
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid or expired reset code" });
+      }
+      
+      // Get user and update password
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Update the user's password
+      await storage.updateUserPassword(user.id, newPassword);
+      
+      res.json({ 
+        success: true, 
+        message: "Password reset successfully. You can now log in with your new password." 
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
     }
   });
 

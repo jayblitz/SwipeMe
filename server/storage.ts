@@ -76,6 +76,15 @@ export const storage = {
     return user;
   },
 
+  async updateUserPassword(id: string, newPassword: string): Promise<User | undefined> {
+    const hashedPassword = await hashPassword(newPassword);
+    const [user] = await db.update(users)
+      .set({ password: hashedPassword, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  },
+
   async createVerificationCode(email: string, type: string = "signup"): Promise<string> {
     const code = generateVerificationCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
