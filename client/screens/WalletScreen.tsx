@@ -246,18 +246,22 @@ interface SendToAddressModalProps {
 
 function SendToAddressModal({ visible, onClose, tokenBalances, userId, onSuccess, initialAddress }: SendToAddressModalProps) {
   const { theme } = useTheme();
-  const [recipientAddress, setRecipientAddress] = useState(initialAddress || "");
-
-  useEffect(() => {
-    if (initialAddress) {
-      setRecipientAddress(initialAddress);
-    }
-  }, [initialAddress]);
+  const [recipientAddress, setRecipientAddress] = useState("");
   const [amount, setAmount] = useState("");
   const [selectedTokenIndex, setSelectedTokenIndex] = useState(0);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txResult, setTxResult] = useState<{ txHash: string; explorer: string } | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setRecipientAddress(initialAddress || "");
+      setAmount("");
+      setSelectedTokenIndex(0);
+      setError(null);
+      setTxResult(null);
+    }
+  }, [visible, initialAddress]);
 
   const selectedToken = TEMPO_TOKENS[selectedTokenIndex];
   const selectedBalance = tokenBalances[selectedTokenIndex];
