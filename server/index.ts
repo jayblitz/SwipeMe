@@ -104,7 +104,8 @@ function setupRateLimiting(app: express.Application) {
     message: { error: "Too many verification code requests, please try again in an hour" },
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => req.body?.email || req.ip || "unknown",
+    keyGenerator: (req) => req.body?.email?.toLowerCase() || "anonymous",
+    validate: { xForwardedForHeader: false },
   });
 
   const verifyLimiter = rateLimit({
@@ -113,7 +114,8 @@ function setupRateLimiting(app: express.Application) {
     message: { error: "Too many verification attempts, please try again in 5 minutes" },
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => req.body?.email || req.ip || "unknown",
+    keyGenerator: (req) => req.body?.email?.toLowerCase() || "anonymous",
+    validate: { xForwardedForHeader: false },
   });
 
   app.use("/api/", globalLimiter);
