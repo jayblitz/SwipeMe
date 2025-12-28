@@ -36,7 +36,9 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const bytes = randomBytes(4);
+  const num = bytes.readUInt32BE(0) % 900000;
+  return (100000 + num).toString();
 }
 
 export const storage = {

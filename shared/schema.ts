@@ -119,11 +119,44 @@ export const verifyCodeSchema = z.object({
   code: z.string().length(6, "Code must be 6 digits"),
 });
 
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[0-9]/, "Password must contain at least one number")
+  .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character");
+
 export const setPasswordSchema = z.object({
   email: z.string().email(),
   code: z.string().length(6),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: passwordSchema,
 });
+
+export function validatePasswordStrength(password: string): { score: number; feedback: string[] } {
+  const feedback: string[] = [];
+  let score = 0;
+
+  if (password.length >= 8) score += 1;
+  else feedback.push("Use at least 8 characters");
+
+  if (password.length >= 12) score += 1;
+
+  if (/[A-Z]/.test(password)) score += 1;
+  else feedback.push("Add uppercase letter");
+
+  if (/[a-z]/.test(password)) score += 1;
+  else feedback.push("Add lowercase letter");
+
+  if (/[0-9]/.test(password)) score += 1;
+  else feedback.push("Add a number");
+
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  else feedback.push("Add special character");
+
+  if (password.length >= 16) score += 1;
+
+  return { score: Math.min(score, 5), feedback };
+}
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),

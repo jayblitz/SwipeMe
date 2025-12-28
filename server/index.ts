@@ -1,6 +1,8 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import session from "express-session";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
@@ -58,11 +60,77 @@ function setupCors(app: express.Application) {
   });
 }
 
+function setupSecurityHeaders(app: express.Application) {
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        connectSrc: ["'self'", "https:", "wss:"],
+        fontSrc: ["'self'", "https:", "data:"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }));
+}
+
+function setupRateLimiting(app: express.Application) {
+  const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: "Too many requests, please try again later" },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const authLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 5,
+    message: { error: "Too many authentication attempts, please try again in 5 minutes" },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+  });
+
+  const otpLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 3,
+    message: { error: "Too many verification code requests, please try again in an hour" },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.body?.email || req.ip || "unknown",
+  });
+
+  const verifyLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 5,
+    message: { error: "Too many verification attempts, please try again in 5 minutes" },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.body?.email || req.ip || "unknown",
+  });
+
+  app.use("/api/", globalLimiter);
+  app.use("/api/auth/login", authLimiter);
+  app.use("/api/auth/signup/start", otpLimiter);
+  app.use("/api/auth/signup/verify", verifyLimiter);
+  app.use("/api/auth/password/reset/start", otpLimiter);
+  app.use("/api/auth/2fa/verify", authLimiter);
+}
+
 function setupSession(app: express.Application) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error("SESSION_SECRET environment variable is required");
   }
+
+  const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_DEV_DOMAIN;
 
   app.use(
     session({
@@ -71,10 +139,10 @@ function setupSession(app: express.Application) {
       saveUninitialized: false,
       name: "swipeme.sid",
       cookie: {
-        secure: process.env.NODE_ENV === "production" || process.env.REPLIT_DEV_DOMAIN ? true : false,
+        secure: isProduction,
         httpOnly: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        sameSite: "none",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        sameSite: isProduction ? "none" : "lax",
       },
     })
   );
@@ -267,9 +335,11 @@ function setupErrorHandler(app: express.Application) {
 (async () => {
   app.set("trust proxy", 1);
   
+  setupSecurityHeaders(app);
   setupCors(app);
   setupSession(app);
   setupBodyParsing(app);
+  setupRateLimiting(app);
   setupRequestLogging(app);
 
   configureExpoAndLanding(app);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, Image, TextInput, Pressable, ActivityIndicator, Alert, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -42,6 +42,17 @@ export default function AuthScreen() {
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+
+    const timer = setTimeout(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -194,11 +205,72 @@ export default function AuthScreen() {
     }
   };
 
+  const getPasswordStrength = (pwd: string): { score: number; feedback: string[]; label: string; color: string } => {
+    const feedback: string[] = [];
+    let score = 0;
+
+    if (pwd.length >= 8) score += 1;
+    else feedback.push("8+ characters");
+
+    if (pwd.length >= 12) score += 1;
+
+    if (/[A-Z]/.test(pwd)) score += 1;
+    else feedback.push("uppercase");
+
+    if (/[a-z]/.test(pwd)) score += 1;
+    else feedback.push("lowercase");
+
+    if (/[0-9]/.test(pwd)) score += 1;
+    else feedback.push("number");
+
+    if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
+    else feedback.push("special char");
+
+    const finalScore = Math.min(score, 5);
+    let label = "Weak";
+    let color = Colors.light.error;
+
+    if (finalScore >= 5) {
+      label = "Strong";
+      color = "#22C55E";
+    } else if (finalScore >= 4) {
+      label = "Good";
+      color = "#84CC16";
+    } else if (finalScore >= 3) {
+      label = "Fair";
+      color = "#EAB308";
+    }
+
+    return { score: finalScore, feedback, label, color };
+  };
+
+  const passwordStrength = getPasswordStrength(password);
+
   const handleCompleteSignUp = async () => {
     setError("");
     
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
+      return;
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      setError("Password must contain an uppercase letter");
+      return;
+    }
+
+    if (!/[a-z]/.test(password)) {
+      setError("Password must contain a lowercase letter");
+      return;
+    }
+
+    if (!/[0-9]/.test(password)) {
+      setError("Password must contain a number");
+      return;
+    }
+
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      setError("Password must contain a special character");
       return;
     }
     
@@ -215,11 +287,17 @@ export default function AuthScreen() {
   };
 
   const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
+    
     setError("");
     try {
       await startSignUp(email.trim());
+      setResendCooldown(60);
       Alert.alert("Code Sent", "A new verification code has been sent to your email");
     } catch (err: any) {
+      if (err.message?.includes("Too many")) {
+        setResendCooldown(300);
+      }
       setError(err.message || "Failed to resend code");
     }
   };
@@ -524,8 +602,14 @@ export default function AuthScreen() {
           {isLoading ? <ActivityIndicator color="#FFFFFF" /> : "Verify"}
         </Button>
 
-        <Pressable onPress={handleResendCode} disabled={isLoading} style={styles.resendButton}>
-          <ThemedText style={{ color: Colors.light.primary }}>Resend code</ThemedText>
+        <Pressable 
+          onPress={handleResendCode} 
+          disabled={isLoading || resendCooldown > 0} 
+          style={styles.resendButton}
+        >
+          <ThemedText style={{ color: resendCooldown > 0 ? theme.textSecondary : Colors.light.primary }}>
+            {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Resend code"}
+          </ThemedText>
         </Pressable>
       </View>
     </>
@@ -558,6 +642,34 @@ export default function AuthScreen() {
             <Feather name={showPassword ? "eye-off" : "eye"} size={20} color={theme.textSecondary} />
           </Pressable>
         </View>
+
+        {password.length > 0 ? (
+          <View style={styles.strengthContainer}>
+            <View style={styles.strengthBarContainer}>
+              {[1, 2, 3, 4, 5].map((level) => (
+                <View
+                  key={level}
+                  style={[
+                    styles.strengthBar,
+                    {
+                      backgroundColor: passwordStrength.score >= level ? passwordStrength.color : theme.border,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+            <View style={styles.strengthInfo}>
+              <ThemedText style={[styles.strengthLabel, { color: passwordStrength.color }]}>
+                {passwordStrength.label}
+              </ThemedText>
+              {passwordStrength.feedback.length > 0 ? (
+                <ThemedText style={[styles.strengthHint, { color: theme.textSecondary }]}>
+                  Add: {passwordStrength.feedback.join(", ")}
+                </ThemedText>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         <View style={[styles.inputContainer, { backgroundColor: theme.backgroundDefault, borderColor: error ? Colors.light.error : theme.border }]}>
           <Feather name="lock" size={20} color={theme.textSecondary} style={styles.inputIcon} />
@@ -778,5 +890,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     marginTop: Spacing.xl,
+  },
+  strengthContainer: {
+    marginTop: -Spacing.xs,
+  },
+  strengthBarContainer: {
+    flexDirection: "row",
+    gap: 4,
+    marginBottom: Spacing.xs,
+  },
+  strengthBar: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  strengthInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  strengthLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  strengthHint: {
+    fontSize: 11,
+    flex: 1,
+    textAlign: "right",
   },
 });
