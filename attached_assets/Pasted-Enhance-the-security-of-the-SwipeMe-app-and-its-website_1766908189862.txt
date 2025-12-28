@@ -1,0 +1,34 @@
+Enhance the security of the SwipeMe app and its website (swipeme.org) in my Replit project. The app uses Expo/React Native for the client, Express/Node.js for the server, and Drizzle ORM for the database. Focus on the following areas: user authentication and system security, password checks, rate limiting, and email verification with OTP generation. Make changes step-by-step, preserving existing functionality, and ensure all updates are production-ready with best practices.
+
+1. **User Authentication and System Security**:
+   - Strengthen session management in server/index.ts: Use secure cookies (httpOnly, secure, sameSite: 'strict') and increase session secret complexity if needed.
+   - Add JWT as an alternative for API auth if sessions are insufficient—implement in auth routes.
+   - Ensure all sensitive routes (e.g., /api/wallet, /api/user) use requireAuth middleware and input validation with Zod.
+   - For the website (if static, assume hosted separately): Add Content Security Policy (CSP) headers if dynamic, or note to enable HTTPS via hosting provider.
+
+2. **Password Check**:
+   - In signup/complete route (server/auth.ts or similar): Add password strength validation (min 8 chars, uppercase, lowercase, number, special char) using a library like zxcvbn if not present (install if needed, but check deps).
+   - Use bcrypt for hashing (already in Node crypto? Confirm and implement if missing) with salt rounds >=12.
+   - On client (AuthScreen.tsx): Add real-time password strength meter UI with feedback.
+
+3. **Rate Limiting**:
+   - Install express-rate-limit if not present (add to package.json and npm install).
+   - In server/index.ts: Apply global rate limiter (e.g., 100 requests/15min per IP) and stricter on auth routes (e.g., 5 attempts/5min for login to prevent brute-force).
+   - Handle limit exceeded with 429 response and error message.
+
+4. **Email Verification and OTP Generation**:
+   - In verification_codes table (shared/schema.ts): Ensure OTPs expire (already has expiresAt? Enforce 10min).
+   - Enhance OTP generation: Use crypto.randomBytes for secure 6-digit codes.
+   - In signup/start route: Rate limit OTP sends (e.g., 3/hour per email).
+   - Add resend OTP button on client with cooldown timer.
+   - Verify OTP on server with anti-brute-force (e.g., max 3 wrong attempts).
+
+5. **General Security Audit**:
+   - Scan for vulnerabilities: Run npm audit and suggest fixes.
+   - Add helmet middleware for HTTP headers in Express.
+   - Ensure all env vars (e.g., DATABASE_URL, session secret) are .env protected (add .gitignore if missing).
+   - For app: Add secure storage for wallets (expo-secure-store already there—confirm usage).
+
+6. **Testing and Output**:
+   - Test changes: Run the app, simulate attacks (e.g., rapid logins), and verify no breaks.
+   - Output a summary of changes, updated files, and any new deps installed.
