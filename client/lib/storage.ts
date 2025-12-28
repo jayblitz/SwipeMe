@@ -386,7 +386,7 @@ export async function sendPayment(
     
     const chatIndex = chats.findIndex(c => c.id === chatId);
     if (chatIndex !== -1) {
-      chats[chatIndex].lastMessage = `Payment sent - $${amount.toFixed(2)}`;
+      chats[chatIndex].lastMessage = `Swiped $${amount.toFixed(2)}`;
       chats[chatIndex].lastMessageTime = now;
       await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
     }
@@ -700,7 +700,7 @@ function getMessagePreview(message: Message): string {
     case "audio":
       return "Sent a voice message";
     case "payment":
-      return `Payment sent - $${message.paymentAmount?.toFixed(2) || "0.00"}`;
+      return `Swiped $${message.paymentAmount?.toFixed(2) || "0.00"}`;
     default:
       return message.content || "";
   }

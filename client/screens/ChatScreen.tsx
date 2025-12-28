@@ -392,7 +392,7 @@ function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
             color="#FFFFFF"
           />
           <ThemedText style={[styles.paymentLabel, { color: "rgba(255,255,255,0.9)" }]}>
-            {isOwnMessage ? "You sent" : "You received"}
+            {isOwnMessage ? "You swiped" : "Swiped you"}
           </ThemedText>
         </View>
         <ThemedText style={[styles.paymentAmount, { color: "#FFFFFF" }]}>
@@ -1151,12 +1151,13 @@ export default function ChatScreen() {
       }
       
       // Record the payment in chat and transaction history
+      const recipientName = participant.name || "Contact";
       const { message } = await sendPayment(
         chatId,
         amount,
         `${memo || "Payment"} (${selectedToken.symbol})`,
         participant.id,
-        participant.name,
+        recipientName,
         participant.avatarId,
         txData.txHash,
         txData.explorer
@@ -1174,8 +1175,8 @@ export default function ChatScreen() {
       
       setTimeout(() => {
         Alert.alert(
-          "Success",
-          "Payment sent successfully!",
+          "Swiped!",
+          `You just swiped ${recipientName} $${amount.toFixed(2)} ${selectedToken.symbol}`,
           [
             { text: "OK", style: "cancel" },
             { 

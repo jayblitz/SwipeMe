@@ -372,7 +372,7 @@ function SendToAddressModal({ visible, onClose, tokenBalances, userId, onSuccess
               <View style={[styles.successIcon, { backgroundColor: theme.success + "20" }]}>
                 <Feather name="check-circle" size={48} color={theme.success} />
               </View>
-              <ThemedText type="h4" style={styles.successTitle}>Transfer Sent</ThemedText>
+              <ThemedText type="h4" style={styles.successTitle}>Swiped!</ThemedText>
               <ThemedText style={[styles.successAmount, { color: theme.textSecondary }]}>
                 {amount} {selectedToken.symbol}
               </ThemedText>

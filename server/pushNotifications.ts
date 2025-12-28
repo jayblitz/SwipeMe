@@ -95,8 +95,8 @@ export async function sendPaymentNotification(
   currency: string,
   txHash?: string
 ): Promise<boolean> {
-  const title = "Payment Received";
-  const body = `${senderName} sent you $${amount} ${currency}`;
+  const title = "You just got swiped!";
+  const body = `${senderName} swiped you $${amount} ${currency}`;
 
   return sendPushNotification(
     pushToken,
