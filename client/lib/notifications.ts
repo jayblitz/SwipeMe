@@ -87,6 +87,40 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
+export async function registerAndSavePushToken(userId: string): Promise<string | null> {
+  if (!userId) {
+    console.log("Cannot register push token: no user ID");
+    return null;
+  }
+  
+  try {
+    const token = await registerForPushNotifications();
+    if (!token) {
+      console.log("Push notification registration returned no token (permission denied or unsupported)");
+      return null;
+    }
+    
+    const { getApiUrl } = await import("@/lib/query-client");
+    const response = await fetch(new URL(`/api/users/${userId}/push-token`, getApiUrl()).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ pushToken: token }),
+    });
+    
+    if (!response.ok) {
+      console.error("Failed to save push token to server:", await response.text());
+    } else {
+      console.log("Push token registered with server");
+    }
+    
+    return token;
+  } catch (error) {
+    console.error("Error registering push token:", error);
+    return null;
+  }
+}
+
 export async function getSavedPushToken(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(PUSH_TOKEN_KEY);

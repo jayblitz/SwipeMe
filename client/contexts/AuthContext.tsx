@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { registerAndSavePushToken } from "@/lib/notifications";
 
 export interface User {
   id: string;
@@ -53,9 +54,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
+  const pushRegisteredRef = useRef(false);
+
   useEffect(() => {
     loadStoredAuth();
   }, []);
+
+  useEffect(() => {
+    if (user && !pushRegisteredRef.current) {
+      pushRegisteredRef.current = true;
+      registerAndSavePushToken(user.id).catch(err => 
+        console.error("Failed to register push token:", err)
+      );
+    }
+    if (!user) {
+      pushRegisteredRef.current = false;
+    }
+  }, [user]);
 
   const loadStoredAuth = async () => {
     try {

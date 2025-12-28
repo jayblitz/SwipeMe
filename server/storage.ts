@@ -134,6 +134,13 @@ export const storage = {
     return wallet;
   },
 
+  async getWalletByAddress(address: string): Promise<Wallet | undefined> {
+    const [wallet] = await db.select().from(wallets).where(eq(wallets.address, address.toLowerCase()));
+    if (wallet) return wallet;
+    const [checksumWallet] = await db.select().from(wallets).where(eq(wallets.address, address));
+    return checksumWallet;
+  },
+
   async createWallet(userId: string, address: string, encryptedPrivateKey?: string, encryptedSeedPhrase?: string, isImported: boolean = false): Promise<Wallet> {
     const [wallet] = await db.insert(wallets).values({
       userId,

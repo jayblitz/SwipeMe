@@ -36,6 +36,7 @@ import {
   signMessage,
   type TransferParams
 } from "./wallet";
+import { sendPaymentNotification } from "./pushNotifications";
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -474,6 +475,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/users/:userId/push-token", requireSameUser, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { pushToken } = req.body;
+      
+      if (!pushToken || typeof pushToken !== "string") {
+        return res.status(400).json({ error: "Push token is required" });
+      }
+      
+      await storage.updateUser(userId, { pushToken });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Save push token error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/contacts/invite", requireAuth, async (req: Request, res: Response) => {
     try {
       const { email, name } = req.body;
@@ -821,10 +840,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       logWalletAction("TRANSFER", userId, true, `To: ${toAddress.slice(0, 10)}... Amount: ${amount}`);
       
+      const explorerUrl = `${tempoTestnet.blockExplorers?.default.url || "https://explorer.testnet.tempo.xyz"}/tx/${txHash}`;
+      
+      const recipientWallet = await storage.getWalletByAddress(toAddress);
+      if (recipientWallet) {
+        const recipient = await storage.getUserById(recipientWallet.userId);
+        if (recipient?.pushToken) {
+          const sender = await storage.getUserById(userId);
+          const senderName = sender?.displayName || sender?.email?.split("@")[0] || "Someone";
+          sendPaymentNotification(
+            recipient.pushToken,
+            senderName,
+            amount,
+            "USD",
+            txHash
+          ).catch(err => console.error("Push notification error:", err));
+        }
+      }
+      
       res.json({
         success: true,
         txHash,
-        explorer: `${tempoTestnet.blockExplorers?.default.url || "https://explorer.testnet.tempo.xyz"}/tx/${txHash}`,
+        explorer: explorerUrl,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {

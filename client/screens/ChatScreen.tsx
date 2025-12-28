@@ -11,6 +11,7 @@ import * as Contacts from "expo-contacts";
 import * as DocumentPicker from "expo-document-picker";
 import { useAudioRecorder, AudioModule, RecordingPresets, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
@@ -26,6 +27,7 @@ import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 import { useXMTP } from "@/contexts/XMTPContext";
 import { findOrCreateDm, sendXMTPMessage, getMessages as getXMTPMessages, streamMessages, type XMTPConversation } from "@/lib/xmtp";
+import { PaymentCelebration } from "@/components/PaymentCelebration";
 
 interface AttachmentOption {
   id: string;
@@ -353,56 +355,75 @@ const IMAGE_MAX_WIDTH = screenWidth * 0.65;
 function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
   const { theme } = useTheme();
   
+  const handleExplorerPress = async () => {
+    if (!message.paymentExplorerUrl) return;
+    try {
+      const canOpen = await Linking.canOpenURL(message.paymentExplorerUrl);
+      if (canOpen) {
+        await Linking.openURL(message.paymentExplorerUrl);
+      } else {
+        Alert.alert("Unable to open link", "Could not open the transaction explorer.");
+      }
+    } catch (error) {
+      console.error("Failed to open explorer URL:", error);
+      Alert.alert("Error", "Failed to open the transaction link.");
+    }
+  };
+  
   if (message.type === "payment") {
+    const gradientColors: readonly [string, string, string] = isOwnMessage 
+      ? ["#6366F1", "#8B5CF6", "#A855F7"]
+      : ["#10B981", "#34D399", "#6EE7B7"];
+    
     return (
-      <View style={[
-        styles.paymentBubble,
-        { 
-          backgroundColor: isOwnMessage ? theme.primary : theme.backgroundSecondary,
-          alignSelf: isOwnMessage ? "flex-end" : "flex-start",
-        }
-      ]}>
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          styles.paymentBubble,
+          { alignSelf: isOwnMessage ? "flex-end" : "flex-start" }
+        ]}
+      >
         <View style={styles.paymentHeader}>
           <Feather 
             name={isOwnMessage ? "arrow-up-right" : "arrow-down-left"} 
             size={16} 
-            color={isOwnMessage ? "#FFFFFF" : theme.primary} 
+            color="#FFFFFF"
           />
-          <ThemedText style={[
-            styles.paymentLabel,
-            { color: isOwnMessage ? "rgba(255,255,255,0.8)" : theme.textSecondary }
-          ]}>
-            {isOwnMessage ? "You sent" : "Received"}
+          <ThemedText style={[styles.paymentLabel, { color: "rgba(255,255,255,0.9)" }]}>
+            {isOwnMessage ? "You sent" : "You received"}
           </ThemedText>
         </View>
-        <ThemedText style={[
-          styles.paymentAmount,
-          { color: isOwnMessage ? "#FFFFFF" : theme.text }
-        ]}>
+        <ThemedText style={[styles.paymentAmount, { color: "#FFFFFF" }]}>
           ${message.paymentAmount?.toFixed(2)}
         </ThemedText>
         {message.paymentMemo ? (
-          <ThemedText style={[
-            styles.paymentMemo,
-            { color: isOwnMessage ? "rgba(255,255,255,0.8)" : theme.textSecondary }
-          ]}>
+          <ThemedText style={[styles.paymentMemo, { color: "rgba(255,255,255,0.85)" }]}>
             {message.paymentMemo}
           </ThemedText>
         ) : null}
-        <View style={styles.paymentStatus}>
-          <Feather 
-            name="check-circle" 
-            size={12} 
-            color={isOwnMessage ? "rgba(255,255,255,0.7)" : theme.success} 
-          />
-          <ThemedText style={[
-            styles.paymentStatusText,
-            { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.success }
-          ]}>
-            {message.paymentStatus === "completed" ? "Completed" : "Pending"}
-          </ThemedText>
+        <View style={styles.paymentFooter}>
+          <View style={styles.paymentStatus}>
+            <Feather 
+              name="check-circle" 
+              size={12} 
+              color="rgba(255,255,255,0.85)"
+            />
+            <ThemedText style={[styles.paymentStatusText, { color: "rgba(255,255,255,0.85)" }]}>
+              {message.paymentStatus === "completed" ? "Completed" : "Pending"}
+            </ThemedText>
+          </View>
+          {message.paymentExplorerUrl ? (
+            <Pressable onPress={handleExplorerPress} style={styles.explorerLink}>
+              <Feather name="external-link" size={12} color="rgba(255,255,255,0.85)" />
+              <ThemedText style={[styles.explorerLinkText, { color: "rgba(255,255,255,0.85)" }]}>
+                View
+              </ThemedText>
+            </Pressable>
+          ) : null}
         </View>
-      </View>
+      </LinearGradient>
     );
   }
 
@@ -884,6 +905,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [showPayment, setShowPayment] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [showAttachments, setShowAttachments] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
@@ -1267,7 +1289,8 @@ export default function ChatScreen() {
         participant.id,
         participant.name,
         participant.avatarId,
-        txData.txHash
+        txData.txHash,
+        txData.explorer
       );
       setMessages(prev => [message, ...prev]);
       
@@ -1278,17 +1301,21 @@ export default function ChatScreen() {
       }
       
       setShowPayment(false);
-      Alert.alert(
-        "Success",
-        "Payment sent successfully!",
-        [
-          { text: "OK", style: "cancel" },
-          { 
-            text: "View on Explorer", 
-            onPress: () => Linking.openURL(txData.explorer) 
-          },
-        ]
-      );
+      setShowCelebration(true);
+      
+      setTimeout(() => {
+        Alert.alert(
+          "Success",
+          "Payment sent successfully!",
+          [
+            { text: "OK", style: "cancel" },
+            { 
+              text: "View on Explorer", 
+              onPress: () => Linking.openURL(txData.explorer) 
+            },
+          ]
+        );
+      }, 500);
     } catch (error) {
       console.error("Payment error:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to send payment";
@@ -1727,6 +1754,11 @@ export default function ChatScreen() {
         />
       ) : null}
 
+      <PaymentCelebration
+        visible={showCelebration}
+        onComplete={() => setShowCelebration(false)}
+      />
+
       <AttachmentsModal
         visible={showAttachments}
         onClose={() => setShowAttachments(false)}
@@ -2057,10 +2089,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: Spacing.sm,
   },
   paymentStatusText: {
     fontSize: 12,
+  },
+  paymentFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: Spacing.sm,
+  },
+  explorerLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 12,
+  },
+  explorerLinkText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   inputContainer: {
     flexDirection: "row",

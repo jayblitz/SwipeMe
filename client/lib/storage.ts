@@ -71,6 +71,8 @@ export interface Message {
   paymentAmount?: number;
   paymentMemo?: string;
   paymentStatus?: "pending" | "completed" | "failed";
+  paymentTxHash?: string;
+  paymentExplorerUrl?: string;
   imageAttachment?: ImageAttachment;
   locationAttachment?: LocationAttachment;
   contactAttachment?: ContactAttachment;
@@ -310,7 +312,8 @@ export async function sendPayment(
   recipientId: string,
   recipientName: string,
   recipientAvatarId: string,
-  txHash?: string
+  txHash?: string,
+  explorerUrl?: string
 ): Promise<{ message: Message; transaction: Transaction }> {
   // Get chat timer for disappearing messages
   const chats = await getChats();
@@ -328,6 +331,8 @@ export async function sendPayment(
     paymentAmount: amount,
     paymentMemo: memo,
     paymentStatus: "completed",
+    paymentTxHash: txHash,
+    paymentExplorerUrl: explorerUrl,
     expiresAt: timer ? now + getTimerDuration(timer) : undefined,
   };
   
