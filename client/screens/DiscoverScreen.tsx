@@ -423,6 +423,154 @@ function NewContactModal({ visible, onClose, onStartChat }: NewContactModalProps
   );
 }
 
+interface NewGroupModalProps {
+  visible: boolean;
+  onClose: () => void;
+  contacts: Contact[];
+  onCreateGroup: (name: string, selectedContacts: Contact[]) => void;
+}
+
+function NewGroupModal({ visible, onClose, contacts, onCreateGroup }: NewGroupModalProps) {
+  const { theme } = useTheme();
+  const [groupName, setGroupName] = useState("");
+  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const resetForm = () => {
+    setGroupName("");
+    setSelectedContacts(new Set());
+    setSearchQuery("");
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const toggleContact = (contactId: string) => {
+    const newSelected = new Set(selectedContacts);
+    if (newSelected.has(contactId)) {
+      newSelected.delete(contactId);
+    } else if (newSelected.size < 10) {
+      newSelected.add(contactId);
+    } else {
+      Alert.alert("Limit Reached", "You can only add up to 10 people in a group.");
+    }
+    setSelectedContacts(newSelected);
+  };
+
+  const handleCreate = () => {
+    if (selectedContacts.size === 0) {
+      Alert.alert("Select Contacts", "Please select at least one contact to create a group.");
+      return;
+    }
+    const selected = contacts.filter(c => selectedContacts.has(c.id));
+    onCreateGroup(groupName.trim() || `Group (${selected.length + 1})`, selected);
+    handleClose();
+  };
+
+  const filteredContacts = contacts.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View style={[styles.newGroupModalContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={handleClose} style={styles.closeButton}>
+              <ThemedText style={{ color: theme.primary }}>Cancel</ThemedText>
+            </Pressable>
+            <ThemedText type="h4">New Group</ThemedText>
+            <Pressable 
+              onPress={handleCreate} 
+              style={styles.createButton}
+              disabled={selectedContacts.size === 0}
+            >
+              <ThemedText style={{ color: selectedContacts.size > 0 ? theme.primary : theme.textSecondary }}>
+                Create
+              </ThemedText>
+            </Pressable>
+          </View>
+
+          <View style={[styles.groupNameContainer, { backgroundColor: theme.backgroundDefault }]}>
+            <TextInput
+              style={[styles.groupNameInput, { color: theme.text }]}
+              placeholder="Group Name (optional)"
+              placeholderTextColor={theme.textSecondary}
+              value={groupName}
+              onChangeText={setGroupName}
+            />
+          </View>
+
+          <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+            Select Contacts ({selectedContacts.size}/10)
+          </ThemedText>
+
+          <View style={[styles.searchContainer, { marginHorizontal: Spacing.lg }]}>
+            <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
+              <Feather name="search" size={18} color={theme.textSecondary} />
+              <TextInput
+                style={[styles.searchInput, { color: theme.text }]}
+                placeholder="Search contacts..."
+                placeholderTextColor={theme.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
+
+          {filteredContacts.length === 0 ? (
+            <View style={styles.emptyGroupContacts}>
+              <Feather name="users" size={48} color={theme.textSecondary} />
+              <ThemedText style={[styles.emptyTitle, { color: theme.textSecondary }]}>
+                No contacts available
+              </ThemedText>
+              <ThemedText style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                Your contacts on SwipeMe will appear here
+              </ThemedText>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredContacts}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: Spacing.xl }}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => toggleContact(item.id)}
+                  style={({ pressed }) => [
+                    styles.groupContactItem,
+                    { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
+                  ]}
+                >
+                  <Avatar avatarId={item.avatarId} size={44} />
+                  <View style={styles.groupContactContent}>
+                    <ThemedText style={styles.groupContactName}>{item.name}</ThemedText>
+                  </View>
+                  <View style={[
+                    styles.checkbox,
+                    { 
+                      borderColor: selectedContacts.has(item.id) ? theme.primary : theme.border,
+                      backgroundColor: selectedContacts.has(item.id) ? theme.primary : "transparent",
+                    }
+                  ]}>
+                    {selectedContacts.has(item.id) ? (
+                      <Feather name="check" size={14} color="#FFFFFF" />
+                    ) : null}
+                  </View>
+                </Pressable>
+              )}
+            />
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 interface DeviceContact {
   id: string;
   name: string;
@@ -443,6 +591,7 @@ export default function DiscoverScreen() {
   const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showNewContact, setShowNewContact] = useState(false);
+  const [showNewGroup, setShowNewGroup] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<Contacts.PermissionStatus | null>(null);
 
   const checkPermission = useCallback(async () => {
@@ -599,7 +748,14 @@ export default function DiscoverScreen() {
   };
 
   const handleNewGroup = () => {
-    Alert.alert("New Group", "Create a group chat with up to 10 people.");
+    setShowNewGroup(true);
+  };
+
+  const handleCreateGroup = async (groupName: string, selectedContacts: Contact[]) => {
+    Alert.alert(
+      "Group Created",
+      `Group "${groupName}" created with ${selectedContacts.length} member(s).`
+    );
   };
 
   const handlePayAnyone = () => {
@@ -645,6 +801,12 @@ export default function DiscoverScreen() {
           onClose={() => setShowNewContact(false)}
           onStartChat={handleStartChatWithUser}
         />
+        <NewGroupModal
+          visible={showNewGroup}
+          onClose={() => setShowNewGroup(false)}
+          contacts={contacts}
+          onCreateGroup={handleCreateGroup}
+        />
         <Pressable
           onPress={() => setShowMenu(true)}
           style={[styles.fab, { bottom: tabBarHeight + Spacing.lg }]}
@@ -671,6 +833,12 @@ export default function DiscoverScreen() {
           visible={showNewContact}
           onClose={() => setShowNewContact(false)}
           onStartChat={handleStartChatWithUser}
+        />
+        <NewGroupModal
+          visible={showNewGroup}
+          onClose={() => setShowNewGroup(false)}
+          contacts={contacts}
+          onCreateGroup={handleCreateGroup}
         />
         <Pressable
           onPress={() => setShowMenu(true)}
@@ -749,6 +917,13 @@ export default function DiscoverScreen() {
         visible={showNewContact}
         onClose={() => setShowNewContact(false)}
         onStartChat={handleStartChatWithUser}
+      />
+
+      <NewGroupModal
+        visible={showNewGroup}
+        onClose={() => setShowNewGroup(false)}
+        contacts={contacts}
+        onCreateGroup={handleCreateGroup}
       />
       
       <Pressable
@@ -997,5 +1172,66 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 14,
     flex: 1,
+  },
+  newGroupModalContainer: {
+    flex: 1,
+    paddingTop: Spacing.md,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  createButton: {
+    padding: Spacing.xs,
+  },
+  groupNameContainer: {
+    marginHorizontal: Spacing.lg,
+    marginVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  groupNameInput: {
+    height: 48,
+    fontSize: 16,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  emptyGroupContacts: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  groupContactItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+  },
+  groupContactContent: {
+    flex: 1,
+    marginLeft: Spacing.md,
+  },
+  groupContactName: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

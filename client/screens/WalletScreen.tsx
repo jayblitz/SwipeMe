@@ -5,6 +5,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from "expo-camera";
 
 const TEMPO_FAUCET_URL = "https://docs.tempo.xyz/quickstart/faucet?tab=Fund+an+address#faucet";
 import { ThemedText } from "@/components/ThemedText";
@@ -240,11 +241,18 @@ interface SendToAddressModalProps {
   tokenBalances: TokenBalance[];
   userId: string;
   onSuccess: () => void;
+  initialAddress?: string | null;
 }
 
-function SendToAddressModal({ visible, onClose, tokenBalances, userId, onSuccess }: SendToAddressModalProps) {
+function SendToAddressModal({ visible, onClose, tokenBalances, userId, onSuccess, initialAddress }: SendToAddressModalProps) {
   const { theme } = useTheme();
-  const [recipientAddress, setRecipientAddress] = useState("");
+  const [recipientAddress, setRecipientAddress] = useState(initialAddress || "");
+
+  useEffect(() => {
+    if (initialAddress) {
+      setRecipientAddress(initialAddress);
+    }
+  }, [initialAddress]);
   const [amount, setAmount] = useState("");
   const [selectedTokenIndex, setSelectedTokenIndex] = useState(0);
   const [isSending, setIsSending] = useState(false);
@@ -492,6 +500,161 @@ function SendToAddressModal({ visible, onClose, tokenBalances, userId, onSuccess
   );
 }
 
+interface QRScannerModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onScan: (address: string) => void;
+}
+
+function QRScannerModal({ visible, onClose, onScan }: QRScannerModalProps) {
+  const { theme } = useTheme();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+
+  const handleBarCodeScanned = (result: BarcodeScanningResult) => {
+    if (scanned) return;
+    
+    const { data } = result;
+    let address = data;
+    
+    if (data.startsWith("ethereum:")) {
+      address = data.replace("ethereum:", "").split("@")[0].split("?")[0];
+    }
+    
+    if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      setScanned(true);
+      onScan(address);
+      onClose();
+    } else {
+      Alert.alert("Invalid QR Code", "This QR code does not contain a valid wallet address.");
+    }
+  };
+
+  const handleClose = () => {
+    setScanned(false);
+    onClose();
+  };
+
+  const renderContent = () => {
+    if (Platform.OS === "web") {
+      return (
+        <View style={styles.qrScannerPlaceholder}>
+          <View style={[styles.qrScannerIcon, { backgroundColor: theme.backgroundSecondary }]}>
+            <Feather name="camera-off" size={48} color={theme.textSecondary} />
+          </View>
+          <ThemedText type="h4" style={{ marginBottom: Spacing.sm, textAlign: "center" }}>
+            Camera Not Available
+          </ThemedText>
+          <ThemedText style={[styles.qrScannerText, { color: theme.textSecondary }]}>
+            Run this app in Expo Go on your mobile device to scan QR codes.
+          </ThemedText>
+          <Pressable
+            onPress={handleClose}
+            style={[styles.qrScannerButton, { backgroundColor: theme.backgroundSecondary }]}
+          >
+            <ThemedText style={{ color: theme.text }}>Close</ThemedText>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (!permission) {
+      return (
+        <View style={styles.qrScannerPlaceholder}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      );
+    }
+
+    if (!permission.granted) {
+      return (
+        <View style={styles.qrScannerPlaceholder}>
+          <View style={[styles.qrScannerIcon, { backgroundColor: theme.backgroundSecondary }]}>
+            <Feather name="camera" size={48} color={theme.textSecondary} />
+          </View>
+          <ThemedText type="h4" style={{ marginBottom: Spacing.sm, textAlign: "center" }}>
+            Camera Access Required
+          </ThemedText>
+          <ThemedText style={[styles.qrScannerText, { color: theme.textSecondary }]}>
+            We need camera access to scan wallet QR codes for payments.
+          </ThemedText>
+          {permission.status === "denied" && !permission.canAskAgain ? (
+            <Pressable
+              onPress={async () => {
+                try {
+                  await Linking.openSettings();
+                } catch {
+                  Alert.alert("Unable to Open Settings", "Please enable camera permission in your device settings.");
+                }
+              }}
+              style={[styles.qrScannerButton, { backgroundColor: theme.primary }]}
+            >
+              <ThemedText style={{ color: "#FFFFFF" }}>Open Settings</ThemedText>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={requestPermission}
+              style={[styles.qrScannerButton, { backgroundColor: theme.primary }]}
+            >
+              <ThemedText style={{ color: "#FFFFFF" }}>Enable Camera</ThemedText>
+            </Pressable>
+          )}
+          <Pressable
+            onPress={handleClose}
+            style={[styles.qrScannerButton, { backgroundColor: theme.backgroundSecondary, marginTop: Spacing.sm }]}
+          >
+            <ThemedText style={{ color: theme.text }}>Cancel</ThemedText>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.qrScannerContainer}>
+        <CameraView
+          style={StyleSheet.absoluteFillObject}
+          facing="back"
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr"],
+          }}
+          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        />
+        <View style={styles.qrScannerOverlay}>
+          <View style={[styles.qrScannerCorner, styles.qrScannerCornerTopLeft, { borderColor: theme.primary }]} />
+          <View style={[styles.qrScannerCorner, styles.qrScannerCornerTopRight, { borderColor: theme.primary }]} />
+          <View style={[styles.qrScannerCorner, styles.qrScannerCornerBottomLeft, { borderColor: theme.primary }]} />
+          <View style={[styles.qrScannerCorner, styles.qrScannerCornerBottomRight, { borderColor: theme.primary }]} />
+        </View>
+        <View style={styles.qrScannerHint}>
+          <ThemedText style={styles.qrScannerHintText}>
+            Point camera at a wallet QR code
+          </ThemedText>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <View style={[styles.qrScannerModal, { backgroundColor: theme.backgroundDefault }]}>
+        <View style={[styles.qrScannerHeader, { borderBottomColor: theme.border }]}>
+          <Pressable onPress={handleClose} style={styles.qrScannerCloseButton}>
+            <Feather name="x" size={24} color={theme.text} />
+          </Pressable>
+          <ThemedText type="h4">Scan QR Code</ThemedText>
+          <View style={{ width: 44 }} />
+        </View>
+        {renderContent()}
+      </View>
+    </Modal>
+  );
+}
+
 function TransactionHistoryEmpty() {
   const { theme } = useTheme();
 
@@ -528,6 +691,8 @@ export default function WalletScreen() {
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [showSendAddressModal, setShowSendAddressModal] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [scannedAddress, setScannedAddress] = useState<string | null>(null);
 
   const loadBalances = useCallback(async (walletAddress: string) => {
     if (!walletAddress) return;
@@ -581,7 +746,14 @@ export default function WalletScreen() {
   };
 
   const handleScanQR = () => {
-    Alert.alert("Scan QR Code", "QR scanner coming soon. For now, use the enter address option.");
+    setShowSendModal(false);
+    setShowQRScanner(true);
+  };
+
+  const handleQRScan = (address: string) => {
+    setScannedAddress(address);
+    setShowQRScanner(false);
+    setShowSendAddressModal(true);
   };
 
   const handleEnterAddress = () => {
@@ -892,10 +1064,20 @@ export default function WalletScreen() {
 
       <SendToAddressModal
         visible={showSendAddressModal}
-        onClose={() => setShowSendAddressModal(false)}
+        onClose={() => {
+          setShowSendAddressModal(false);
+          setScannedAddress(null);
+        }}
         tokenBalances={tokenBalances}
         userId={user?.id || ""}
         onSuccess={handleTransferSuccess}
+        initialAddress={scannedAddress}
+      />
+
+      <QRScannerModal
+        visible={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onScan={handleQRScan}
       />
     </ThemedView>
   );
@@ -1426,5 +1608,107 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  qrScannerModal: {
+    flex: 1,
+  },
+  qrScannerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  qrScannerCloseButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrScannerContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  qrScannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrScannerCorner: {
+    position: "absolute",
+    width: 60,
+    height: 60,
+    borderWidth: 3,
+  },
+  qrScannerCornerTopLeft: {
+    top: "25%",
+    left: "15%",
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 12,
+  },
+  qrScannerCornerTopRight: {
+    top: "25%",
+    right: "15%",
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+    borderTopRightRadius: 12,
+  },
+  qrScannerCornerBottomLeft: {
+    bottom: "25%",
+    left: "15%",
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 12,
+  },
+  qrScannerCornerBottomRight: {
+    bottom: "25%",
+    right: "15%",
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderBottomRightRadius: 12,
+  },
+  qrScannerHint: {
+    position: "absolute",
+    bottom: "15%",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  qrScannerHintText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "500",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    overflow: "hidden",
+  },
+  qrScannerPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  qrScannerIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  qrScannerText: {
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: Spacing.lg,
+    lineHeight: 22,
+  },
+  qrScannerButton: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.button,
   },
 });

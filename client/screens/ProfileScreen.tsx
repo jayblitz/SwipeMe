@@ -9,6 +9,8 @@ import { Feather } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
+import Constants from "expo-constants";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
@@ -168,27 +170,41 @@ function EditProfileModal({ visible, onClose, onSave, initialData }: Omit<EditPr
 
     if (!result.canceled && result.assets[0]) {
       try {
-        const base64 = await FileSystem.readAsStringAsync(result.assets[0].uri, {
-          encoding: "base64",
-        });
+        const asset = result.assets[0];
         
-        const sizeInBytes = (base64.length * 3) / 4;
+        const manipulated = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 400, height: 400 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+        
+        if (!manipulated.base64) {
+          throw new Error("Failed to get base64 from image");
+        }
+        
+        const sizeInBytes = (manipulated.base64.length * 3) / 4;
         const maxSizeBytes = 500 * 1024;
         
         if (sizeInBytes > maxSizeBytes) {
-          Alert.alert(
-            "Image Too Large", 
-            "Please choose a smaller image (under 500KB) or try a lower quality photo."
+          const furtherCompressed = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 300, height: 300 } }],
+            { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
           );
-          return;
+          
+          if (!furtherCompressed.base64) {
+            throw new Error("Failed to compress image");
+          }
+          
+          const dataUri = `data:image/jpeg;base64,${furtherCompressed.base64}`;
+          setPendingProfileImage(dataUri);
+        } else {
+          const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
+          setPendingProfileImage(dataUri);
         }
-        
-        const mimeType = result.assets[0].mimeType || "image/jpeg";
-        const dataUri = `data:${mimeType};base64,${base64}`;
-        setPendingProfileImage(dataUri);
       } catch (error) {
-        console.error("Failed to convert image to base64:", error);
-        Alert.alert("Error", "Failed to process image. Please try again.");
+        console.error("Failed to process image:", error);
+        Alert.alert("Error", "Failed to process image. Please try again with a different photo.");
       }
     }
   };
@@ -1134,7 +1150,7 @@ export default function ProfileScreen() {
         </Pressable>
 
         <ThemedText style={[styles.version, { color: theme.textSecondary }]}>
-          SwipeMe v1.0.0
+          SwipeMe v{Constants.expoConfig?.version || "1.0.1"}
         </ThemedText>
       </ScrollView>
 

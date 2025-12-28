@@ -389,9 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
             <div style="text-align: center; margin-bottom: 32px;">
-              <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #0066FF 0%, #00A3FF 100%); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center;">
-                <span style="font-size: 40px; color: white;">S</span>
-              </div>
+              <img src="https://swipeme.org/assets/images/icon.png" alt="SwipeMe" style="width: 80px; height: 80px; border-radius: 20px;" />
             </div>
             
             <h1 style="color: #000000; font-size: 24px; font-weight: 700; margin: 0 0 16px 0; text-align: center;">
