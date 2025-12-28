@@ -19,7 +19,7 @@ function ChatsHeaderLeft() {
   return (
     <View style={styles.headerLeftContainer}>
       <Image
-        source={require("@assets/images/icon.png")}
+        source={require("../../assets/images/icon.png")}
         style={styles.headerIcon}
         resizeMode="contain"
       />
