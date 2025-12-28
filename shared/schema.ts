@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -76,7 +76,10 @@ export const chatParticipants = pgTable("chat_participants", {
   chatId: varchar("chat_id").notNull().references(() => chats.id),
   userId: varchar("user_id").notNull().references(() => users.id),
   joinedAt: timestamp("joined_at").defaultNow(),
-});
+}, (table) => [
+  index("chat_participants_chat_idx").on(table.chatId),
+  index("chat_participants_user_idx").on(table.userId),
+]);
 
 export const messages = pgTable("messages", {
   id: varchar("id")
@@ -89,7 +92,11 @@ export const messages = pgTable("messages", {
   metadata: jsonb("metadata"),
   expiresAt: timestamp("expires_at"), // For disappearing messages - null means never expires
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("messages_chat_created_idx").on(table.chatId, table.createdAt),
+  index("messages_sender_idx").on(table.senderId),
+  index("messages_expires_idx").on(table.expiresAt),
+]);
 
 export const transactions = pgTable("transactions", {
   id: varchar("id")
@@ -104,7 +111,12 @@ export const transactions = pgTable("transactions", {
   chatId: varchar("chat_id").references(() => chats.id),
   messageId: varchar("message_id").references(() => messages.id),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("transactions_from_user_idx").on(table.fromUserId, table.createdAt),
+  index("transactions_to_user_idx").on(table.toUserId, table.createdAt),
+  index("transactions_chat_idx").on(table.chatId),
+  index("transactions_status_idx").on(table.status),
+]);
 
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,

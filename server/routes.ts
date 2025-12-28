@@ -37,6 +37,7 @@ import {
   type TransferParams
 } from "./wallet";
 import { sendPaymentNotification } from "./pushNotifications";
+import { pool } from "./db";
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -74,6 +75,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ]
       }
     }]);
+  });
+
+  // Health check endpoint for monitoring and load balancer
+  app.get("/api/health", async (_req: Request, res: Response) => {
+    try {
+      const start = Date.now();
+      await pool.query("SELECT 1");
+      const dbLatency = Date.now() - start;
+      
+      const poolStatus = {
+        totalCount: pool.totalCount,
+        idleCount: pool.idleCount,
+        waitingCount: pool.waitingCount,
+      };
+      
+      res.json({
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        database: {
+          connected: true,
+          latencyMs: dbLatency,
+          pool: poolStatus,
+        },
+      });
+    } catch (error) {
+      res.status(503).json({
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        database: { connected: false },
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   });
 
   app.post("/api/auth/signup/start", async (req: Request, res: Response) => {

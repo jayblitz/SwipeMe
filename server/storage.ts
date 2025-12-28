@@ -1,4 +1,4 @@
-import { eq, and, gt, desc, inArray } from "drizzle-orm";
+import { eq, and, gt, desc, inArray, lt, or } from "drizzle-orm";
 import { db } from "./db";
 import { 
   users, 
@@ -180,6 +180,48 @@ export const storage = {
 
   async getAllWaitlistSignups(): Promise<WaitlistSignup[]> {
     return await db.select().from(waitlistSignups).orderBy(desc(waitlistSignups.createdAt));
+  },
+
+  // Paginated query pattern for scaling (keyset pagination with composite cursor)
+  // Cursor format: "timestamp|id" for tie-breaking on same-timestamp records
+  async getWaitlistSignupsPaginated(limit: number = 50, cursor?: string): Promise<{
+    items: WaitlistSignup[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  }> {
+    let results: WaitlistSignup[];
+    
+    if (cursor) {
+      const [timestampStr, lastId] = cursor.split("|");
+      const cursorTime = new Date(timestampStr);
+      // Keyset pagination: (createdAt < cursor) OR (createdAt = cursor AND id < lastId)
+      results = await db.select().from(waitlistSignups)
+        .where(
+          or(
+            lt(waitlistSignups.createdAt, cursorTime),
+            and(
+              eq(waitlistSignups.createdAt, cursorTime),
+              lt(waitlistSignups.id, lastId)
+            )
+          )
+        )
+        .orderBy(desc(waitlistSignups.createdAt), desc(waitlistSignups.id))
+        .limit(limit + 1);
+    } else {
+      results = await db.select().from(waitlistSignups)
+        .orderBy(desc(waitlistSignups.createdAt), desc(waitlistSignups.id))
+        .limit(limit + 1);
+    }
+    
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, -1) : results;
+    // Build composite cursor: "timestamp|id"
+    const lastItem = items[items.length - 1];
+    const nextCursor = hasMore && lastItem?.createdAt 
+      ? `${lastItem.createdAt.toISOString()}|${lastItem.id}`
+      : null;
+    
+    return { items, nextCursor, hasMore };
   },
 
   async createPasskey(userId: string, credentialId: string, publicKey: string, deviceName?: string): Promise<Passkey> {
