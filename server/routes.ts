@@ -573,10 +573,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     } catch (error) {
+      const userId = req.body?.userId || "unknown";
       if (error instanceof z.ZodError) {
+        logWalletAction("CREATE", userId, false, "Validation failed");
         return res.status(400).json({ error: error.errors[0].message });
       }
       console.error("Create wallet error:", error);
+      logWalletAction("CREATE", userId, false, error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -631,13 +634,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     } catch (error) {
+      const userId = req.body?.userId || "unknown";
       if (error instanceof z.ZodError) {
+        logWalletAction("IMPORT", userId, false, "Validation failed");
         return res.status(400).json({ error: error.errors[0].message });
       }
       if (error instanceof Error) {
+        logWalletAction("IMPORT", userId, false, error.message);
         return res.status(400).json({ error: error.message });
       }
       console.error("Import wallet error:", error);
+      logWalletAction("IMPORT", userId, false, "Unknown error");
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -646,10 +653,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);
       if (!wallet) {
+        logWalletAction("DELETE", req.params.userId, false, "Wallet not found");
         return res.status(404).json({ error: "Wallet not found" });
       }
       
       await storage.deleteWallet(req.params.userId);
+      
+      logWalletAction("DELETE", req.params.userId, true, "Wallet deleted");
       
       res.json({ 
         success: true,
@@ -657,6 +667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Delete wallet error:", error);
+      logWalletAction("DELETE", req.params.userId, false, error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -745,6 +756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const wallet = await storage.getWalletByUserId(userId);
       if (!wallet) {
+        logWalletAction("SIGN", userId, false, "Wallet not found");
         return res.status(404).json({ error: "Wallet not found" });
       }
       
@@ -755,6 +767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (wallet.encryptedSeedPhrase) {
         signingKey = decryptSensitiveData(wallet.encryptedSeedPhrase);
       } else {
+        logWalletAction("SIGN", userId, false, "No signing key");
         return res.status(400).json({ error: "No signing key available for this wallet" });
       }
       
@@ -767,13 +780,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signature,
       });
     } catch (error) {
+      const userId = req.params.userId;
       if (error instanceof z.ZodError) {
+        logWalletAction("SIGN", userId, false, "Validation failed");
         return res.status(400).json({ error: error.errors[0].message });
       }
       console.error("Sign message error:", error);
       if (error instanceof Error) {
+        logWalletAction("SIGN", userId, false, error.message);
         return res.status(400).json({ error: error.message });
       }
+      logWalletAction("SIGN", userId, false, "Unknown error");
       res.status(500).json({ error: "Failed to sign message" });
     }
   });
