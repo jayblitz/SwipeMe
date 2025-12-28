@@ -1,0 +1,89 @@
+Based on the SwipeMe app's structure (React Native/Expo client, Node.js/Express server with Drizzle ORM for DB, Viem for blockchain/wallets, and shared schemas), here are extra security fixes to bolster it. These build on existing elements like session-based auth (express-session), encrypted wallets (AES-256), and biometrics (expo-local-authentication), focusing on OWASP best practices. Implementation is low-cost/free, using npm packages and code tweaks. Prioritize server-side first, as it's the gatekeeper for sensitive data.
+
+### 1. **Add Rate Limiting to Prevent Brute-Force and DDoS Attacks**
+   - **Issue**: Auth routes (e.g., login, signup, OTP) lack limits, risking brute-force on passwords or OTPs.
+   - **Fix**: Install `express-rate-limit` (free: `npm i express-rate-limit`) and apply middleware in server/index.ts.
+     ```js
+     const rateLimit = require('express-rate-limit');
+     const limiter = rateLimit({
+       windowMs: 5 * 60 * 1000, // 5 minutes
+       max: 5, // 5 requests per window
+       message: 'Too many attempts, try again later.',
+     });
+     app.use('/api/auth', limiter); // Apply to auth routes
+     ```
+   - **Impact**: Reduces abuse; add stricter for OTP (e.g., 3/hour per IP/email).
+   - **Test**: Simulate rapid logins—expect 429 errors.
+
+### 2. **Strengthen Password Hashing and Validation**
+   - **Issue**: Passwords use PBKDF2 (Node crypto), but no strength checks; could allow weak passwords.
+   - **Fix**: Install `zxcvbn` (free: `npm i zxcvbn`) for strength scoring. In server/auth signup route, validate:
+     ```js
+     const zxcvbn = require('zxcvbn');
+     if (zxcvbn(password).score < 3) throw new Error('Password too weak');
+     // Then hash with higher iterations: crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512')
+     ```
+     On client (AuthScreen.tsx): Add real-time feedback UI with zxcvbn.
+   - **Impact**: Prevents weak passwords; enforce min 8 chars, mix types.
+   - **Test**: Try weak passwords (e.g., "password1")—expect rejection.
+
+### 3. **Implement Multi-Factor Authentication (MFA) with OTP**
+   - **Issue**: Only biometrics; no secondary factor for high-risk actions like transfers.
+   - **Fix**: Expand existing OTP (otpauth dep) for MFA. In server, generate TOTP secrets on signup (store hashed in users table). For login/transfer:
+     ```js
+     const otpauth = require('otpauth');
+     const totp = new otpauth.TOTP({ secret: user.mfaSecret });
+     if (!totp.validate({ token: req.body.otp })) throw new Error('Invalid OTP');
+     ```
+     Client: Add OTP input in AuthScreen.tsx or WalletScreen.tsx for confirmations.
+   - **Impact**: Adds layer against credential stuffing; email OTP as fallback (Resend dep already there).
+   - **Test**: Enable MFA in profile, attempt login without—expect failure.
+
+### 4. **Enhance Input Validation and Sanitization**
+   - **Issue**: Zod is used (drizzle-zod dep), but not consistently across all inputs (e.g., memos, amounts).
+   - **Fix**: Extend Zod schemas in shared/schema.ts for all API payloads. In server routes:
+     ```js
+     const { z } = require('zod');
+     const transferSchema = z.object({ amount: z.number().positive(), memo: z.string().max(100).trim() });
+     const parsed = transferSchema.safeParse(req.body);
+     if (!parsed.success) throw new Error('Invalid input');
+     ```
+   - **Impact**: Prevents injection/SQLi; sanitize memos to strip HTML.
+   - **Test**: Send invalid data (e.g., negative amount)—expect errors.
+
+### 5. **Secure Session and Cookie Handling**
+   - **Issue**: Sessions use express-session, but configs may lack production flags (e.g., secure cookies).
+   - **Fix**: Update in server/index.ts:
+     ```js
+     app.use(session({
+       secret: process.env.SESSION_SECRET || 'strong-random-secret', // Use env var
+       resave: false,
+       saveUninitialized: false,
+       cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true, sameSite: 'strict', maxAge: 3600000 } // 1 hour
+     }));
+     ```
+   - **Impact**: Protects against XSS/session fixation; add CSRF tokens for forms (csrf dep free).
+   - **Test**: Inspect cookies in browser dev tools—ensure secure flags.
+
+### 6. **Add Logging and Monitoring for Anomalies**
+   - **Issue**: No structured logging for security events (e.g., failed logins).
+   - **Fix**: Install winston (free: `npm i winston`) and log in routes:
+     ```js
+     const winston = require('winston');
+     const logger = winston.createLogger({ transports: [new winston.transports.Console()] });
+     // In login: if (!valid) logger.warn(`Failed login for ${email} from IP ${req.ip}`);
+     ```
+   - **Impact**: Detects attacks; output to console/file for free monitoring.
+   - **Test**: Trigger failures—check logs.
+
+### 7. **Client-Side Security Tweaks**
+   - **Issue**: Expo handles much, but no explicit secure storage checks.
+   - **Fix**: In WalletScreen.tsx, ensure keys use expo-secure-store:
+     ```tsx
+     import * as SecureStore from 'expo-secure-store';
+     await SecureStore.setItemAsync('privateKey', encryptedKey, { keychainAccessGroup: 'group.swipeme' });
+     ```
+   - **Impact**: Protects against device theft; add app pinning for biometrics.
+   - **Test**: Log out/in—verify data persistence securely.
+
+Prioritize 1-3 for immediate impact (auth-focused). Run `npm audit` to check deps. For website (swipeme.org, static landing): Add CSP meta tag in HTML (<meta http-equiv="Content-Security-Policy" content="default-src 'self';">) to prevent XSS. Total time: 1-2 days. If needed, Replit prompt: "Implement rate limiting and stronger password validation in my server code."
