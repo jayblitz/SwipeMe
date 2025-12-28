@@ -3,8 +3,20 @@ import { createServer, type Server } from "node:http";
 import { randomBytes } from "crypto";
 import { storage, verifyPassword } from "./storage";
 import { sendVerificationEmail } from "./email";
-import { signupSchema, verifyCodeSchema, setPasswordSchema, loginSchema, waitlistSchema, verify2FASchema } from "@shared/schema";
+import { 
+  signupSchema, 
+  verifyCodeSchema, 
+  setPasswordSchema, 
+  loginSchema, 
+  waitlistSchema, 
+  verify2FASchema,
+  walletCreateSchema,
+  walletImportSchema,
+  transferSchema,
+  signMessageSchema
+} from "@shared/schema";
 import { z } from "zod";
+import { logFailedLogin, logSuccessfulLogin, log2FAAttempt, logWalletAction } from "./logger";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from "@simplewebauthn/server";
@@ -148,14 +160,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
       const { email, password } = loginSchema.parse(req.body);
+      const clientIp = req.ip || req.socket.remoteAddress || "unknown";
       
       const user = await storage.getUserByEmail(email);
       if (!user) {
+        logFailedLogin(email, clientIp, "User not found");
         return res.status(401).json({ error: "Incorrect email or password" });
       }
       
       const isValidPassword = await verifyPassword(password, user.password);
       if (!isValidPassword) {
+        logFailedLogin(email, clientIp, "Invalid password");
         return res.status(401).json({ error: "Incorrect email or password" });
       }
       
@@ -172,6 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // No 2FA - create session immediately
       req.session.userId = user.id;
       req.session.email = user.email;
+      logSuccessfulLogin(email, user.id, clientIp);
       
       res.json({ 
         success: true, 
@@ -198,9 +214,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/verify-2fa", async (req: Request, res: Response) => {
     try {
       const { userId, code } = verify2FASchema.parse(req.body);
+      const clientIp = req.ip || req.socket.remoteAddress || "unknown";
       
       const user = await storage.getUserById(userId);
       if (!user) {
+        log2FAAttempt(userId, clientIp, false);
         return res.status(404).json({ error: "User not found" });
       }
       
@@ -220,12 +238,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const delta = totp.validate({ token: code, window: 1 });
       if (delta === null) {
+        log2FAAttempt(userId, clientIp, false);
         return res.status(401).json({ error: "Invalid verification code" });
       }
       
       // 2FA verified - create session
       req.session.userId = user.id;
       req.session.email = user.email;
+      log2FAAttempt(userId, clientIp, true);
+      logSuccessfulLogin(user.email, user.id, clientIp);
       
       res.json({
         success: true,
@@ -516,14 +537,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/wallet/create", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { userId } = req.body;
-      
-      if (!userId) {
-        return res.status(400).json({ error: "User ID is required" });
-      }
+      const { userId } = walletCreateSchema.parse(req.body);
       
       const existingWallet = await storage.getWalletByUserId(userId);
       if (existingWallet) {
+        logWalletAction("CREATE", userId, false, "Wallet already exists");
         return res.status(400).json({ error: "Wallet already exists" });
       }
       
@@ -539,6 +557,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         false
       );
       
+      logWalletAction("CREATE", userId, true, `Address: ${address.slice(0, 10)}...`);
+      
       res.json({ 
         success: true,
         wallet: { 
@@ -553,6 +573,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       console.error("Create wallet error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
@@ -560,18 +583,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/wallet/import", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { userId, seedPhrase, privateKey } = req.body;
-      
-      if (!userId) {
-        return res.status(400).json({ error: "User ID is required" });
-      }
-      
-      if (!seedPhrase && !privateKey) {
-        return res.status(400).json({ error: "Seed phrase or private key is required" });
-      }
+      const { userId, seedPhrase, privateKey } = walletImportSchema.parse(req.body);
       
       const existingWallet = await storage.getWalletByUserId(userId);
       if (existingWallet) {
+        logWalletAction("IMPORT", userId, false, "Wallet already exists");
         return res.status(400).json({ error: "Wallet already exists" });
       }
       
@@ -583,10 +599,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const result = importWalletFromMnemonic(seedPhrase);
         address = result.address;
         encryptedSeedPhrase = encryptSensitiveData(result.mnemonic);
-      } else {
+      } else if (privateKey) {
         const result = importWalletFromPrivateKey(privateKey);
         address = result.address;
         encryptedPrivateKey = encryptSensitiveData(result.privateKey);
+      } else {
+        return res.status(400).json({ error: "Seed phrase or private key is required" });
       }
       
       const wallet = await storage.createWallet(
@@ -596,6 +614,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         encryptedSeedPhrase, 
         true
       );
+      
+      logWalletAction("IMPORT", userId, true, `Address: ${address.slice(0, 10)}...`);
       
       res.json({ 
         success: true,
@@ -611,6 +631,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       if (error instanceof Error) {
         return res.status(400).json({ error: error.message });
       }
@@ -664,14 +687,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/wallet/:userId/transfer", requireSameUser, async (req: Request, res: Response) => {
     try {
-      const { tokenAddress, toAddress, amount, decimals } = req.body;
+      const { tokenAddress, toAddress, amount, decimals } = transferSchema.parse(req.body);
+      const userId = req.params.userId;
       
-      if (!tokenAddress || !toAddress || !amount || decimals === undefined) {
-        return res.status(400).json({ error: "Missing required fields: tokenAddress, toAddress, amount, decimals" });
-      }
-      
-      const wallet = await storage.getWalletByUserId(req.params.userId);
+      const wallet = await storage.getWalletByUserId(userId);
       if (!wallet) {
+        logWalletAction("TRANSFER", userId, false, "Wallet not found");
         return res.status(404).json({ error: "Wallet not found" });
       }
       
@@ -682,6 +703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (wallet.encryptedSeedPhrase) {
         signingKey = decryptSensitiveData(wallet.encryptedSeedPhrase);
       } else {
+        logWalletAction("TRANSFER", userId, false, "No signing key");
         return res.status(400).json({ error: "No signing key available for this wallet" });
       }
       
@@ -695,14 +717,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         decimals,
       } as TransferParams);
       
+      logWalletAction("TRANSFER", userId, true, `To: ${toAddress.slice(0, 10)}... Amount: ${amount}`);
+      
       res.json({
         success: true,
         txHash,
         explorer: `${tempoTestnet.blockExplorers?.default.url || "https://explorer.testnet.tempo.xyz"}/tx/${txHash}`,
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       console.error("Transfer error:", error);
       if (error instanceof Error) {
+        logWalletAction("TRANSFER", req.params.userId, false, error.message);
         return res.status(400).json({ error: error.message });
       }
       res.status(500).json({ error: "Transaction failed" });
@@ -712,13 +740,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sign a message for XMTP authentication (server-side signing keeps private key secure)
   app.post("/api/wallet/:userId/sign", requireSameUser, async (req: Request, res: Response) => {
     try {
-      const { message } = req.body;
+      const { message } = signMessageSchema.parse(req.body);
+      const userId = req.params.userId;
       
-      if (!message || typeof message !== "string") {
-        return res.status(400).json({ error: "Message is required" });
-      }
-      
-      const wallet = await storage.getWalletByUserId(req.params.userId);
+      const wallet = await storage.getWalletByUserId(userId);
       if (!wallet) {
         return res.status(404).json({ error: "Wallet not found" });
       }
@@ -735,11 +760,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const signature = await signMessage(signingKey, message);
       
+      logWalletAction("SIGN", userId, true, "Message signed");
+      
       res.json({
         success: true,
         signature,
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
       console.error("Sign message error:", error);
       if (error instanceof Error) {
         return res.status(400).json({ error: error.message });

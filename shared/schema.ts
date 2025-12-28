@@ -205,3 +205,30 @@ export const verify2FASchema = z.object({
 
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
 export type Passkey = typeof passkeys.$inferSelect;
+
+// Wallet operation validation schemas
+const ethereumAddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid Ethereum address");
+
+export const walletCreateSchema = z.object({
+  userId: z.string().uuid("Invalid user ID"),
+});
+
+export const walletImportSchema = z.object({
+  userId: z.string().uuid("Invalid user ID"),
+  seedPhrase: z.string().optional(),
+  privateKey: z.string().optional(),
+}).refine(
+  (data) => data.seedPhrase || data.privateKey,
+  { message: "Seed phrase or private key is required" }
+);
+
+export const transferSchema = z.object({
+  tokenAddress: ethereumAddressSchema,
+  toAddress: ethereumAddressSchema,
+  amount: z.string().regex(/^\d+(\.\d+)?$/, "Invalid amount format"),
+  decimals: z.number().int().min(0).max(18),
+});
+
+export const signMessageSchema = z.object({
+  message: z.string().min(1, "Message is required").max(10000, "Message too long"),
+});
