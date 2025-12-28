@@ -11,8 +11,8 @@ const CURRENT_STORAGE_VERSION = "2";
 export interface Contact {
   id: string;
   name: string;
-  avatarId: string;
-  walletAddress: string;
+  avatarId?: string;
+  walletAddress?: string;
   phone?: string;
 }
 
@@ -117,6 +117,10 @@ export async function initializeStorage(): Promise<void> {
   }
 }
 
+export function generateChatId(): string {
+  return `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
 export async function getChats(): Promise<Chat[]> {
   try {
     const chats = await AsyncStorage.getItem(CHATS_KEY);
@@ -124,6 +128,21 @@ export async function getChats(): Promise<Chat[]> {
   } catch (error) {
     console.error("Failed to get chats:", error);
     return [];
+  }
+}
+
+export async function saveChat(chat: Chat): Promise<void> {
+  try {
+    const chats = await getChats();
+    const existingIndex = chats.findIndex(c => c.id === chat.id);
+    if (existingIndex !== -1) {
+      chats[existingIndex] = chat;
+    } else {
+      chats.push(chat);
+    }
+    await AsyncStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+  } catch (error) {
+    console.error("Failed to save chat:", error);
   }
 }
 

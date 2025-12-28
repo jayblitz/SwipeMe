@@ -624,6 +624,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/users/search", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const email = req.query.email as string;
+      
+      if (!email || email.trim().length === 0) {
+        return res.json({ users: [] });
+      }
+      
+      const searchEmail = email.trim().toLowerCase();
+      const currentUserId = req.session?.userId;
+      
+      const user = await storage.getUserByEmail(searchEmail);
+      
+      if (!user || user.id === currentUserId) {
+        return res.json({ users: [] });
+      }
+      
+      res.json({
+        users: [{
+          id: user.id,
+          email: user.email,
+          name: user.displayName || undefined,
+        }]
+      });
+    } catch (error) {
+      console.error("Search users error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/wallet/:userId", requireSameUser, async (req: Request, res: Response) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);

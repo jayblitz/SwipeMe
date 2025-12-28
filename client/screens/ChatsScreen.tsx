@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from "react";
-import { View, StyleSheet, FlatList, Pressable, RefreshControl, Platform, ActivityIndicator } from "react-native";
+import React, { useState, useCallback, useLayoutEffect } from "react";
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, Platform, ActivityIndicator, TextInput } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -10,10 +10,12 @@ import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { getChats, Chat } from "@/lib/storage";
+import { getChats, Chat, saveChat, generateChatId } from "@/lib/storage";
 import { useXMTP } from "@/contexts/XMTPContext";
 import { getConversations, getMessages, type ConversationInfo, type XMTPConversation } from "@/lib/xmtp";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
+import { NewMessageScreen } from "@/screens/NewMessageScreen";
+import * as Contacts from "expo-contacts";
 
 interface XMTPConversationItem {
   id: string;
@@ -142,7 +144,7 @@ function EmptyState() {
       </View>
       <ThemedText type="h4" style={styles.emptyTitle}>No conversations yet</ThemedText>
       <ThemedText style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-        Start a conversation from the Discover tab
+        Tap the compose button to start a new chat
       </ThemedText>
     </View>
   );
@@ -186,9 +188,35 @@ export default function ChatsScreen() {
   const [xmtpConversations, setXmtpConversations] = useState<XMTPConversationItem[]>([]);
   const [legacyChats, setLegacyChats] = useState<Chat[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showNewMessage, setShowNewMessage] = useState(false);
+  const [deviceContacts, setDeviceContacts] = useState<Contacts.Contact[]>([]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={() => setShowNewMessage(true)} style={{ padding: 8 }}>
+          <Feather name="edit" size={22} color={theme.text} />
+        </Pressable>
+      ),
+    });
+  }, [navigation, theme]);
+
+  const loadContacts = useCallback(async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status === "granted") {
+        const { data } = await Contacts.getContactsAsync({
+          fields: [Contacts.Fields.Name, Contacts.Fields.Emails, Contacts.Fields.Image],
+        });
+        setDeviceContacts(data);
+      }
+    } catch (error) {
+      console.error("Failed to load contacts:", error);
+    }
+  }, []);
 
   const loadConversations = useCallback(async () => {
-    // Always load legacy chats from AsyncStorage first
     const loadedChats = await getChats();
     setLegacyChats(loadedChats.sort((a, b) => b.lastMessageTime - a.lastMessageTime));
 
@@ -240,7 +268,8 @@ export default function ChatsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadConversations();
-    }, [loadConversations])
+      loadContacts();
+    }, [loadConversations, loadContacts])
   );
 
   const handleRefresh = async () => {
@@ -268,23 +297,45 @@ export default function ChatsScreen() {
     });
   };
 
-  // Create unified chat item type for combined list
+  const handleStartChat = async (user: { id: string; email: string; name?: string }) => {
+    const chatId = generateChatId();
+    const displayName = user.name || user.email;
+    
+    const newChat: Chat = {
+      id: chatId,
+      participants: [{
+        id: user.id,
+        name: displayName,
+        avatarId: undefined,
+      }],
+      isGroup: false,
+      lastMessage: "",
+      lastMessageTime: Date.now(),
+      unreadCount: 0,
+    };
+    
+    await saveChat(newChat);
+    await loadConversations();
+    
+    navigation.navigate("Chat", {
+      chatId,
+      name: displayName,
+      contactId: user.id,
+    });
+  };
+
   type UnifiedChatItem = 
     | { type: "xmtp"; data: XMTPConversationItem }
     | { type: "legacy"; data: Chat };
 
-  // Combine XMTP and legacy chats, sorted by time
   const combinedChats: UnifiedChatItem[] = React.useMemo(() => {
     const xmtpItems: UnifiedChatItem[] = xmtpConversations.map(conv => ({
       type: "xmtp" as const,
       data: conv,
     }));
     
-    // Filter out legacy chats that might have matching XMTP conversations
-    // (to avoid duplicates if a contact has both)
     const xmtpPeerAddresses = new Set(xmtpConversations.map(c => c.peerAddress.toLowerCase()));
     const filteredLegacy = legacyChats.filter(chat => {
-      // Keep legacy chats that don't have a matching XMTP conversation
       const participant = chat.participants[0];
       if (!participant?.walletAddress) return true;
       return !xmtpPeerAddresses.has(participant.walletAddress.toLowerCase());
@@ -295,13 +346,25 @@ export default function ChatsScreen() {
       data: chat,
     }));
     
-    // Combine and sort by time
-    return [...xmtpItems, ...legacyItems].sort((a, b) => {
+    let combined = [...xmtpItems, ...legacyItems].sort((a, b) => {
       const timeA = a.type === "xmtp" ? a.data.lastMessageTime : a.data.lastMessageTime;
       const timeB = b.type === "xmtp" ? b.data.lastMessageTime : b.data.lastMessageTime;
       return timeB - timeA;
     });
-  }, [xmtpConversations, legacyChats]);
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      combined = combined.filter((item) => {
+        if (item.type === "xmtp") {
+          return item.data.peerAddress.toLowerCase().includes(query);
+        }
+        const name = item.data.isGroup ? item.data.name : item.data.participants[0]?.name;
+        return name?.toLowerCase().includes(query);
+      });
+    }
+
+    return combined;
+  }, [xmtpConversations, legacyChats, searchQuery]);
 
   const renderChatItem = ({ item }: { item: UnifiedChatItem }) => {
     if (item.type === "xmtp") {
@@ -310,11 +373,28 @@ export default function ChatsScreen() {
     return <LegacyChatItem chat={item.data} onPress={() => handleLegacyChatPress(item.data)} />;
   };
 
-  const isNativeMode = Platform.OS !== "web" && isSupported;
   const showEmptyState = combinedChats.length === 0 && !isInitializing;
 
   return (
     <ThemedView style={styles.container}>
+      <View style={[styles.searchContainer, { paddingTop: headerHeight + Spacing.sm }]}>
+        <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
+          <Feather name="search" size={18} color={theme.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder="Search"
+            placeholderTextColor={theme.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 ? (
+            <Pressable onPress={() => setSearchQuery("")}>
+              <Feather name="x-circle" size={18} color={theme.textSecondary} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
       <XMTPStatus isInitializing={isInitializing} error={error} />
       
       <FlatList
@@ -324,7 +404,6 @@ export default function ChatsScreen() {
         contentContainerStyle={[
           styles.listContent,
           {
-            paddingTop: headerHeight + Spacing.md,
             paddingBottom: tabBarHeight + Spacing.xl,
           },
           showEmptyState && styles.emptyListContent,
@@ -341,6 +420,13 @@ export default function ChatsScreen() {
           <View style={[styles.separator, { backgroundColor: theme.border }]} />
         )}
       />
+
+      <NewMessageScreen
+        visible={showNewMessage}
+        onClose={() => setShowNewMessage(false)}
+        onStartChat={handleStartChat}
+        deviceContacts={deviceContacts}
+      />
     </ThemedView>
   );
 }
@@ -348,6 +434,23 @@ export default function ChatsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  searchContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: Spacing.xs,
   },
   listContent: {
     paddingHorizontal: Spacing.md,

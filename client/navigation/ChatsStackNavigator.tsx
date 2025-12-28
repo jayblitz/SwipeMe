@@ -1,13 +1,11 @@
 import React from "react";
+import { View, Image, StyleSheet } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Pressable } from "react-native";
-import { Feather } from "@expo/vector-icons";
 import ChatsScreen from "@/screens/ChatsScreen";
 import ChatScreen from "@/screens/ChatScreen";
 import ContactDetailsScreen from "@/screens/ContactDetailsScreen";
-import { HeaderTitle } from "@/components/HeaderTitle";
+import { ThemedText } from "@/components/ThemedText";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
-import { useTheme } from "@/hooks/useTheme";
 
 export type ChatsStackParamList = {
   ChatsList: undefined;
@@ -17,10 +15,27 @@ export type ChatsStackParamList = {
 
 const Stack = createNativeStackNavigator<ChatsStackParamList>();
 
+function ChatsHeaderLeft() {
+  return (
+    <View style={styles.headerLeftContainer}>
+      <Image
+        source={require("@assets/images/icon.png")}
+        style={styles.headerIcon}
+        resizeMode="contain"
+      />
+    </View>
+  );
+}
+
+function ChatsHeaderTitle() {
+  return (
+    <ThemedText style={styles.headerTitle}>Chats</ThemedText>
+  );
+}
+
 export default function ChatsStackNavigator() {
   const screenOptions = useScreenOptions();
   const opaqueOptions = useScreenOptions({ transparent: false });
-  const { theme } = useTheme();
 
   return (
     <Stack.Navigator screenOptions={screenOptions}>
@@ -28,12 +43,8 @@ export default function ChatsStackNavigator() {
         name="ChatsList"
         component={ChatsScreen}
         options={{
-          headerTitle: () => <HeaderTitle title="SwipeMe" />,
-          headerRight: () => (
-            <Pressable style={{ padding: 8 }}>
-              <Feather name="search" size={22} color={theme.text} />
-            </Pressable>
-          ),
+          headerLeft: () => <ChatsHeaderLeft />,
+          headerTitle: () => <ChatsHeaderTitle />,
         }}
       />
       <Stack.Screen
@@ -55,3 +66,21 @@ export default function ChatsStackNavigator() {
     </Stack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  headerLeftContainer: {
+    marginRight: 8,
+  },
+  headerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  headerButton: {
+    padding: 8,
+  },
+});
