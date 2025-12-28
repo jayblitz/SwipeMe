@@ -123,6 +123,8 @@ function setupRateLimiting(app: express.Application) {
   app.use("/api/auth/signup/start", otpLimiter);
   app.use("/api/auth/signup/verify", verifyLimiter);
   app.use("/api/auth/password/reset/start", otpLimiter);
+  app.use("/api/auth/forgot-password", otpLimiter);
+  app.use("/api/auth/reset-password", verifyLimiter);
   app.use("/api/auth/2fa/verify", authLimiter);
 }
 
