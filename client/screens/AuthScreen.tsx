@@ -27,6 +27,7 @@ type AuthStep =
   | "signup-email" 
   | "signup-verify" 
   | "signup-password"
+  | "signup-username"
   | "forgot-password"
   | "reset-code"
   | "reset-password";
@@ -51,6 +52,10 @@ export default function AuthScreen() {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameError, setUsernameError] = useState("");
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -403,8 +408,71 @@ export default function AuthScreen() {
     
     try {
       await completeSignUp(email.trim(), verificationCode, password);
+      setStep("signup-username");
     } catch (err: any) {
       setError(err.message || "Signup failed");
+    }
+  };
+
+  const validateUsername = (uname: string): string | null => {
+    if (uname.length < 3) return "Username must be at least 3 characters";
+    if (uname.length > 20) return "Username must be at most 20 characters";
+    if (!/^[a-z0-9_]+$/.test(uname)) return "Only lowercase letters, numbers, and underscores";
+    if (!/^[a-z]/.test(uname)) return "Must start with a letter";
+    return null;
+  };
+
+  const checkUsernameAvailability = async (uname: string) => {
+    const validationError = validateUsername(uname);
+    if (validationError) {
+      setUsernameError(validationError);
+      setUsernameAvailable(null);
+      return;
+    }
+
+    setIsCheckingUsername(true);
+    setUsernameError("");
+    try {
+      const response = await apiRequest("GET", `/api/username/check?username=${encodeURIComponent(uname)}`);
+      const data = await response.json();
+      if (data.error) {
+        setUsernameError(data.error);
+        setUsernameAvailable(false);
+      } else {
+        setUsernameAvailable(data.available);
+        if (!data.available) {
+          setUsernameError("Username is already taken");
+        }
+      }
+    } catch (err) {
+      setUsernameError("Failed to check username");
+    } finally {
+      setIsCheckingUsername(false);
+    }
+  };
+
+  const handleSetUsername = async () => {
+    const validationError = validateUsername(username);
+    if (validationError) {
+      setUsernameError(validationError);
+      return;
+    }
+
+    if (!usernameAvailable) {
+      setUsernameError("Please choose an available username");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const response = await apiRequest("POST", "/api/user/username", { username });
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || "Failed to set username");
+      }
+    } catch (err: any) {
+      setUsernameError(err.message || "Failed to set username");
+      setResetLoading(false);
     }
   };
 
@@ -843,6 +911,79 @@ export default function AuthScreen() {
     </>
   );
 
+  const renderUsernameForm = () => (
+    <>
+      <View style={styles.securityIconContainer}>
+        <View style={[styles.securityIcon, { backgroundColor: Colors.light.primaryLight }]}>
+          <Feather name="at-sign" size={32} color={Colors.light.primary} />
+        </View>
+      </View>
+
+      <ThemedText type="h3" style={[styles.stepTitle, { textAlign: "center" }]}>Choose your username</ThemedText>
+      <ThemedText style={[styles.stepSubtitle, { color: theme.textSecondary, textAlign: "center" }]}>
+        This is how others will find and identify you on SwipeMe.
+      </ThemedText>
+
+      <View style={styles.form}>
+        <View style={[
+          styles.inputContainer, 
+          { 
+            backgroundColor: theme.backgroundDefault, 
+            borderColor: usernameError ? Colors.light.error : usernameAvailable ? "#22C55E" : theme.border 
+          }
+        ]}>
+          <ThemedText style={[styles.atSymbol, { color: theme.textSecondary }]}>@</ThemedText>
+          <TextInput
+            style={[styles.input, { color: theme.text }]}
+            placeholder="username"
+            placeholderTextColor={theme.textSecondary}
+            value={username}
+            onChangeText={(text) => {
+              const cleaned = text.toLowerCase().replace(/[^a-z0-9_]/g, "");
+              setUsername(cleaned);
+              setUsernameError("");
+              setUsernameAvailable(null);
+            }}
+            onBlur={() => {
+              if (username.length >= 3) {
+                checkUsernameAvailability(username);
+              }
+            }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+          />
+          {isCheckingUsername ? (
+            <ActivityIndicator size="small" color={theme.primary} />
+          ) : usernameAvailable === true ? (
+            <Feather name="check-circle" size={20} color="#22C55E" />
+          ) : usernameAvailable === false ? (
+            <Feather name="x-circle" size={20} color={Colors.light.error} />
+          ) : null}
+        </View>
+
+        <ThemedText style={[styles.usernameHint, { color: theme.textSecondary }]}>
+          3-20 characters, lowercase letters, numbers, and underscores only
+        </ThemedText>
+
+        {usernameError ? (
+          <View style={styles.errorContainer}>
+            <Feather name="alert-circle" size={16} color={Colors.light.error} />
+            <ThemedText style={styles.errorText}>{usernameError}</ThemedText>
+          </View>
+        ) : null}
+
+        <Button 
+          onPress={handleSetUsername} 
+          disabled={resetLoading || !usernameAvailable || isCheckingUsername} 
+          style={styles.submitButton}
+        >
+          {resetLoading ? <ActivityIndicator color="#FFFFFF" /> : "Continue"}
+        </Button>
+      </View>
+    </>
+  );
+
   const renderForgotPasswordForm = () => (
     <>
       <View style={styles.stepHeader}>
@@ -1028,6 +1169,8 @@ export default function AuthScreen() {
         return renderVerifyCodeForm();
       case "signup-password":
         return renderPasswordForm();
+      case "signup-username":
+        return renderUsernameForm();
       case "forgot-password":
         return renderForgotPasswordForm();
       case "reset-code":
@@ -1260,5 +1403,15 @@ const styles = StyleSheet.create({
   resendLink: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  atSymbol: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginRight: Spacing.xs,
+  },
+  usernameHint: {
+    fontSize: 12,
+    marginTop: -Spacing.xs,
+    marginBottom: Spacing.md,
   },
 });

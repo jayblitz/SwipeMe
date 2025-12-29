@@ -15,7 +15,9 @@ import {
   transferSchema,
   signMessageSchema,
   forgotPasswordSchema,
-  resetPasswordSchema
+  resetPasswordSchema,
+  setUsernameSchema,
+  usernameSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { logFailedLogin, logSuccessfulLogin, log2FAAttempt, logWalletAction } from "./logger";
@@ -179,6 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: { 
           id: user.id, 
           email: user.email,
+          username: user.username,
           displayName: user.displayName,
           profileImage: user.profileImage,
           themePreference: user.themePreference,
@@ -231,6 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: { 
           id: user.id, 
           email: user.email,
+          username: user.username,
           displayName: user.displayName,
           profileImage: user.profileImage,
           themePreference: user.themePreference,
@@ -354,6 +358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: {
           id: user.id,
           email: user.email,
+          username: user.username,
           displayName: user.displayName,
           profileImage: user.profileImage,
           themePreference: user.themePreference,
@@ -390,6 +395,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } else {
       res.json({ authenticated: false });
+    }
+  });
+
+  app.get("/api/username/check", async (req: Request, res: Response) => {
+    try {
+      const username = req.query.username as string;
+      if (!username) {
+        return res.status(400).json({ error: "Username is required" });
+      }
+      
+      const normalizedUsername = username.toLowerCase().trim();
+      const validation = usernameSchema.safeParse(normalizedUsername);
+      if (!validation.success) {
+        return res.json({ 
+          available: false, 
+          error: validation.error.errors[0].message 
+        });
+      }
+      
+      const existingUser = await storage.getUserByUsername(normalizedUsername);
+      res.json({ available: !existingUser });
+    } catch (error) {
+      console.error("Username check error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/user/username", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { username } = setUsernameSchema.parse(req.body);
+      const userId = req.session.userId!;
+      
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(409).json({ error: "Username is already taken" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (user?.username) {
+        return res.status(400).json({ error: "Username cannot be changed once set" });
+      }
+      
+      await storage.updateUserUsername(userId, username);
+      res.json({ success: true, username });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Set username error:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -1383,6 +1438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: {
           id: user.id,
           email: user.email,
+          username: user.username,
           displayName: user.displayName,
           profileImage: user.profileImage,
           themePreference: user.themePreference,

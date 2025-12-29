@@ -59,6 +59,19 @@ export const storage = {
     return matchedUsers;
   },
 
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username.toLowerCase()));
+    return user;
+  },
+
+  async updateUserUsername(id: string, username: string): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ username: username.toLowerCase(), updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  },
+
   async createUser(email: string, password: string): Promise<User> {
     const hashedPassword = await hashPassword(password);
     const [user] = await db.insert(users).values({

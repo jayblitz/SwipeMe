@@ -8,6 +8,7 @@ export const users = pgTable("users", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
+  username: text("username").unique(),
   password: text("password").notNull(),
   displayName: text("display_name"),
   profileImage: text("profile_image"),
@@ -174,6 +175,16 @@ export function validatePasswordStrength(password: string): { score: number; fee
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
+});
+
+export const usernameSchema = z.string()
+  .min(3, "Username must be at least 3 characters")
+  .max(20, "Username must be at most 20 characters")
+  .regex(/^[a-z0-9_]+$/, "Username can only contain lowercase letters, numbers, and underscores")
+  .regex(/^[a-z]/, "Username must start with a letter");
+
+export const setUsernameSchema = z.object({
+  username: usernameSchema,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

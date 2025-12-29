@@ -6,6 +6,7 @@ import { registerAndSavePushToken } from "@/lib/notifications";
 export interface User {
   id: string;
   email: string;
+  username?: string | null;
   displayName?: string | null;
   profileImage?: string | null;
   status?: string | null;
