@@ -687,6 +687,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/users/check-batch", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { emails } = req.body;
+      
+      if (!emails || !Array.isArray(emails) || emails.length === 0) {
+        return res.json({ users: [] });
+      }
+      
+      const validEmails = emails
+        .filter((e: unknown) => typeof e === "string" && e.trim().length > 0)
+        .map((e: string) => e.trim().toLowerCase())
+        .slice(0, 500);
+      
+      if (validEmails.length === 0) {
+        return res.json({ users: [] });
+      }
+      
+      const currentUserId = req.session?.userId;
+      
+      const matchedUsers = await storage.getUsersByEmails(validEmails);
+      
+      const foundUsers = matchedUsers
+        .filter(user => user.id !== currentUserId)
+        .map(user => ({
+          id: user.id,
+          email: user.email,
+          name: user.displayName || undefined,
+        }));
+      
+      res.json({ users: foundUsers });
+    } catch (error) {
+      console.error("Check batch users error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/wallet/:userId", requireSameUser, async (req: Request, res: Response) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);

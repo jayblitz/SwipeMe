@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -32,12 +32,20 @@ interface UserSearchResult {
   name?: string;
 }
 
+interface ContactWithStatus extends Contacts.Contact {
+  isOnSwipeMe?: boolean;
+  swipeMeUser?: UserSearchResult;
+}
+
 interface ContactSection {
   title: string;
-  data: Contacts.Contact[];
+  data: ContactWithStatus[];
+  isSwipeMeSection?: boolean;
 }
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("");
+
+type ViewMode = "main" | "findByEmail";
 
 export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts }: NewMessageScreenProps) {
   const { theme } = useTheme();
@@ -45,17 +53,89 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
-  const [showEmailSearch, setShowEmailSearch] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("main");
+  const [swipeMeContacts, setSwipeMeContacts] = useState<ContactWithStatus[]>([]);
+  const [isCheckingContacts, setIsCheckingContacts] = useState(false);
+
+  useEffect(() => {
+    if (visible && deviceContacts.length > 0) {
+      checkContactsOnSwipeMe();
+    }
+  }, [visible, deviceContacts]);
+
+  const checkContactsOnSwipeMe = async () => {
+    if (deviceContacts.length === 0) return;
+    
+    setIsCheckingContacts(true);
+    
+    try {
+      const emails = deviceContacts
+        .filter(c => c.emails && c.emails.length > 0)
+        .map(c => c.emails![0].email)
+        .filter(Boolean);
+      
+      if (emails.length === 0) {
+        setIsCheckingContacts(false);
+        return;
+      }
+
+      const url = new URL("/api/users/check-batch", getApiUrl());
+      const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ emails }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const swipeMeUsers: Record<string, UserSearchResult> = {};
+        (data.users || []).forEach((user: UserSearchResult) => {
+          swipeMeUsers[user.email.toLowerCase()] = user;
+        });
+
+        const contactsWithStatus: ContactWithStatus[] = deviceContacts.map(contact => {
+          const email = contact.emails?.[0]?.email?.toLowerCase();
+          if (email && swipeMeUsers[email]) {
+            return {
+              ...contact,
+              isOnSwipeMe: true,
+              swipeMeUser: swipeMeUsers[email],
+            };
+          }
+          return { ...contact, isOnSwipeMe: false };
+        });
+
+        setSwipeMeContacts(contactsWithStatus.filter(c => c.isOnSwipeMe));
+      } else {
+        setSwipeMeContacts([]);
+      }
+    } catch (error) {
+      console.error("Failed to check contacts:", error);
+      setSwipeMeContacts([]);
+    } finally {
+      setIsCheckingContacts(false);
+    }
+  };
 
   const groupedContacts = useMemo(() => {
-    const sorted = [...deviceContacts].sort((a, b) => {
+    const contactsToShow = isCheckingContacts 
+      ? deviceContacts 
+      : deviceContacts.filter(contact => {
+          const email = contact.emails?.[0]?.email?.toLowerCase();
+          return !swipeMeContacts.some(sc => 
+            sc.emails?.[0]?.email?.toLowerCase() === email
+          );
+        });
+
+    const sorted = [...contactsToShow].sort((a, b) => {
       const nameA = a.name || "";
       const nameB = b.name || "";
       return nameA.localeCompare(nameB);
     });
 
     const sections: ContactSection[] = [];
-    const grouped: { [key: string]: Contacts.Contact[] } = {};
+    const grouped: { [key: string]: ContactWithStatus[] } = {};
 
     sorted.forEach((contact) => {
       const name = contact.name || "";
@@ -78,7 +158,7 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
     });
 
     return sections;
-  }, [deviceContacts]);
+  }, [deviceContacts, swipeMeContacts, isCheckingContacts]);
 
   const isValidEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -107,7 +187,7 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
         const data = await response.json();
         setSearchResults(data.users || []);
         if (data.users?.length === 0) {
-          Alert.alert("No User Found", "No user with that email address was found.");
+          Alert.alert("No User Found", "No user with that email address was found on SwipeMe.");
         }
       } else {
         setSearchResults([]);
@@ -125,45 +205,84 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
     onStartChat(user);
     setSearchQuery("");
     setSearchResults([]);
-    setShowEmailSearch(false);
+    setViewMode("main");
     onClose();
   };
 
-  const handleContactPress = async (contact: Contacts.Contact) => {
+  const handleNewGroup = () => {
+    Alert.alert(
+      "Coming Soon",
+      "Group chats are coming to SwipeMe! You'll soon be able to create groups, share payments, and chat with multiple friends at once.",
+      [{ text: "OK", style: "default" }]
+    );
+  };
+
+  const handleFindByEmail = () => {
+    setViewMode("findByEmail");
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
+  const handleBackToMain = () => {
+    setViewMode("main");
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
+  const handleClose = () => {
+    setViewMode("main");
+    setSearchQuery("");
+    setSearchResults([]);
+    onClose();
+  };
+
+  const handleSwipeMeContactPress = (contact: ContactWithStatus) => {
+    if (contact.swipeMeUser) {
+      handleSelectUser(contact.swipeMeUser);
+    }
+  };
+
+  const handleInviteContact = (contact: Contacts.Contact) => {
     const email = contact.emails?.[0]?.email;
     if (!email) {
-      Alert.alert("No Email", "This contact doesn't have an email address.");
+      Alert.alert("No Email", "This contact doesn't have an email address to send an invitation.");
       return;
     }
     
-    setSearchQuery(email);
-    setShowEmailSearch(true);
-    
-    if (!isValidEmail(email)) {
-      return;
-    }
-    
-    setIsSearching(true);
-    try {
-      const url = new URL("/api/users/search", getApiUrl());
-      url.searchParams.set("email", email.toLowerCase());
-      
-      const response = await fetch(url.toString(), {
-        credentials: "include",
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.users || []);
-      } else {
-        setSearchResults([]);
-      }
-    } catch (error) {
-      console.error("Search error:", error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
+    Alert.alert(
+      "Invite to SwipeMe",
+      `Send an invitation to ${contact.name || email}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Send Invite",
+          onPress: async () => {
+            try {
+              const url = new URL("/api/invitations/send", getApiUrl());
+              const response = await fetch(url.toString(), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ email }),
+              });
+              
+              if (response.ok) {
+                Alert.alert(
+                  "Invitation Sent",
+                  `We've sent an invitation to ${contact.name || email}. They'll be able to chat with you once they join SwipeMe!`
+                );
+              } else {
+                const error = await response.json();
+                Alert.alert("Error", error.error || "Failed to send invitation.");
+              }
+            } catch (error) {
+              console.error("Invite error:", error);
+              Alert.alert("Error", "Failed to send invitation. Please try again.");
+            }
+          }
+        },
+      ]
+    );
   };
 
   const renderAlphabetIndex = () => (
@@ -178,9 +297,8 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
     </View>
   );
 
-  const renderContactItem = ({ item }: { item: Contacts.Contact }) => {
+  const renderSwipeMeContact = ({ item }: { item: ContactWithStatus }) => {
     const initials = (item.name || "?").slice(0, 2).toUpperCase();
-    const hasEmail = (item.emails?.length || 0) > 0;
     
     return (
       <Pressable
@@ -188,18 +306,46 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
           styles.contactItem,
           { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
         ]}
-        onPress={() => handleContactPress(item)}
+        onPress={() => handleSwipeMeContactPress(item)}
       >
         <View style={[styles.contactAvatar, { backgroundColor: theme.primary }]}>
           <ThemedText style={styles.contactInitials}>{initials}</ThemedText>
         </View>
-        <View style={styles.contactInfo}>
+        <View style={styles.contactInfoColumn}>
           <ThemedText style={styles.contactName}>{item.name || "Unknown"}</ThemedText>
-          {hasEmail ? (
-            <Feather name="at-sign" size={14} color={theme.textSecondary} style={{ marginLeft: 4 }} />
-          ) : null}
+          <ThemedText style={[styles.contactEmail, { color: theme.textSecondary }]}>
+            On SwipeMe
+          </ThemedText>
         </View>
+        <Feather name="chevron-right" size={20} color={theme.textSecondary} />
       </Pressable>
+    );
+  };
+
+  const renderContactItem = ({ item }: { item: ContactWithStatus }) => {
+    const initials = (item.name || "?").slice(0, 2).toUpperCase();
+    const hasEmail = (item.emails?.length || 0) > 0;
+    
+    return (
+      <View style={[styles.contactItem, { backgroundColor: "transparent" }]}>
+        <View style={[styles.contactAvatar, { backgroundColor: theme.textSecondary }]}>
+          <ThemedText style={styles.contactInitials}>{initials}</ThemedText>
+        </View>
+        <View style={styles.contactInfoColumn}>
+          <ThemedText style={styles.contactName}>{item.name || "Unknown"}</ThemedText>
+        </View>
+        {hasEmail ? (
+          <Pressable 
+            style={({ pressed }) => [
+              styles.inviteButton, 
+              { backgroundColor: pressed ? theme.primaryDark || theme.primary : theme.primary }
+            ]}
+            onPress={() => handleInviteContact(item)}
+          >
+            <ThemedText style={styles.inviteButtonText}>Invite</ThemedText>
+          </Pressable>
+        ) : null}
+      </View>
     );
   };
 
@@ -224,7 +370,7 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
           {(item.name || item.email).slice(0, 2).toUpperCase()}
         </ThemedText>
       </View>
-      <View style={styles.contactInfo}>
+      <View style={styles.contactInfoColumn}>
         <ThemedText style={styles.contactName}>{item.name || item.email}</ThemedText>
         <ThemedText style={[styles.contactEmail, { color: theme.textSecondary }]}>
           {item.email}
@@ -233,113 +379,178 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
     </Pressable>
   );
 
+  const renderFindByEmailView = () => (
+    <View style={styles.findByEmailContainer}>
+      <View style={[styles.searchInputContainer, { backgroundColor: theme.backgroundDefault }]}>
+        <Feather name="search" size={18} color={theme.textSecondary} />
+        <TextInput
+          style={[styles.searchInput, { color: theme.text }]}
+          placeholder="Enter email address"
+          placeholderTextColor={theme.textSecondary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmitEditing={handleEmailSearch}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          autoFocus
+        />
+        {isSearching ? (
+          <ActivityIndicator size="small" color={theme.primary} />
+        ) : searchQuery.length > 0 ? (
+          <Pressable onPress={() => setSearchQuery("")}>
+            <Feather name="x-circle" size={18} color={theme.textSecondary} />
+          </Pressable>
+        ) : null}
+      </View>
+      
+      <Pressable 
+        style={[
+          styles.searchButton, 
+          { 
+            backgroundColor: searchQuery.trim().length > 0 ? theme.primary : theme.backgroundSecondary,
+            opacity: searchQuery.trim().length > 0 ? 1 : 0.6,
+          }
+        ]}
+        onPress={handleEmailSearch}
+        disabled={isSearching || searchQuery.trim().length === 0}
+      >
+        <ThemedText style={[
+          styles.searchButtonText,
+          { color: searchQuery.trim().length > 0 ? "#FFFFFF" : theme.textSecondary }
+        ]}>
+          Search
+        </ThemedText>
+      </Pressable>
+      
+      {searchResults.length > 0 ? (
+        <FlatList
+          data={searchResults}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSearchResult}
+          style={styles.searchResultsList}
+        />
+      ) : null}
+    </View>
+  );
+
+  const renderMainView = () => (
+    <>
+      <View style={styles.optionsContainer}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.optionItem,
+            { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
+          ]}
+          onPress={handleNewGroup}
+        >
+          <Feather name="users" size={20} color={theme.text} />
+          <ThemedText style={styles.optionText}>New Group</ThemedText>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.optionItem,
+            { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
+          ]}
+          onPress={handleFindByEmail}
+        >
+          <Feather name="at-sign" size={20} color={theme.text} />
+          <ThemedText style={styles.optionText}>Find by Email</ThemedText>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </Pressable>
+      </View>
+
+      {Platform.OS !== "web" ? (
+        <View style={styles.contactsContainer}>
+          {isCheckingContacts ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={theme.primary} />
+              <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
+                Checking contacts...
+              </ThemedText>
+            </View>
+          ) : null}
+          
+          {swipeMeContacts.length > 0 ? (
+            <View style={styles.swipeMeSection}>
+              <View style={[styles.sectionDivider, { backgroundColor: theme.backgroundSecondary }]}>
+                <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+                <ThemedText style={[styles.dividerText, { color: theme.textSecondary }]}>
+                  On SwipeMe
+                </ThemedText>
+                <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+              </View>
+              <FlatList
+                data={swipeMeContacts}
+                keyExtractor={(item, index) => `swipeme-${index}-${item.name || ""}`}
+                renderItem={renderSwipeMeContact}
+                scrollEnabled={false}
+              />
+            </View>
+          ) : null}
+          
+          {deviceContacts.length > 0 ? (
+            <View style={styles.regularContactsSection}>
+              <View style={[styles.sectionDivider, { backgroundColor: theme.backgroundSecondary }]}>
+                <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+                <ThemedText style={[styles.dividerText, { color: theme.textSecondary }]}>
+                  Contacts
+                </ThemedText>
+                <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+              </View>
+              <View style={styles.contactsListContainer}>
+                <SectionList
+                  sections={groupedContacts}
+                  keyExtractor={(item, index) => `contact-${index}-${item.name || ""}`}
+                  renderItem={renderContactItem}
+                  renderSectionHeader={renderSectionHeader}
+                  stickySectionHeadersEnabled
+                  contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.xl }}
+                />
+                {renderAlphabetIndex()}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <View style={styles.webFallbackContainer}>
+          <Feather name="smartphone" size={32} color={theme.textSecondary} />
+          <ThemedText style={[styles.webFallbackText, { color: theme.textSecondary }]}>
+            Device contacts available on mobile
+          </ThemedText>
+        </View>
+      )}
+    </>
+  );
+
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
           <View style={styles.headerContent}>
-            <ThemedText style={styles.headerTitle}>New Message</ThemedText>
-            <Pressable onPress={onClose} style={styles.closeButton}>
+            {viewMode === "findByEmail" ? (
+              <Pressable onPress={handleBackToMain} style={styles.backButton}>
+                <Feather name="arrow-left" size={24} color={theme.text} />
+              </Pressable>
+            ) : null}
+            <ThemedText style={styles.headerTitle}>
+              {viewMode === "findByEmail" ? "Find by Email" : "New Message"}
+            </ThemedText>
+            <Pressable onPress={handleClose} style={styles.closeButton}>
               <Feather name="x" size={24} color={theme.text} />
             </Pressable>
           </View>
         </View>
 
-        <View style={styles.optionsContainer}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.optionItem,
-              { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
-            ]}
-          >
-            <Feather name="users" size={20} color={theme.text} />
-            <ThemedText style={styles.optionText}>New Group</ThemedText>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.optionItem,
-              { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
-            ]}
-            onPress={() => setShowEmailSearch(!showEmailSearch)}
-          >
-            <Feather name="at-sign" size={20} color={theme.text} />
-            <ThemedText style={styles.optionText}>Find by Email</ThemedText>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-          </Pressable>
-        </View>
-
-        <View style={styles.emailSearchContainer}>
-          <View style={[styles.searchInputContainer, { backgroundColor: theme.backgroundDefault }]}>
-            <Feather name="search" size={18} color={theme.textSecondary} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.text }]}
-              placeholder="Enter email address to find user"
-              placeholderTextColor={theme.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={handleEmailSearch}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-            />
-            {isSearching ? (
-              <ActivityIndicator size="small" color={theme.primary} />
-            ) : searchQuery.length > 0 ? (
-              <Pressable onPress={() => setSearchQuery("")}>
-                <Feather name="x-circle" size={18} color={theme.textSecondary} />
-              </Pressable>
-            ) : null}
-          </View>
-          
-          <Pressable 
-            style={[styles.searchButton, { backgroundColor: theme.primary }]}
-            onPress={handleEmailSearch}
-            disabled={isSearching || searchQuery.trim().length === 0}
-          >
-            <ThemedText style={styles.searchButtonText}>Search</ThemedText>
-          </Pressable>
-          
-          {searchResults.length > 0 ? (
-            <FlatList
-              data={searchResults}
-              keyExtractor={(item) => item.id}
-              renderItem={renderSearchResult}
-              style={styles.searchResultsList}
-            />
-          ) : null}
-        </View>
-
-        {Platform.OS !== "web" && deviceContacts.length > 0 ? (
-          <View style={styles.contactsContainer}>
-            <ThemedText style={[styles.contactsTitle, { color: theme.textSecondary }]}>
-              Device Contacts
-            </ThemedText>
-            <SectionList
-              sections={groupedContacts}
-              keyExtractor={(item, index) => `contact-${index}-${item.name || ""}`}
-              renderItem={renderContactItem}
-              renderSectionHeader={renderSectionHeader}
-              stickySectionHeadersEnabled
-              contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.xl }}
-            />
-            {renderAlphabetIndex()}
-          </View>
-        ) : Platform.OS === "web" ? (
-          <View style={styles.webFallbackContainer}>
-            <Feather name="smartphone" size={32} color={theme.textSecondary} />
-            <ThemedText style={[styles.webFallbackText, { color: theme.textSecondary }]}>
-              Device contacts available on mobile
-            </ThemedText>
-          </View>
-        ) : null}
+        {viewMode === "findByEmail" ? renderFindByEmailView() : renderMainView()}
       </View>
     </Modal>
   );
@@ -368,6 +579,11 @@ const styles = StyleSheet.create({
     right: 0,
     padding: Spacing.xs,
   },
+  backButton: {
+    position: "absolute",
+    left: 0,
+    padding: Spacing.xs,
+  },
   optionsContainer: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -386,7 +602,32 @@ const styles = StyleSheet.create({
   },
   contactsContainer: {
     flex: 1,
+  },
+  swipeMeSection: {
+    marginBottom: Spacing.sm,
+  },
+  regularContactsSection: {
+    flex: 1,
+  },
+  contactsListContainer: {
+    flex: 1,
     flexDirection: "row",
+  },
+  sectionDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "uppercase",
   },
   sectionHeader: {
     paddingHorizontal: Spacing.lg,
@@ -415,6 +656,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  contactInfoColumn: {
+    flex: 1,
+    flexDirection: "column",
+  },
   contactInfo: {
     flex: 1,
     flexDirection: "row",
@@ -426,6 +671,16 @@ const styles = StyleSheet.create({
   contactEmail: {
     fontSize: 13,
     marginTop: 2,
+  },
+  inviteButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
+  },
+  inviteButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
   },
   alphabetIndex: {
     position: "absolute",
@@ -442,6 +697,11 @@ const styles = StyleSheet.create({
   alphabetText: {
     fontSize: 10,
     fontWeight: "500",
+  },
+  findByEmailContainer: {
+    flex: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
   },
   emailSearchContainer: {
     flex: 1,
@@ -477,7 +737,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   searchButtonText: {
-    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -498,6 +757,16 @@ const styles = StyleSheet.create({
   webFallbackText: {
     fontSize: 15,
     textAlign: "center",
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  loadingText: {
+    fontSize: 14,
   },
   bottomSearchBar: {
     paddingHorizontal: Spacing.md,
