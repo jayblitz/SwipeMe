@@ -620,7 +620,7 @@ interface PaymentModalProps {
   onClose: () => void;
   onSend: (amount: number, memo: string, selectedToken: TempoToken) => void;
   recipientName: string;
-  recipientAvatar: string;
+  recipientAvatar?: string;
   tokenBalances: TokenBalance[];
   sending: boolean;
 }

@@ -331,7 +331,7 @@ export async function sendPayment(
   memo: string,
   recipientId: string,
   recipientName: string,
-  recipientAvatarId: string,
+  recipientAvatarId?: string,
   txHash?: string,
   explorerUrl?: string
 ): Promise<{ message: Message; transaction: Transaction }> {
