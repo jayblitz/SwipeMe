@@ -292,12 +292,13 @@ export default function ChatsScreen() {
     navigation.navigate("Chat", { 
       chatId: chat.id, 
       name: chat.isGroup ? (chat.name || "Group") : participant.name,
+      peerAddress: participant?.walletAddress,
       avatarId: participant?.avatarId,
       contactId: participant?.id,
     });
   };
 
-  const handleStartChat = async (user: { id: string; email: string; name?: string }) => {
+  const handleStartChat = async (user: { id: string; email: string; name?: string; walletAddress?: string }) => {
     const chatId = generateChatId();
     const displayName = user.name || user.email;
     
@@ -307,6 +308,7 @@ export default function ChatsScreen() {
         id: user.id,
         name: displayName,
         avatarId: undefined,
+        walletAddress: user.walletAddress,
       }],
       isGroup: false,
       lastMessage: "",
@@ -320,6 +322,7 @@ export default function ChatsScreen() {
     navigation.navigate("Chat", {
       chatId,
       name: displayName,
+      peerAddress: user.walletAddress,
       contactId: user.id,
     });
   };

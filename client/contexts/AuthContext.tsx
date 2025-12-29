@@ -26,6 +26,7 @@ export interface LoginResult {
 
 interface AuthContextType {
   user: User | null;
+  pendingUser: User | null;
   isLoading: boolean;
   isInitializing: boolean;
   isAuthenticated: boolean;
@@ -40,7 +41,8 @@ interface AuthContextType {
   ) => Promise<void>;
   startSignUp: (email: string) => Promise<void>;
   verifyCode: (email: string, code: string) => Promise<void>;
-  completeSignUp: (email: string, code: string, password: string) => Promise<void>;
+  completeSignUp: (email: string, code: string, password: string) => Promise<User>;
+  finalizeSignUp: () => Promise<void>;
   signOut: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -52,6 +54,7 @@ const USER_STORAGE_KEY = "@swipeme_user";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [pendingUser, setPendingUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -212,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const completeSignUp = useCallback(async (email: string, code: string, password: string) => {
+  const completeSignUp = useCallback(async (email: string, code: string, password: string): Promise<User> => {
     setIsLoading(true);
     try {
       const response = await apiRequest("POST", "/api/auth/signup/complete", { email, code, password });
@@ -222,8 +225,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(data.error || "Signup failed");
       }
       
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
-      setUser(data.user);
+      setPendingUser(data.user);
+      return data.user;
     } catch (error: any) {
       console.error("Complete signup failed:", error);
       throw new Error(error.message || "Signup failed. Please try again.");
@@ -231,6 +234,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     }
   }, []);
+
+  const finalizeSignUp = useCallback(async () => {
+    if (!pendingUser) {
+      throw new Error("No pending user to finalize");
+    }
+    
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(new URL(`/api/user/${pendingUser.id}`, baseUrl), {
+        credentials: "include",
+      });
+      const data = await response.json();
+      
+      const finalUser = data.user || pendingUser;
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(finalUser));
+      setUser(finalUser);
+      setPendingUser(null);
+    } catch (error) {
+      console.error("Failed to fetch latest user data, using pending user:", error);
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(pendingUser));
+      setUser(pendingUser);
+      setPendingUser(null);
+    }
+  }, [pendingUser]);
 
   const signOut = useCallback(async () => {
     try {
@@ -284,6 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        pendingUser,
         isLoading,
         isInitializing,
         isAuthenticated: !!user,
@@ -293,6 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         startSignUp,
         verifyCode,
         completeSignUp,
+        finalizeSignUp,
         signOut,
         updateUser,
         refreshUser,

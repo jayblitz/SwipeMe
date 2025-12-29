@@ -1086,6 +1086,16 @@ export default function ChatScreen() {
           type: "text",
         };
         setMessages(prev => [newMessage, ...prev]);
+        
+        if (chat?.participants?.[0]?.id) {
+          const recipientId = chat.participants[0].id;
+          fetch(new URL("/api/notify/message", getApiUrl()), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ recipientId, message: messageText, chatId }),
+          }).catch(err => console.error("Notification send failed:", err));
+        }
       } catch (error) {
         console.error("Failed to send XMTP message:", error);
         Alert.alert("Error", "Failed to send message. Please try again.");
@@ -1094,6 +1104,16 @@ export default function ChatScreen() {
     } else {
       const newMessage = await sendMessage(chatId, messageText);
       setMessages(prev => [newMessage, ...prev]);
+      
+      if (chat?.participants?.[0]?.id) {
+        const recipientId = chat.participants[0].id;
+        fetch(new URL("/api/notify/message", getApiUrl()), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ recipientId, message: messageText, chatId }),
+        }).catch(err => console.error("Notification send failed:", err));
+      }
     }
   };
 

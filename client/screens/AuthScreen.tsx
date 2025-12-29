@@ -35,7 +35,7 @@ type AuthStep =
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { signIn, verify2FA, signInWithPasskey, startSignUp, verifyCode, completeSignUp, isLoading } = useAuth();
+  const { signIn, verify2FA, signInWithPasskey, startSignUp, verifyCode, completeSignUp, finalizeSignUp, isLoading } = useAuth();
   
   const [step, setStep] = useState<AuthStep>("login-email");
   const [email, setEmail] = useState("");
@@ -470,6 +470,7 @@ export default function AuthScreen() {
       if (!data.success) {
         throw new Error(data.error || "Failed to set username");
       }
+      await finalizeSignUp();
     } catch (err: any) {
       setUsernameError(err.message || "Failed to set username");
       setResetLoading(false);

@@ -777,11 +777,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ users: [] });
       }
       
+      const wallet = await storage.getWalletByUserId(user.id);
+      
       res.json({
         users: [{
           id: user.id,
           email: user.email,
           name: user.displayName || undefined,
+          walletAddress: wallet?.address,
         }]
       });
     } catch (error) {
@@ -811,13 +814,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const matchedUsers = await storage.getUsersByEmails(validEmails);
       
-      const foundUsers = matchedUsers
-        .filter(user => user.id !== currentUserId)
-        .map(user => ({
-          id: user.id,
-          email: user.email,
-          name: user.displayName || undefined,
-        }));
+      const filteredUsers = matchedUsers.filter(user => user.id !== currentUserId);
+      
+      const foundUsers = await Promise.all(
+        filteredUsers.map(async user => {
+          const wallet = await storage.getWalletByUserId(user.id);
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.displayName || undefined,
+            walletAddress: wallet?.address,
+          };
+        })
+      );
       
       res.json({ users: foundUsers });
     } catch (error) {

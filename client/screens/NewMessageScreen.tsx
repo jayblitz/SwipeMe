@@ -22,7 +22,7 @@ import * as Contacts from "expo-contacts";
 interface NewMessageScreenProps {
   visible: boolean;
   onClose: () => void;
-  onStartChat: (user: { id: string; email: string; name?: string }) => void;
+  onStartChat: (user: { id: string; email: string; name?: string; walletAddress?: string }) => void;
   deviceContacts: Contacts.Contact[];
 }
 
@@ -30,6 +30,7 @@ interface UserSearchResult {
   id: string;
   email: string;
   name?: string;
+  walletAddress?: string;
 }
 
 interface ContactWithStatus extends Contacts.Contact {
