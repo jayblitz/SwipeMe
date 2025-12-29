@@ -271,4 +271,16 @@ export const storage = {
     const userPasskeys = await db.select().from(passkeys).where(eq(passkeys.userId, userId));
     return userPasskeys.length > 0;
   },
+
+  async isChatParticipant(chatId: string, userId: string): Promise<boolean> {
+    const [participant] = await db.select()
+      .from(chatParticipants)
+      .where(
+        and(
+          eq(chatParticipants.chatId, chatId),
+          eq(chatParticipants.userId, userId)
+        )
+      );
+    return !!participant;
+  },
 };

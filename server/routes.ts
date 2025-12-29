@@ -586,8 +586,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { recipientId, message, chatId } = req.body;
       const senderId = req.session.userId;
       
-      if (!recipientId || !message) {
-        return res.status(400).json({ error: "Recipient ID and message are required" });
+      if (!recipientId || !message || !chatId) {
+        return res.status(400).json({ error: "Recipient ID, message, and chat ID are required" });
+      }
+      
+      // Verify sender is a participant in this chat
+      const isParticipant = await storage.isChatParticipant(chatId, senderId!);
+      if (!isParticipant) {
+        return res.status(403).json({ error: "You are not a participant in this chat" });
+      }
+      
+      // Verify recipient is also a participant
+      const recipientIsParticipant = await storage.isChatParticipant(chatId, recipientId);
+      if (!recipientIsParticipant) {
+        return res.status(400).json({ error: "Recipient is not in this chat" });
       }
       
       const recipient = await storage.getUserById(recipientId);
@@ -598,11 +610,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sender = await storage.getUserById(senderId!);
       const senderUsername = sender?.username || sender?.displayName || sender?.email?.split("@")[0] || "Someone";
       
+      // Truncate message for security
+      const truncatedMessage = message.length > 100 ? message.slice(0, 97) + "..." : message;
+      
       const sent = await sendMessageNotification(
         recipient.pushToken,
         senderUsername,
-        message,
-        chatId || ""
+        truncatedMessage,
+        chatId
       );
       
       res.json({ success: sent });
