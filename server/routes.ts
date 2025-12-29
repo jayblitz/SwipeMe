@@ -38,7 +38,7 @@ import {
   signMessage,
   type TransferParams
 } from "./wallet";
-import { sendPaymentNotification } from "./pushNotifications";
+import { sendPaymentNotification, sendMessageNotification } from "./pushNotifications";
 import { pool } from "./db";
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -581,6 +581,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/notify/message", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { recipientId, message, chatId } = req.body;
+      const senderId = req.session.userId;
+      
+      if (!recipientId || !message) {
+        return res.status(400).json({ error: "Recipient ID and message are required" });
+      }
+      
+      const recipient = await storage.getUserById(recipientId);
+      if (!recipient?.pushToken) {
+        return res.json({ success: false, reason: "Recipient has no push token" });
+      }
+      
+      const sender = await storage.getUserById(senderId!);
+      const senderUsername = sender?.username || sender?.displayName || sender?.email?.split("@")[0] || "Someone";
+      
+      const sent = await sendMessageNotification(
+        recipient.pushToken,
+        senderUsername,
+        message,
+        chatId || ""
+      );
+      
+      res.json({ success: sent });
+    } catch (error) {
+      console.error("Send notification error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/contacts/invite", requireAuth, async (req: Request, res: Response) => {
     try {
       const { email, name } = req.body;
@@ -1003,10 +1034,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const recipient = await storage.getUserById(recipientWallet.userId);
         if (recipient?.pushToken) {
           const sender = await storage.getUserById(userId);
-          const senderName = sender?.displayName || sender?.email?.split("@")[0] || "Someone";
+          const senderUsername = sender?.username || sender?.displayName || sender?.email?.split("@")[0] || "Someone";
           sendPaymentNotification(
             recipient.pushToken,
-            senderName,
+            senderUsername,
             amount,
             "USD",
             txHash

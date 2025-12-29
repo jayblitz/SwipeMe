@@ -90,13 +90,14 @@ export async function sendMessageNotification(
 
 export async function sendPaymentNotification(
   pushToken: string,
-  senderName: string,
+  senderUsername: string,
   amount: string,
   currency: string,
   txHash?: string
 ): Promise<boolean> {
   const title = "You just got swiped!";
-  const body = `${senderName} swiped you $${amount} ${currency}`;
+  const displayName = senderUsername.startsWith("@") ? senderUsername : `@${senderUsername}`;
+  const body = `${displayName} swiped you $${amount} ${currency}`;
 
   return sendPushNotification(
     pushToken,

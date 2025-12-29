@@ -15,28 +15,33 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { XMTPProvider } from "@/contexts/XMTPContext";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { NotificationHandler } from "@/components/NotificationHandler";
 
 export default function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <WalletProvider>
-            <XMTPProvider>
-              <ThemeProvider>
-                <SafeAreaProvider>
-                  <GestureHandlerRootView style={styles.root}>
-                    <KeyboardProvider>
-                      <NavigationContainer>
-                        <RootStackNavigator />
-                      </NavigationContainer>
-                      <StatusBar style="auto" />
-                    </KeyboardProvider>
-                  </GestureHandlerRootView>
-                </SafeAreaProvider>
-              </ThemeProvider>
-            </XMTPProvider>
-          </WalletProvider>
+          <NotificationProvider>
+            <WalletProvider>
+              <XMTPProvider>
+                <ThemeProvider>
+                  <SafeAreaProvider>
+                    <GestureHandlerRootView style={styles.root}>
+                      <KeyboardProvider>
+                        <NavigationContainer>
+                          <NotificationHandler />
+                          <RootStackNavigator />
+                        </NavigationContainer>
+                        <StatusBar style="auto" />
+                      </KeyboardProvider>
+                    </GestureHandlerRootView>
+                  </SafeAreaProvider>
+                </ThemeProvider>
+              </XMTPProvider>
+            </WalletProvider>
+          </NotificationProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
