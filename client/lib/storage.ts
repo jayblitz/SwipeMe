@@ -11,6 +11,7 @@ const CURRENT_STORAGE_VERSION = "2";
 export interface Contact {
   id: string;
   name: string;
+  username?: string;
   avatarId?: string;
   walletAddress?: string;
   phone?: string;

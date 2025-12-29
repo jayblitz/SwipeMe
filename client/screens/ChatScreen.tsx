@@ -347,12 +347,13 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
 interface MessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
+  recipientUsername?: string;
 }
 
 const { width: screenWidth } = Dimensions.get("window");
 const IMAGE_MAX_WIDTH = screenWidth * 0.65;
 
-function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
+function MessageBubble({ message, isOwnMessage, recipientUsername }: MessageBubbleProps) {
   const { theme } = useTheme();
   
   const handleExplorerPress = async () => {
@@ -392,7 +393,9 @@ function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
             color="#FFFFFF"
           />
           <ThemedText style={[styles.paymentLabel, { color: "rgba(255,255,255,0.9)" }]}>
-            {isOwnMessage ? "You swiped" : "Swiped you"}
+            {isOwnMessage 
+              ? `You swiped${recipientUsername ? ` @${recipientUsername}` : ""}` 
+              : `${recipientUsername ? `@${recipientUsername}` : "Someone"} swiped you`}
           </ThemedText>
         </View>
         <ThemedText style={[styles.paymentAmount, { color: "#FFFFFF" }]}>
@@ -1495,7 +1498,7 @@ export default function ChatScreen() {
               
               return (
                 <>
-                  <MessageBubble message={item} isOwnMessage={item.senderId === "me"} />
+                  <MessageBubble message={item} isOwnMessage={item.senderId === "me"} recipientUsername={participant?.username} />
                   {showDateSeparator ? <DateSeparator timestamp={item.timestamp} /> : null}
                 </>
               );
