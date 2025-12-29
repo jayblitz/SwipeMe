@@ -28,7 +28,8 @@ interface NewMessageScreenProps {
 
 interface UserSearchResult {
   id: string;
-  email: string;
+  email?: string;
+  username?: string;
   name?: string;
   walletAddress?: string;
 }
@@ -46,17 +47,20 @@ interface ContactSection {
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("");
 
-type ViewMode = "main" | "findByEmail";
+type ViewMode = "main" | "findByEmail" | "findByUsername";
 
 export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts }: NewMessageScreenProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState("");
+  const [usernameQuery, setUsernameQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+  const [usernameResults, setUsernameResults] = useState<UserSearchResult[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("main");
   const [swipeMeContacts, setSwipeMeContacts] = useState<ContactWithStatus[]>([]);
   const [isCheckingContacts, setIsCheckingContacts] = useState(false);
+  const usernameSearchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (visible && deviceContacts.length > 0) {
@@ -92,7 +96,9 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
         const data = await response.json();
         const swipeMeUsers: Record<string, UserSearchResult> = {};
         (data.users || []).forEach((user: UserSearchResult) => {
-          swipeMeUsers[user.email.toLowerCase()] = user;
+          if (user.email) {
+            swipeMeUsers[user.email.toLowerCase()] = user;
+          }
         });
 
         const contactsWithStatus: ContactWithStatus[] = deviceContacts.map(contact => {
@@ -203,9 +209,11 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
   }, [searchQuery]);
 
   const handleSelectUser = (user: UserSearchResult) => {
-    onStartChat(user);
+    onStartChat({ ...user, email: user.email || "" });
     setSearchQuery("");
     setSearchResults([]);
+    setUsernameQuery("");
+    setUsernameResults([]);
     setViewMode("main");
     onClose();
   };
@@ -224,16 +232,70 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
     setSearchResults([]);
   };
 
+  const handleFindByUsername = () => {
+    setViewMode("findByUsername");
+    setUsernameQuery("");
+    setUsernameResults([]);
+  };
+
+  const handleUsernameChange = (text: string) => {
+    setUsernameQuery(text);
+    
+    if (usernameSearchTimeoutRef.current) {
+      clearTimeout(usernameSearchTimeoutRef.current);
+    }
+    
+    const cleanQuery = text.trim().replace(/^@/, "");
+    if (cleanQuery.length === 0) {
+      setUsernameResults([]);
+      return;
+    }
+    
+    usernameSearchTimeoutRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const url = new URL("/api/users/search-username", getApiUrl());
+        url.searchParams.set("username", cleanQuery);
+        
+        const response = await fetch(url.toString(), {
+          credentials: "include",
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUsernameResults(data.users || []);
+        } else {
+          setUsernameResults([]);
+        }
+      } catch (error) {
+        console.error("Username search error:", error);
+        setUsernameResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
+
   const handleBackToMain = () => {
     setViewMode("main");
     setSearchQuery("");
     setSearchResults([]);
+    setUsernameQuery("");
+    setUsernameResults([]);
+    if (usernameSearchTimeoutRef.current) {
+      clearTimeout(usernameSearchTimeoutRef.current);
+    }
   };
 
   const handleClose = () => {
     setViewMode("main");
     setSearchQuery("");
     setSearchResults([]);
+    setUsernameQuery("");
+    setUsernameResults([]);
+    if (usernameSearchTimeoutRef.current) {
+      clearTimeout(usernameSearchTimeoutRef.current);
+    }
     onClose();
   };
 
@@ -368,13 +430,13 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
     >
       <View style={[styles.contactAvatar, { backgroundColor: theme.primary }]}>
         <ThemedText style={styles.contactInitials}>
-          {(item.name || item.email).slice(0, 2).toUpperCase()}
+          {(item.name || item.email || "?").slice(0, 2).toUpperCase()}
         </ThemedText>
       </View>
       <View style={styles.contactInfoColumn}>
-        <ThemedText style={styles.contactName}>{item.name || item.email}</ThemedText>
+        <ThemedText style={styles.contactName}>{item.name || item.email || "Unknown"}</ThemedText>
         <ThemedText style={[styles.contactEmail, { color: theme.textSecondary }]}>
-          {item.email}
+          {item.email || ""}
         </ThemedText>
       </View>
     </Pressable>
@@ -436,6 +498,80 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
     </View>
   );
 
+  const renderUsernameResult = ({ item }: { item: UserSearchResult }) => (
+    <Pressable
+      style={({ pressed }) => [
+        styles.contactItem,
+        { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
+      ]}
+      onPress={() => handleSelectUser({ ...item, email: item.email || "" })}
+    >
+      <View style={[styles.contactAvatar, { backgroundColor: theme.primary }]}>
+        <ThemedText style={styles.contactInitials}>
+          {(item.name || item.username || "?").slice(0, 2).toUpperCase()}
+        </ThemedText>
+      </View>
+      <View style={styles.contactInfoColumn}>
+        <ThemedText style={styles.contactName}>
+          {item.name || `@${item.username}`}
+        </ThemedText>
+        <ThemedText style={[styles.contactEmail, { color: theme.textSecondary }]}>
+          @{item.username}
+        </ThemedText>
+      </View>
+    </Pressable>
+  );
+
+  const renderFindByUsernameView = () => (
+    <View style={styles.findByEmailContainer}>
+      <View style={[styles.searchInputContainer, { backgroundColor: theme.backgroundDefault }]}>
+        <ThemedText style={{ color: theme.textSecondary, fontSize: 18, marginRight: 4 }}>@</ThemedText>
+        <TextInput
+          style={[styles.searchInput, { color: theme.text }]}
+          placeholder="Search username"
+          placeholderTextColor={theme.textSecondary}
+          value={usernameQuery}
+          onChangeText={handleUsernameChange}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          autoFocus
+        />
+        {isSearching ? (
+          <ActivityIndicator size="small" color={theme.primary} />
+        ) : usernameQuery.length > 0 ? (
+          <Pressable onPress={() => { setUsernameQuery(""); setUsernameResults([]); }}>
+            <Feather name="x-circle" size={18} color={theme.textSecondary} />
+          </Pressable>
+        ) : null}
+      </View>
+      
+      {usernameResults.length > 0 ? (
+        <FlatList
+          data={usernameResults}
+          keyExtractor={(item) => item.id}
+          renderItem={renderUsernameResult}
+          style={styles.searchResultsList}
+          contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.xl }}
+        />
+      ) : usernameQuery.trim().length > 0 && !isSearching ? (
+        <View style={styles.noResultsContainer}>
+          <Feather name="user-x" size={32} color={theme.textSecondary} />
+          <ThemedText style={[styles.noResultsText, { color: theme.textSecondary }]}>
+            No users found matching "@{usernameQuery.replace(/^@/, "")}"
+          </ThemedText>
+        </View>
+      ) : (
+        <View style={styles.noResultsContainer}>
+          <Feather name="search" size={32} color={theme.textSecondary} />
+          <ThemedText style={[styles.noResultsText, { color: theme.textSecondary }]}>
+            Enter a username to find someone
+          </ThemedText>
+        </View>
+      )}
+    </View>
+  );
+
   const renderMainView = () => (
     <>
       <View style={styles.optionsContainer}>
@@ -456,9 +592,21 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
             styles.optionItem,
             { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
           ]}
-          onPress={handleFindByEmail}
+          onPress={handleFindByUsername}
         >
           <Feather name="at-sign" size={20} color={theme.text} />
+          <ThemedText style={styles.optionText}>Find by Username</ThemedText>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.optionItem,
+            { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
+          ]}
+          onPress={handleFindByEmail}
+        >
+          <Feather name="mail" size={20} color={theme.text} />
           <ThemedText style={styles.optionText}>Find by Email</ThemedText>
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
         </Pressable>
@@ -537,13 +685,13 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
       <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
           <View style={styles.headerContent}>
-            {viewMode === "findByEmail" ? (
+            {viewMode !== "main" ? (
               <Pressable onPress={handleBackToMain} style={styles.backButton}>
                 <Feather name="arrow-left" size={24} color={theme.text} />
               </Pressable>
             ) : null}
             <ThemedText style={styles.headerTitle}>
-              {viewMode === "findByEmail" ? "Find by Email" : "New Message"}
+              {viewMode === "findByEmail" ? "Find by Email" : viewMode === "findByUsername" ? "Find by Username" : "New Message"}
             </ThemedText>
             <Pressable onPress={handleClose} style={styles.closeButton}>
               <Feather name="x" size={24} color={theme.text} />
@@ -551,7 +699,7 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
           </View>
         </View>
 
-        {viewMode === "findByEmail" ? renderFindByEmailView() : renderMainView()}
+        {viewMode === "findByEmail" ? renderFindByEmailView() : viewMode === "findByUsername" ? renderFindByUsernameView() : renderMainView()}
       </View>
     </Modal>
   );

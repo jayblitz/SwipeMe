@@ -793,6 +793,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/users/search-username", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const username = req.query.username as string;
+      
+      if (!username || username.trim().length === 0) {
+        return res.json({ users: [] });
+      }
+      
+      const searchQuery = username.trim().toLowerCase().replace(/^@/, "");
+      const currentUserId = req.session?.userId;
+      
+      const matchedUsers = await storage.searchUsersByUsername(searchQuery, currentUserId, 20);
+      
+      const usersWithWallets = await Promise.all(
+        matchedUsers.map(async user => {
+          const wallet = await storage.getWalletByUserId(user.id);
+          return {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            name: user.displayName || undefined,
+            walletAddress: wallet?.address,
+          };
+        })
+      );
+      
+      res.json({ users: usersWithWallets });
+    } catch (error) {
+      console.error("Search users by username error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/users/check-batch", requireAuth, async (req: Request, res: Response) => {
     try {
       const { emails } = req.body;

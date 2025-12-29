@@ -1,4 +1,4 @@
-import { eq, and, gt, desc, inArray, lt, or } from "drizzle-orm";
+import { eq, and, gt, desc, inArray, lt, or, ilike, ne } from "drizzle-orm";
 import { db } from "./db";
 import { 
   users, 
@@ -62,6 +62,20 @@ export const storage = {
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username.toLowerCase()));
     return user;
+  },
+
+  async searchUsersByUsername(query: string, excludeUserId?: string, limit: number = 20): Promise<User[]> {
+    if (!query || query.trim().length === 0) return [];
+    const searchPattern = `${query.toLowerCase()}%`;
+    const conditions = [ilike(users.username, searchPattern)];
+    if (excludeUserId) {
+      conditions.push(ne(users.id, excludeUserId));
+    }
+    const matchedUsers = await db.select()
+      .from(users)
+      .where(and(...conditions))
+      .limit(limit);
+    return matchedUsers;
   },
 
   async updateUserUsername(id: string, username: string): Promise<User | undefined> {
