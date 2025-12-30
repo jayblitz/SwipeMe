@@ -1,4 +1,4 @@
-import { eq, and, gt, desc, inArray, lt, or, ilike, ne } from "drizzle-orm";
+import { eq, and, gt, desc, inArray, lt, or, ilike, ne, count } from "drizzle-orm";
 import { db } from "./db";
 import { 
   users, 
@@ -11,6 +11,7 @@ import {
   transactions,
   waitlistSignups,
   passkeys,
+  follows,
   posts,
   postLikes,
   postComments,
@@ -21,6 +22,7 @@ import {
   type WaitlistSignup,
   type Passkey,
   type ChatParticipant,
+  type Follow,
   type Post,
   type PostComment,
   type PostTip
@@ -356,12 +358,13 @@ export const storage = {
   },
 
   // Moments (Social Feed) methods
-  async createPost(authorId: string, content?: string, mediaUrls?: string[], visibility?: string): Promise<Post> {
+  async createPost(authorId: string, content?: string, mediaUrls?: string[], mediaType?: string, visibility?: string): Promise<Post> {
     const [post] = await db.insert(posts)
       .values({
         authorId,
         content: content || null,
         mediaUrls: mediaUrls || null,
+        mediaType: mediaType || "text",
         visibility: visibility || "public",
       })
       .returning();
@@ -466,5 +469,93 @@ export const storage = {
       await db.update(posts).set({ tipsTotal: newTotal.toString() }).where(eq(posts.id, postId));
     }
     return tip;
+  },
+
+  async followUser(followerId: string, followingId: string): Promise<Follow | null> {
+    if (followerId === followingId) return null;
+    const [existing] = await db.select()
+      .from(follows)
+      .where(and(eq(follows.followerId, followerId), eq(follows.followingId, followingId)));
+    if (existing) return existing;
+    const [follow] = await db.insert(follows)
+      .values({ followerId, followingId })
+      .returning();
+    return follow;
+  },
+
+  async unfollowUser(followerId: string, followingId: string): Promise<boolean> {
+    const result = await db.delete(follows)
+      .where(and(eq(follows.followerId, followerId), eq(follows.followingId, followingId)))
+      .returning();
+    return result.length > 0;
+  },
+
+  async isFollowing(followerId: string, followingId: string): Promise<boolean> {
+    const [existing] = await db.select()
+      .from(follows)
+      .where(and(eq(follows.followerId, followerId), eq(follows.followingId, followingId)));
+    return !!existing;
+  },
+
+  async getFollowersCount(userId: string): Promise<number> {
+    const [result] = await db.select({ count: count() })
+      .from(follows)
+      .where(eq(follows.followingId, userId));
+    return result?.count ?? 0;
+  },
+
+  async getFollowingCount(userId: string): Promise<number> {
+    const [result] = await db.select({ count: count() })
+      .from(follows)
+      .where(eq(follows.followerId, userId));
+    return result?.count ?? 0;
+  },
+
+  async getFollowers(userId: string, limit: number = 50): Promise<User[]> {
+    const followerRecords = await db.select()
+      .from(follows)
+      .where(eq(follows.followingId, userId))
+      .orderBy(desc(follows.createdAt))
+      .limit(limit);
+    const followerIds = followerRecords.map(f => f.followerId);
+    if (followerIds.length === 0) return [];
+    const followerUsers = await db.select().from(users).where(inArray(users.id, followerIds));
+    return followerUsers;
+  },
+
+  async getFollowing(userId: string, limit: number = 50): Promise<User[]> {
+    const followingRecords = await db.select()
+      .from(follows)
+      .where(eq(follows.followerId, userId))
+      .orderBy(desc(follows.createdAt))
+      .limit(limit);
+    const followingIds = followingRecords.map(f => f.followingId);
+    if (followingIds.length === 0) return [];
+    const followingUsers = await db.select().from(users).where(inArray(users.id, followingIds));
+    return followingUsers;
+  },
+
+  async getPostsByUser(userId: string, viewerId: string, limit: number = 20, offset: number = 0): Promise<(Post & { author: User; isLiked: boolean })[]> {
+    const userPosts = await db.select()
+      .from(posts)
+      .where(eq(posts.authorId, userId))
+      .orderBy(desc(posts.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const postsWithAuthors = await Promise.all(
+      userPosts.map(async (post) => {
+        const author = await this.getUserById(post.authorId);
+        const [like] = await db.select()
+          .from(postLikes)
+          .where(and(eq(postLikes.postId, post.id), eq(postLikes.userId, viewerId)));
+        return {
+          ...post,
+          author: author!,
+          isLiked: !!like,
+        };
+      })
+    );
+    return postsWithAuthors;
   },
 };

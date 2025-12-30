@@ -269,6 +269,19 @@ export const resetPasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
+// Follows table for user relationships
+export const follows = pgTable("follows", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  followerId: varchar("follower_id").notNull().references(() => users.id),
+  followingId: varchar("following_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("follows_follower_idx").on(table.followerId),
+  index("follows_following_idx").on(table.followingId),
+]);
+
 // Moments (Social Feed) tables
 export const posts = pgTable("posts", {
   id: varchar("id")
@@ -277,6 +290,7 @@ export const posts = pgTable("posts", {
   authorId: varchar("author_id").notNull().references(() => users.id),
   content: text("content"),
   mediaUrls: jsonb("media_urls").$type<string[]>(),
+  mediaType: text("media_type").default("text"), // text, photo, video
   visibility: text("visibility").notNull().default("public"), // public, friends, private
   likesCount: text("likes_count").default("0"),
   commentsCount: text("comments_count").default("0"),
@@ -328,6 +342,7 @@ export const postTips = pgTable("post_tips", {
   index("post_tips_from_user_idx").on(table.fromUserId),
 ]);
 
+export type Follow = typeof follows.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type PostLike = typeof postLikes.$inferSelect;
 export type PostComment = typeof postComments.$inferSelect;
@@ -336,6 +351,7 @@ export type PostTip = typeof postTips.$inferSelect;
 export const createPostSchema = z.object({
   content: z.string().min(1).max(2000).optional(),
   mediaUrls: z.array(z.string().url()).max(10).optional(),
+  mediaType: z.enum(["text", "photo", "video"]).optional(),
   visibility: z.enum(["public", "friends", "private"]).optional(),
 });
 
