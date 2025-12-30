@@ -6,6 +6,7 @@ import { sql } from "drizzle-orm";
 export const aiConversations = pgTable("ai_conversations", {
   id: serial("id").primaryKey(),
   userId: text("user_id"),
+  accessKey: text("access_key"),
   title: text("title").notNull(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });

@@ -1,11 +1,17 @@
 import { db } from "../../db";
 import { aiConversations, aiMessages } from "@shared/models/chat";
 import { eq, desc } from "drizzle-orm";
+import crypto from "crypto";
+
+function generateAccessKey(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
 
 export interface IChatStorage {
   getConversation(id: number): Promise<typeof aiConversations.$inferSelect | undefined>;
   getAllConversations(userId?: string): Promise<(typeof aiConversations.$inferSelect)[]>;
-  createConversation(title: string, userId?: string): Promise<typeof aiConversations.$inferSelect>;
+  getConversationsByUser(userId: string | null): Promise<(typeof aiConversations.$inferSelect)[]>;
+  createConversation(title: string, userId?: string | null): Promise<typeof aiConversations.$inferSelect>;
   deleteConversation(id: number): Promise<void>;
   getMessagesByConversation(conversationId: number): Promise<(typeof aiMessages.$inferSelect)[]>;
   createMessage(conversationId: number, role: string, content: string): Promise<typeof aiMessages.$inferSelect>;
@@ -24,8 +30,20 @@ export const chatStorage: IChatStorage = {
     return db.select().from(aiConversations).orderBy(desc(aiConversations.createdAt));
   },
 
-  async createConversation(title: string, userId?: string) {
-    const [conversation] = await db.insert(aiConversations).values({ title, userId }).returning();
+  async getConversationsByUser(userId: string | null) {
+    if (userId) {
+      return db.select().from(aiConversations).where(eq(aiConversations.userId, userId)).orderBy(desc(aiConversations.createdAt));
+    }
+    return [];
+  },
+
+  async createConversation(title: string, userId?: string | null) {
+    const accessKey = userId ? null : generateAccessKey();
+    const [conversation] = await db.insert(aiConversations).values({ 
+      title, 
+      userId: userId || null,
+      accessKey 
+    }).returning();
     return conversation;
   },
 

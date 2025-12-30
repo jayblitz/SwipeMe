@@ -18,9 +18,13 @@ import { createChat, Contact } from "@/lib/storage";
 import { apiRequest } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 import { MainTabParamList } from "@/navigation/MainTabNavigator";
+import { DiscoverStackParamList } from "@/navigation/DiscoverStackNavigator";
 
 type NavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<MainTabParamList, "DiscoverTab">,
+  CompositeNavigationProp<
+    BottomTabNavigationProp<MainTabParamList, "DiscoverTab">,
+    NativeStackNavigationProp<DiscoverStackParamList>
+  >,
   NativeStackNavigationProp<ChatsStackParamList>
 >;
 
@@ -175,6 +179,34 @@ const MINI_APPS: MiniApp[] = [
   { id: "converter", name: "Converter", icon: "refresh-cw", color: "#14B8A6", category: "utilities" },
   { id: "notes", name: "Notes", icon: "file-text", color: "#F97316", category: "utilities" },
 ];
+
+function AIAssistantSection({ onPress }: { onPress: () => void }) {
+  const { theme } = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.aiAssistantCard,
+        { 
+          backgroundColor: theme.backgroundDefault,
+          opacity: pressed ? 0.8 : 1,
+        }
+      ]}
+    >
+      <View style={[styles.aiAssistantIcon, { backgroundColor: theme.primary }]}>
+        <Feather name="cpu" size={28} color="#FFFFFF" />
+      </View>
+      <View style={styles.aiAssistantContent}>
+        <ThemedText style={styles.aiAssistantTitle}>AI Assistant</ThemedText>
+        <ThemedText style={[styles.aiAssistantSubtitle, { color: theme.textSecondary }]}>
+          Powered by Grok - Ask anything about crypto
+        </ThemedText>
+      </View>
+      <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+    </Pressable>
+  );
+}
 
 function MiniAppsSection({ onAppPress }: { onAppPress: (app: MiniApp) => void }) {
   const { theme } = useTheme();
@@ -957,6 +989,10 @@ export default function DiscoverScreen() {
     }
   };
 
+  const handleAIAssistantPress = () => {
+    navigation.navigate("AIAssistant" as any);
+  };
+
   const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (contact.phone && contact.phone.includes(searchQuery))
@@ -1050,6 +1086,7 @@ export default function DiscoverScreen() {
         ]}
         ListHeaderComponent={
           <View>
+            <AIAssistantSection onPress={handleAIAssistantPress} />
             <MiniAppsSection onAppPress={handleMiniAppPress} />
             
             <ThemedText style={[styles.contactsSectionTitle, { color: theme.textSecondary }]}>
@@ -1428,6 +1465,32 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
+  },
+  aiAssistantCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
+  },
+  aiAssistantIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.md,
+  },
+  aiAssistantContent: {
+    flex: 1,
+  },
+  aiAssistantTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  aiAssistantSubtitle: {
+    fontSize: 13,
   },
   miniAppsSection: {
     marginBottom: Spacing.lg,
