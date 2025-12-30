@@ -12,6 +12,9 @@ import {
   postLikes,
   postComments,
   postTips,
+  revenueLedger,
+  creatorBalances,
+  creatorWithdrawals,
   type User,
   type Wallet,
   type WaitlistSignup,
@@ -20,7 +23,10 @@ import {
   type Follow,
   type Post,
   type PostComment,
-  type PostTip
+  type PostTip,
+  type RevenueLedger,
+  type CreatorBalance,
+  type CreatorWithdrawal
 } from "@shared/schema";
 import { randomBytes, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -552,5 +558,177 @@ export const storage = {
       })
     );
     return postsWithAuthors;
+  },
+
+  // Revenue tracking functions
+  // Note: This is a TRACKING-ONLY model for testnet development
+  // Fees are calculated and recorded for analytics/reporting but not actually collected on-chain
+  // Production implementation would require: split payments, fee collection to platform wallet, etc.
+  async recordRevenueEntry(data: {
+    transactionId?: string;
+    tipId?: string;
+    revenueSource: string;
+    grossAmount: string;
+    feeAmount: string;
+    feePercentage: string;
+    netToRecipient: string;
+    currency: string;
+    tempoTxHash?: string;
+  }): Promise<RevenueLedger> {
+    const [entry] = await db.insert(revenueLedger)
+      .values({
+        transactionId: data.transactionId || null,
+        tipId: data.tipId || null,
+        revenueSource: data.revenueSource,
+        grossAmount: data.grossAmount,
+        feeAmount: data.feeAmount,
+        feePercentage: data.feePercentage,
+        netToRecipient: data.netToRecipient,
+        currency: data.currency,
+        tempoTxHash: data.tempoTxHash || null,
+        recordedAt: new Date(),
+      })
+      .returning();
+    return entry;
+  },
+
+  async getRevenueStats(): Promise<{
+    totalRevenue: string;
+    tipFees: string;
+    p2pFees: string;
+    miniAppFees: string;
+    entryCount: number;
+  }> {
+    const entries = await db.select().from(revenueLedger);
+    
+    let totalRevenue = 0;
+    let tipFees = 0;
+    let p2pFees = 0;
+    let miniAppFees = 0;
+    
+    for (const entry of entries) {
+      const fee = parseFloat(entry.feeAmount);
+      totalRevenue += fee;
+      if (entry.revenueSource === 'tip_fee') tipFees += fee;
+      if (entry.revenueSource === 'p2p_fee') p2pFees += fee;
+      if (entry.revenueSource === 'mini_app_fee') miniAppFees += fee;
+    }
+    
+    return {
+      totalRevenue: totalRevenue.toFixed(6),
+      tipFees: tipFees.toFixed(6),
+      p2pFees: p2pFees.toFixed(6),
+      miniAppFees: miniAppFees.toFixed(6),
+      entryCount: entries.length,
+    };
+  },
+
+  async getOrCreateCreatorBalance(creatorId: string): Promise<CreatorBalance> {
+    const [existing] = await db.select()
+      .from(creatorBalances)
+      .where(eq(creatorBalances.creatorId, creatorId));
+    
+    if (existing) return existing;
+    
+    const [created] = await db.insert(creatorBalances)
+      .values({ creatorId })
+      .returning();
+    return created;
+  },
+
+  async updateCreatorBalance(creatorId: string, tipAmount: string, feeAmount: string): Promise<CreatorBalance> {
+    const balance = await this.getOrCreateCreatorBalance(creatorId);
+    
+    // Note: Currently tracking fees for analytics only - full amount goes to creator on-chain
+    // In production with actual fee collection, creator would receive (tipAmount - feeAmount)
+    // For now, totalEarned = full amount received, totalFeesPaid = tracked platform fees
+    const newTotalEarned = parseFloat(balance.totalEarned) + parseFloat(tipAmount);
+    const newPendingBalance = parseFloat(balance.pendingBalance) + parseFloat(tipAmount);
+    const newTotalTipsReceived = parseInt(balance.totalTipsReceived) + 1;
+    const newTotalFeesPaid = parseFloat(balance.totalFeesPaid) + parseFloat(feeAmount);
+    
+    const [updated] = await db.update(creatorBalances)
+      .set({
+        totalEarned: newTotalEarned.toFixed(6),
+        pendingBalance: newPendingBalance.toFixed(6),
+        totalTipsReceived: newTotalTipsReceived.toString(),
+        totalFeesPaid: newTotalFeesPaid.toFixed(6),
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorBalances.creatorId, creatorId))
+      .returning();
+    
+    return updated;
+  },
+
+  async getCreatorBalance(creatorId: string): Promise<CreatorBalance | undefined> {
+    const [balance] = await db.select()
+      .from(creatorBalances)
+      .where(eq(creatorBalances.creatorId, creatorId));
+    return balance;
+  },
+
+  async createWithdrawal(data: {
+    creatorId: string;
+    amount: string;
+    currency: string;
+    destinationWallet: string;
+  }): Promise<CreatorWithdrawal> {
+    const [withdrawal] = await db.insert(creatorWithdrawals)
+      .values({
+        creatorId: data.creatorId,
+        amount: data.amount,
+        currency: data.currency,
+        destinationWallet: data.destinationWallet,
+        status: 'pending',
+      })
+      .returning();
+    return withdrawal;
+  },
+
+  async updateWithdrawalStatus(withdrawalId: string, status: string, tempoTxHash?: string): Promise<CreatorWithdrawal> {
+    const [updated] = await db.update(creatorWithdrawals)
+      .set({
+        status,
+        tempoTxHash: tempoTxHash || null,
+        completedAt: status === 'completed' ? new Date() : null,
+      })
+      .where(eq(creatorWithdrawals.id, withdrawalId))
+      .returning();
+    return updated;
+  },
+
+  async processWithdrawal(creatorId: string, amount: string): Promise<void> {
+    const balance = await this.getCreatorBalance(creatorId);
+    if (!balance) throw new Error("Creator balance not found");
+    
+    const newPendingBalance = parseFloat(balance.pendingBalance) - parseFloat(amount);
+    const newTotalWithdrawn = parseFloat(balance.totalWithdrawn) + parseFloat(amount);
+    
+    if (newPendingBalance < 0) throw new Error("Insufficient balance");
+    
+    await db.update(creatorBalances)
+      .set({
+        pendingBalance: newPendingBalance.toFixed(6),
+        totalWithdrawn: newTotalWithdrawn.toFixed(6),
+        lastWithdrawalAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorBalances.creatorId, creatorId));
+  },
+
+  async getCreatorWithdrawals(creatorId: string, limit: number = 50): Promise<CreatorWithdrawal[]> {
+    return db.select()
+      .from(creatorWithdrawals)
+      .where(eq(creatorWithdrawals.creatorId, creatorId))
+      .orderBy(desc(creatorWithdrawals.createdAt))
+      .limit(limit);
+  },
+
+  async getRecentRevenueLedger(limit: number = 100): Promise<RevenueLedger[]> {
+    return db.select()
+      .from(revenueLedger)
+      .orderBy(desc(revenueLedger.createdAt))
+      .limit(limit);
   },
 };

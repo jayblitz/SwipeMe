@@ -11,6 +11,8 @@ Transitioned from MVP stage to production build phase. Focus is on stability, po
 - Blockchain tipping for posts using pathUSD on Tempo testnet
 - Mini-apps marketplace with functional Calculator app
 - AI Assistant was removed due to security concerns
+- Revenue tracking system with fee analytics (5% tip fees, 1% P2P fees)
+- Creator earnings dashboard with withdrawal functionality
 
 ## User Preferences
 - iOS 26 liquid glass UI design aesthetic
@@ -54,6 +56,7 @@ The application is built with an Expo/React Native frontend and an Express.js ba
   - CSP meta tag on landing page
   - XMTP encryption keys stored in expo-secure-store
 - **Database:** PostgreSQL with schemas for users, wallets, chats, messages, transactions, and authentication-related data (verification codes, passkeys).
+- **Revenue System:** Tracking-only model for testnet development with database tables for revenue_ledger (all platform fees), creator_balances (creator earnings), and creator_withdrawals (payout history). Fee structure: 5% on tips, 1% on P2P transfers. Currently tracks fees for analytics without on-chain collection (full amounts transfer to recipients). Production implementation would require split payments or fee deduction logic.
 
 ## External Dependencies
 - **Resend:** For email verification code delivery.

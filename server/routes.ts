@@ -787,6 +787,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Post author does not have a wallet to receive tips" });
       }
       
+      // Calculate platform fee (5%) - TRACKING ONLY for testnet
+      // Full amount is transferred on-chain; fee is recorded for analytics
+      // Production: implement split payment (net to creator, fee to platform wallet)
+      const FEE_PERCENTAGE = 5;
+      const grossAmount = parseFloat(amount);
+      const feeAmount = grossAmount * (FEE_PERCENTAGE / 100);
+      const netToCreator = grossAmount - feeAmount;
+      
       // Use pathUSD by default (decimals: 18)
       const tipTokenAddress = tokenAddress || "0x7d08bd4f2b9548e99715691d4de8ec5f01f0a82b";
       const decimals = 18;
@@ -801,7 +809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No signing key available for your wallet" });
       }
       
-      // Execute the transfer
+      // Execute the transfer (full amount goes to creator, fee tracked separately)
       const walletClient = createWalletClientForAccount(signingKey);
       const txHash = await transferERC20Token(walletClient, {
         tokenAddress: tipTokenAddress,
@@ -812,6 +820,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Record the tip in database
       const tip = await storage.addPostTip(postId, userId, amount, currency || "pathUSD", txHash);
+      
+      // Record revenue in ledger
+      await storage.recordRevenueEntry({
+        tipId: tip.id,
+        revenueSource: 'tip_fee',
+        grossAmount: grossAmount.toFixed(6),
+        feeAmount: feeAmount.toFixed(6),
+        feePercentage: FEE_PERCENTAGE.toString(),
+        netToRecipient: netToCreator.toFixed(6),
+        currency: currency || "pathUSD",
+        tempoTxHash: txHash,
+      });
+      
+      // Update creator balance
+      await storage.updateCreatorBalance(post.authorId, amount, feeAmount.toFixed(6));
       
       // Send notification to author
       const author = await storage.getUserById(post.authorId);
@@ -833,6 +856,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...tip, 
         txHash,
         explorer: explorerUrl,
+        platformFee: feeAmount.toFixed(6),
+        platformFeePercent: FEE_PERCENTAGE,
+        netToCreator: netToCreator.toFixed(6),
         success: true 
       });
     } catch (error) {
@@ -1466,8 +1492,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const explorerUrl = `${tempoTestnet.blockExplorers?.default.url || "https://explorer.testnet.tempo.xyz"}/tx/${txHash}`;
       
+      // Check if recipient is a platform user (P2P payment)
       const recipientWallet = await storage.getWalletByAddress(toAddress);
+      let platformFee = "0";
+      let netToRecipient = amount;
+      
       if (recipientWallet) {
+        // P2P payment fee (1%) - TRACKING ONLY for testnet
+        // Full amount is transferred on-chain; fee is recorded for analytics
+        // Production: implement split payment or fee deduction
+        const P2P_FEE_PERCENTAGE = 1;
+        const grossAmount = parseFloat(amount);
+        const feeAmount = grossAmount * (P2P_FEE_PERCENTAGE / 100);
+        platformFee = feeAmount.toFixed(6);
+        netToRecipient = (grossAmount - feeAmount).toFixed(6);
+        
+        // Record P2P fee in revenue ledger
+        await storage.recordRevenueEntry({
+          revenueSource: 'p2p_fee',
+          grossAmount: grossAmount.toFixed(6),
+          feeAmount: platformFee,
+          feePercentage: P2P_FEE_PERCENTAGE.toString(),
+          netToRecipient,
+          currency: "pathUSD",
+          tempoTxHash: txHash,
+        });
+        
+        // Send notification
         const recipient = await storage.getUserById(recipientWallet.userId);
         if (recipient?.pushToken) {
           const sender = await storage.getUserById(userId);
@@ -1486,6 +1537,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         txHash,
         explorer: explorerUrl,
+        platformFee,
+        netToRecipient,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1947,6 +2000,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: "Passkey deleted successfully" });
     } catch (error) {
       console.error("Delete passkey error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Creator earnings endpoints
+  app.get("/api/creators/me/earnings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      
+      const balance = await storage.getCreatorBalance(userId);
+      const withdrawals = await storage.getCreatorWithdrawals(userId, 10);
+      const wallet = await storage.getWalletByUserId(userId);
+      
+      if (!balance) {
+        return res.json({
+          creatorId: userId,
+          totalEarned: "0",
+          totalWithdrawn: "0",
+          pendingBalance: "0",
+          totalTipsReceived: "0",
+          totalFeesPaid: "0",
+          walletAddress: wallet?.address || null,
+          recentWithdrawals: [],
+        });
+      }
+      
+      res.json({
+        creatorId: userId,
+        totalEarned: balance.totalEarned,
+        totalWithdrawn: balance.totalWithdrawn,
+        pendingBalance: balance.pendingBalance,
+        totalTipsReceived: balance.totalTipsReceived,
+        totalFeesPaid: balance.totalFeesPaid,
+        lastWithdrawalAt: balance.lastWithdrawalAt,
+        walletAddress: wallet?.address || null,
+        recentWithdrawals: withdrawals.map(w => ({
+          id: w.id,
+          amount: w.amount,
+          currency: w.currency,
+          status: w.status,
+          tempoTxHash: w.tempoTxHash,
+          createdAt: w.createdAt,
+          completedAt: w.completedAt,
+        })),
+      });
+    } catch (error) {
+      console.error("Get creator earnings error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/creators/me/withdraw", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { amount, currency = "pathUSD" } = req.body;
+      
+      if (!amount || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Valid withdrawal amount is required" });
+      }
+      
+      const balance = await storage.getCreatorBalance(userId);
+      if (!balance) {
+        return res.status(400).json({ error: "No earnings to withdraw" });
+      }
+      
+      const pendingBalance = parseFloat(balance.pendingBalance);
+      const withdrawAmount = parseFloat(amount);
+      
+      if (withdrawAmount > pendingBalance) {
+        return res.status(400).json({ 
+          error: "Insufficient balance", 
+          pendingBalance: balance.pendingBalance 
+        });
+      }
+      
+      const wallet = await storage.getWalletByUserId(userId);
+      if (!wallet) {
+        return res.status(400).json({ error: "No wallet found for withdrawal" });
+      }
+      
+      // Create withdrawal record
+      const withdrawal = await storage.createWithdrawal({
+        creatorId: userId,
+        amount: amount,
+        currency,
+        destinationWallet: wallet.address,
+      });
+      
+      // Process the withdrawal (deduct from pending balance)
+      await storage.processWithdrawal(userId, amount);
+      
+      // Mark as completed (in production, this would involve actual blockchain transfer)
+      const completedWithdrawal = await storage.updateWithdrawalStatus(
+        withdrawal.id, 
+        'completed'
+      );
+      
+      res.json({
+        success: true,
+        withdrawal: {
+          id: completedWithdrawal.id,
+          amount: completedWithdrawal.amount,
+          currency: completedWithdrawal.currency,
+          status: completedWithdrawal.status,
+          destinationWallet: completedWithdrawal.destinationWallet,
+          createdAt: completedWithdrawal.createdAt,
+          completedAt: completedWithdrawal.completedAt,
+        },
+      });
+    } catch (error) {
+      console.error("Creator withdrawal error:", error);
+      if (error instanceof Error) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Withdrawal failed" });
+    }
+  });
+
+  // Revenue dashboard endpoints (admin/analytics)
+  app.get("/api/revenue/stats", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const stats = await storage.getRevenueStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Get revenue stats error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/revenue/ledger", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const entries = await storage.getRecentRevenueLedger(limit);
+      res.json({ entries });
+    } catch (error) {
+      console.error("Get revenue ledger error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
