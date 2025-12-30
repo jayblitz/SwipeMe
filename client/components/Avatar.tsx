@@ -1,6 +1,5 @@
 import React from "react";
 import { View, Image, StyleSheet } from "react-native";
-import { BorderRadius } from "@/constants/theme";
 
 const avatarImages: Record<string, any> = {
   coral: require("../../assets/images/avatars/avatar-coral.png"),

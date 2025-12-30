@@ -8,7 +8,6 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
 import Constants from "expo-constants";
 import { ThemedText } from "@/components/ThemedText";
@@ -358,7 +357,7 @@ interface PasskeyItem {
   createdAt: string;
 }
 
-function PasskeyModal({ visible, onClose, userId }: PasskeyModalProps) {
+function PasskeyModal({ visible, onClose, userId: _userId }: PasskeyModalProps) {
   const { theme } = useTheme();
   const [passkeys, setPasskeys] = useState<PasskeyItem[]>([]);
   const [loading, setLoading] = useState(false);

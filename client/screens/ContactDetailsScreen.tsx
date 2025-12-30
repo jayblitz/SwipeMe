@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Modal, FlatList, Alert, Dimensions, Linking } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Modal, Alert, Dimensions, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRoute, RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -10,13 +9,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing, BorderRadius, Typography } from "@/constants/theme";
+import { Spacing, BorderRadius } from "@/constants/theme";
 import { getApiUrl } from "@/lib/query-client";
 import { 
-  getMessages, 
-  Message, 
-  Chat, 
-  getChats,
+  getMessages,
   getChatBackground, 
   setChatBackground, 
   PRESET_BACKGROUNDS, 
@@ -31,7 +27,6 @@ import {
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 
 type ContactDetailsRouteProp = RouteProp<ChatsStackParamList, "ContactDetails">;
-type ContactDetailsNavigationProp = NativeStackNavigationProp<ChatsStackParamList, "ContactDetails">;
 
 interface QuickActionButtonProps {
   icon: keyof typeof Feather.glyphMap;
@@ -162,7 +157,6 @@ type MediaTabType = "media" | "links" | "docs";
 
 export default function ContactDetailsScreen() {
   const route = useRoute<ContactDetailsRouteProp>();
-  const navigation = useNavigation<ContactDetailsNavigationProp>();
   const { chatId, name, peerAddress, avatarId, contactId } = route.params;
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();

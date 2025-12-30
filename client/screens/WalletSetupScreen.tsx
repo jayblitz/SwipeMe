@@ -1,6 +1,6 @@
 import "react-native-get-random-values";
 import React, { useState } from "react";
-import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, Dimensions, Platform } from "react-native";
+import { View, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";

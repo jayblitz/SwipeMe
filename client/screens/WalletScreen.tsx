@@ -14,29 +14,14 @@ import { Avatar } from "@/components/Avatar";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { useWallet, Wallet } from "@/contexts/WalletContext";
+import { useWallet } from "@/contexts/WalletContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { Transaction, getTransactions } from "@/lib/storage";
 import { getApiUrl, apiRequest } from "@/lib/query-client";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS } from "@/lib/tempo-tokens";
 import { parseApiError, ErrorCodes } from "@/lib/errors";
-import { parseUnits, formatUnits } from "viem";
+import { parseUnits } from "viem";
 import WalletSetupScreen from "./WalletSetupScreen";
-
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (date.toDateString() === today.toDateString()) {
-    return "Today";
-  }
-  if (date.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp);
@@ -679,7 +664,7 @@ export default function WalletScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { wallet, isLoading: isLoadingWallet, refreshWallet, setWallet, clearWallet } = useWallet();
+  const { wallet, isLoading: isLoadingWallet, refreshWallet, clearWallet } = useWallet();
   
   const initialBalances: TokenBalance[] = TEMPO_TOKENS.map(token => ({
     token,
@@ -861,36 +846,6 @@ export default function WalletScreen() {
   if (!wallet) {
     return <WalletSetupScreen onWalletCreated={handleWalletCreated} />;
   }
-
-  const groupedTransactions = transactions.reduce((groups, transaction) => {
-    const date = formatDate(transaction.timestamp);
-    if (!groups[date]) {
-      groups[date] = [];
-    }
-    groups[date].push(transaction);
-    return groups;
-  }, {} as Record<string, Transaction[]>);
-
-  const sections = Object.entries(groupedTransactions).map(([date, items]) => ({
-    date,
-    data: items,
-  }));
-
-  const renderItem = ({ item }: { item: Transaction }) => {
-    const section = sections.find(s => s.data.includes(item));
-    const isFirst = section?.data[0] === item;
-    
-    return (
-      <View>
-        {isFirst ? (
-          <ThemedText style={[styles.sectionHeader, { color: theme.textSecondary }]}>
-            {section?.date}
-          </ThemedText>
-        ) : null}
-        <TransactionItem transaction={item} />
-      </View>
-    );
-  };
 
   return (
     <ThemedView style={styles.container}>

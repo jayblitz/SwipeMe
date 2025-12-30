@@ -4,11 +4,7 @@ import {
   users, 
   verificationCodes, 
   wallets, 
-  contacts, 
-  chats, 
   chatParticipants, 
-  messages, 
-  transactions,
   waitlistSignups,
   passkeys,
   follows,
@@ -17,7 +13,6 @@ import {
   postComments,
   postTips,
   type User,
-  type VerificationCode,
   type Wallet,
   type WaitlistSignup,
   type Passkey,
@@ -27,7 +22,7 @@ import {
   type PostComment,
   type PostTip
 } from "@shared/schema";
-import { randomBytes, createHash, scrypt, timingSafeEqual } from "crypto";
+import { randomBytes, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
@@ -198,7 +193,7 @@ export const storage = {
   },
 
   async deleteWallet(userId: string): Promise<boolean> {
-    const result = await db.delete(wallets).where(eq(wallets.userId, userId));
+    await db.delete(wallets).where(eq(wallets.userId, userId));
     return true;
   },
 

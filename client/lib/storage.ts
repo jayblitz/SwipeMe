@@ -98,7 +98,7 @@ export interface Transaction {
   txHash?: string;
 }
 
-export function getContactWalletAddress(contactId: string): string | null {
+export function getContactWalletAddress(_contactId: string): string | null {
   return null;
 }
 

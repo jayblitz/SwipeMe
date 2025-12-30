@@ -3,7 +3,6 @@ import { Message, Chat, getMessages, getChats } from "./storage";
 
 const PENDING_MESSAGES_KEY = "@swipeme_pending_messages";
 const LAST_SYNC_KEY = "@swipeme_last_sync";
-const CACHE_VERSION_KEY = "@swipeme_cache_version";
 
 export interface PendingMessage {
   id: string;

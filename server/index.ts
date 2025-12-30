@@ -272,7 +272,7 @@ function configureExpoAndLanding(app: express.Application) {
 
   log("Serving static Expo files with dynamic manifest routing");
 
-  app.get("/privy-wallet", (req: Request, res: Response) => {
+  app.get("/privy-wallet", (_req: Request, res: Response) => {
     const privyTemplatePath = path.resolve(
       process.cwd(),
       "server",
