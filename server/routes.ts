@@ -859,7 +859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      const follow = await storage.followUser(followerId, followingId);
+      await storage.followUser(followerId, followingId);
       res.json({ success: true, following: true });
     } catch (error) {
       console.error("Follow error:", error);
