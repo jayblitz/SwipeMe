@@ -15,7 +15,7 @@ import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { createChat, Contact } from "@/lib/storage";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 import { MainTabParamList } from "@/navigation/MainTabNavigator";
 
@@ -44,7 +44,7 @@ function ContactItem({ contact, onPress }: ContactItemProps) {
       <View style={styles.contactContent}>
         <ThemedText style={styles.contactName}>{contact.name}</ThemedText>
         <ThemedText style={[styles.contactPhone, { color: theme.textSecondary }]}>
-          {contact.phone || contact.walletAddress.slice(0, 10) + "..."}
+          {contact.phone || (contact.walletAddress ? contact.walletAddress.slice(0, 10) + "..." : "")}
         </ThemedText>
       </View>
       <Feather name="message-circle" size={20} color={theme.primary} />
@@ -167,7 +167,7 @@ interface FABMenuProps {
 }
 
 function FABMenu({ visible, onClose, onNewContact, onNewGroup, onPayAnyone, onSyncContacts }: FABMenuProps) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
 
   const menuItems = [
     { icon: "user-plus" as const, label: "New Contact", onPress: onNewContact },
@@ -585,7 +585,6 @@ export default function DiscoverScreen() {
   const navigation = useNavigation<NavigationProp>();
   
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -593,16 +592,6 @@ export default function DiscoverScreen() {
   const [showNewContact, setShowNewContact] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<Contacts.PermissionStatus | null>(null);
-
-  const checkPermission = useCallback(async () => {
-    if (Platform.OS === "web") {
-      setPermissionStatus(Contacts.PermissionStatus.GRANTED);
-      return;
-    }
-    
-    const { status } = await Contacts.getPermissionsAsync();
-    setPermissionStatus(status);
-  }, []);
 
   const requestPermission = async () => {
     if (Platform.OS === "web") {
@@ -690,8 +679,6 @@ export default function DiscoverScreen() {
     setLoading(true);
     try {
       const deviceContactsList = await fetchDeviceContacts();
-      setDeviceContacts(deviceContactsList);
-      
       const matchedContacts = await matchContactsWithUsers(deviceContactsList);
       setContacts(matchedContacts);
     } catch (error) {
