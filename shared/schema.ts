@@ -347,3 +347,6 @@ export const tipPostSchema = z.object({
   amount: z.string().regex(/^\d+(\.\d+)?$/, "Invalid amount format"),
   currency: z.string().optional(),
 });
+
+// Export AI chat models
+export * from "./models/chat";
