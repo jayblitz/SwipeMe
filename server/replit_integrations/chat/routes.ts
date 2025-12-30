@@ -32,13 +32,20 @@ function getAccessKey(req: Request): string | null {
   return (req.headers["x-access-key"] as string) || req.body?.accessKey || null;
 }
 
+// Strip accessKey from conversation objects to prevent leaking
+function sanitizeConversation(conversation: any): any {
+  const { accessKey, ...safe } = conversation;
+  return safe;
+}
+
 export function registerChatRoutes(app: Express): void {
   // Get all AI conversations for the current user (only returns user-owned conversations)
   app.get("/api/ai/conversations", async (req: Request, res: Response) => {
     try {
       const userId = getUserId(req);
       const conversations = await chatStorage.getConversationsByUser(userId);
-      res.json(conversations);
+      // Strip accessKey from all conversations to prevent leaking
+      res.json(conversations.map(sanitizeConversation));
     } catch (error) {
       console.error("Error fetching AI conversations:", error);
       res.status(500).json({ error: "Failed to fetch conversations" });
@@ -59,7 +66,8 @@ export function registerChatRoutes(app: Express): void {
         return res.status(403).json({ error: "Access denied" });
       }
       const messages = await chatStorage.getMessagesByConversation(id);
-      res.json({ ...conversation, messages });
+      // Strip accessKey from response
+      res.json({ ...sanitizeConversation(conversation), messages });
     } catch (error) {
       console.error("Error fetching AI conversation:", error);
       res.status(500).json({ error: "Failed to fetch conversation" });
