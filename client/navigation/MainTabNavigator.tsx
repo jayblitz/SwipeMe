@@ -1,17 +1,20 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
+import { getFocusedRouteNameFromRoute, RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet, View } from "react-native";
+// StyleSheet needed for absoluteFill
 import ChatsStackNavigator from "@/navigation/ChatsStackNavigator";
 import WalletStackNavigator from "@/navigation/WalletStackNavigator";
+import MomentsStackNavigator from "@/navigation/MomentsStackNavigator";
 import DiscoverStackNavigator from "@/navigation/DiscoverStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 
 export type MainTabParamList = {
   ChatsTab: undefined;
+  MomentsTab: undefined;
   WalletTab: undefined;
   DiscoverTab: undefined;
   ProfileTab: undefined;
@@ -19,7 +22,7 @@ export type MainTabParamList = {
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-function getTabBarStyle(route: any, theme: any, isDark: boolean) {
+function getTabBarStyle(route: RouteProp<MainTabParamList, keyof MainTabParamList>, theme: { backgroundRoot: string }) {
   const routeName = getFocusedRouteNameFromRoute(route) ?? "ChatsList";
   
   if (routeName === "Chat") {
@@ -77,8 +80,18 @@ export default function MainTabNavigator() {
             tabBarIcon: ({ color, size }) => (
               <Feather name="message-circle" size={size} color={color} />
             ),
-            tabBarStyle: getTabBarStyle(route, theme, isDark),
+            tabBarStyle: getTabBarStyle(route, theme),
           })}
+        />
+        <Tab.Screen
+          name="MomentsTab"
+          component={MomentsStackNavigator}
+          options={{
+            title: "Moments",
+            tabBarIcon: ({ color, size }) => (
+              <Feather name="image" size={size} color={color} />
+            ),
+          }}
         />
         <Tab.Screen
           name="WalletTab"
@@ -115,4 +128,3 @@ export default function MainTabNavigator() {
   );
 }
 
-const styles = StyleSheet.create({});

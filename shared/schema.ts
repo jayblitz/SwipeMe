@@ -268,3 +268,82 @@ export const resetPasswordSchema = z.object({
   code: z.string().length(6, "Code must be 6 digits"),
   newPassword: passwordSchema,
 });
+
+// Moments (Social Feed) tables
+export const posts = pgTable("posts", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content"),
+  mediaUrls: jsonb("media_urls").$type<string[]>(),
+  visibility: text("visibility").notNull().default("public"), // public, friends, private
+  likesCount: text("likes_count").default("0"),
+  commentsCount: text("comments_count").default("0"),
+  tipsTotal: text("tips_total").default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("posts_author_idx").on(table.authorId),
+  index("posts_created_idx").on(table.createdAt),
+]);
+
+export const postLikes = pgTable("post_likes", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("post_likes_post_idx").on(table.postId),
+  index("post_likes_user_idx").on(table.userId),
+]);
+
+export const postComments = pgTable("post_comments", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("post_comments_post_idx").on(table.postId),
+  index("post_comments_author_idx").on(table.authorId),
+]);
+
+export const postTips = pgTable("post_tips", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+  fromUserId: varchar("from_user_id").notNull().references(() => users.id),
+  amount: text("amount").notNull(),
+  currency: text("currency").notNull().default("pathUSD"),
+  txHash: text("tx_hash"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("post_tips_post_idx").on(table.postId),
+  index("post_tips_from_user_idx").on(table.fromUserId),
+]);
+
+export type Post = typeof posts.$inferSelect;
+export type PostLike = typeof postLikes.$inferSelect;
+export type PostComment = typeof postComments.$inferSelect;
+export type PostTip = typeof postTips.$inferSelect;
+
+export const createPostSchema = z.object({
+  content: z.string().min(1).max(2000).optional(),
+  mediaUrls: z.array(z.string().url()).max(10).optional(),
+  visibility: z.enum(["public", "friends", "private"]).optional(),
+});
+
+export const createCommentSchema = z.object({
+  content: z.string().min(1).max(500),
+});
+
+export const tipPostSchema = z.object({
+  amount: z.string().regex(/^\d+(\.\d+)?$/, "Invalid amount format"),
+  currency: z.string().optional(),
+});

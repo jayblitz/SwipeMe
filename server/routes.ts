@@ -24,14 +24,12 @@ import { logFailedLogin, logSuccessfulLogin, log2FAAttempt, logWalletAction } fr
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from "@simplewebauthn/server";
-import jwt from "jsonwebtoken";
 import { 
   generateWallet, 
   importWalletFromMnemonic, 
   importWalletFromPrivateKey,
   encryptSensitiveData,
   decryptSensitiveData,
-  getBalance,
   tempoTestnet,
   createWalletClientForAccount,
   transferERC20Token,
@@ -651,6 +649,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get mute status error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Moments (Social Feed) endpoints
+  app.get("/api/moments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const posts = await storage.getPosts(userId, limit, offset);
+      res.json(posts);
+    } catch (error) {
+      console.error("Get moments error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/moments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { content, mediaUrls, visibility } = req.body;
+      
+      if (!content && (!mediaUrls || mediaUrls.length === 0)) {
+        return res.status(400).json({ error: "Content or media is required" });
+      }
+      
+      const post = await storage.createPost(userId, content, mediaUrls, visibility);
+      res.json(post);
+    } catch (error) {
+      console.error("Create moment error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/moments/:postId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { postId } = req.params;
+      
+      const post = await storage.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      
+      if (post.authorId !== userId) {
+        return res.status(403).json({ error: "Not authorized to delete this post" });
+      }
+      
+      await storage.deletePost(postId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete moment error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/moments/:postId/like", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { postId } = req.params;
+      
+      const post = await storage.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      
+      const isLiked = await storage.likePost(postId, userId);
+      res.json({ isLiked });
+    } catch (error) {
+      console.error("Like moment error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/moments/:postId/comments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { postId } = req.params;
+      
+      const comments = await storage.getPostComments(postId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Get comments error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/moments/:postId/comments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { postId } = req.params;
+      const { content } = req.body;
+      
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ error: "Comment content is required" });
+      }
+      
+      const post = await storage.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      
+      const comment = await storage.addPostComment(postId, userId, content.trim());
+      const author = await storage.getUserById(userId);
+      res.json({ ...comment, author });
+    } catch (error) {
+      console.error("Add comment error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/moments/:postId/tip", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { postId } = req.params;
+      const { amount, currency, tokenAddress } = req.body;
+      
+      if (!amount || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Valid tip amount is required" });
+      }
+      
+      const post = await storage.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      
+      // Get tipper's wallet
+      const tipperWallet = await storage.getWalletByUserId(userId);
+      if (!tipperWallet) {
+        return res.status(400).json({ error: "You need a wallet to send tips" });
+      }
+      
+      // Get post author's wallet
+      const authorWallet = await storage.getWalletByUserId(post.authorId);
+      if (!authorWallet) {
+        return res.status(400).json({ error: "Post author does not have a wallet to receive tips" });
+      }
+      
+      // Use pathUSD by default (decimals: 18)
+      const tipTokenAddress = tokenAddress || "0x7d08bd4f2b9548e99715691d4de8ec5f01f0a82b";
+      const decimals = 18;
+      
+      // Get signing key for tipper
+      let signingKey: string;
+      if (tipperWallet.encryptedPrivateKey) {
+        signingKey = decryptSensitiveData(tipperWallet.encryptedPrivateKey);
+      } else if (tipperWallet.encryptedSeedPhrase) {
+        signingKey = decryptSensitiveData(tipperWallet.encryptedSeedPhrase);
+      } else {
+        return res.status(400).json({ error: "No signing key available for your wallet" });
+      }
+      
+      // Execute the transfer
+      const walletClient = createWalletClientForAccount(signingKey);
+      const txHash = await transferERC20Token(walletClient, {
+        tokenAddress: tipTokenAddress,
+        toAddress: authorWallet.address,
+        amount,
+        decimals,
+      } as TransferParams);
+      
+      // Record the tip in database
+      const tip = await storage.addPostTip(postId, userId, amount, currency || "pathUSD", txHash);
+      
+      // Send notification to author
+      const author = await storage.getUserById(post.authorId);
+      if (author?.pushToken) {
+        const tipper = await storage.getUserById(userId);
+        const tipperUsername = tipper?.username || tipper?.displayName || "Someone";
+        sendPaymentNotification(
+          author.pushToken,
+          tipperUsername,
+          amount,
+          currency || "pathUSD",
+          txHash
+        ).catch(err => console.error("Tip notification error:", err));
+      }
+      
+      const explorerUrl = `${tempoTestnet.blockExplorers?.default.url || "https://explorer.testnet.tempo.xyz"}/tx/${txHash}`;
+      
+      res.json({ 
+        ...tip, 
+        txHash,
+        explorer: explorerUrl,
+        success: true 
+      });
+    } catch (error) {
+      console.error("Tip moment error:", error);
+      if (error instanceof Error) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Tip transaction failed" });
     }
   });
 

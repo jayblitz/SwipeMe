@@ -11,12 +11,19 @@ import {
   transactions,
   waitlistSignups,
   passkeys,
+  posts,
+  postLikes,
+  postComments,
+  postTips,
   type User,
   type VerificationCode,
   type Wallet,
   type WaitlistSignup,
   type Passkey,
-  type ChatParticipant
+  type ChatParticipant,
+  type Post,
+  type PostComment,
+  type PostTip
 } from "@shared/schema";
 import { randomBytes, createHash, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -346,5 +353,118 @@ export const storage = {
       .values({ chatId, userId })
       .returning();
     return newParticipant;
+  },
+
+  // Moments (Social Feed) methods
+  async createPost(authorId: string, content?: string, mediaUrls?: string[], visibility?: string): Promise<Post> {
+    const [post] = await db.insert(posts)
+      .values({
+        authorId,
+        content: content || null,
+        mediaUrls: mediaUrls || null,
+        visibility: visibility || "public",
+      })
+      .returning();
+    return post;
+  },
+
+  async getPosts(userId: string, limit: number = 50, offset: number = 0): Promise<(Post & { author: User; isLiked: boolean })[]> {
+    const allPosts = await db.select()
+      .from(posts)
+      .orderBy(desc(posts.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const postsWithAuthors = await Promise.all(
+      allPosts.map(async (post) => {
+        const author = await this.getUserById(post.authorId);
+        const [like] = await db.select()
+          .from(postLikes)
+          .where(and(eq(postLikes.postId, post.id), eq(postLikes.userId, userId)));
+        return {
+          ...post,
+          author: author!,
+          isLiked: !!like,
+        };
+      })
+    );
+    return postsWithAuthors;
+  },
+
+  async getPostById(postId: string): Promise<Post | undefined> {
+    const [post] = await db.select().from(posts).where(eq(posts.id, postId));
+    return post;
+  },
+
+  async deletePost(postId: string): Promise<boolean> {
+    const result = await db.delete(posts).where(eq(posts.id, postId)).returning();
+    return result.length > 0;
+  },
+
+  async likePost(postId: string, userId: string): Promise<boolean> {
+    const [existing] = await db.select()
+      .from(postLikes)
+      .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)));
+    
+    if (existing) {
+      await db.delete(postLikes)
+        .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)));
+      const post = await this.getPostById(postId);
+      if (post) {
+        const newCount = Math.max(0, parseInt(post.likesCount || "0") - 1);
+        await db.update(posts).set({ likesCount: newCount.toString() }).where(eq(posts.id, postId));
+      }
+      return false;
+    } else {
+      await db.insert(postLikes).values({ postId, userId });
+      const post = await this.getPostById(postId);
+      if (post) {
+        const newCount = parseInt(post.likesCount || "0") + 1;
+        await db.update(posts).set({ likesCount: newCount.toString() }).where(eq(posts.id, postId));
+      }
+      return true;
+    }
+  },
+
+  async getPostComments(postId: string): Promise<(PostComment & { author: User })[]> {
+    const allComments = await db.select()
+      .from(postComments)
+      .where(eq(postComments.postId, postId))
+      .orderBy(desc(postComments.createdAt));
+
+    const commentsWithAuthors = await Promise.all(
+      allComments.map(async (comment) => {
+        const author = await this.getUserById(comment.authorId);
+        return { ...comment, author: author! };
+      })
+    );
+    return commentsWithAuthors;
+  },
+
+  async addPostComment(postId: string, authorId: string, content: string): Promise<PostComment> {
+    const [comment] = await db.insert(postComments)
+      .values({ postId, authorId, content })
+      .returning();
+    
+    const post = await this.getPostById(postId);
+    if (post) {
+      const newCount = parseInt(post.commentsCount || "0") + 1;
+      await db.update(posts).set({ commentsCount: newCount.toString() }).where(eq(posts.id, postId));
+    }
+    return comment;
+  },
+
+  async addPostTip(postId: string, fromUserId: string, amount: string, currency: string = "pathUSD", txHash?: string): Promise<PostTip> {
+    const [tip] = await db.insert(postTips)
+      .values({ postId, fromUserId, amount, currency, txHash: txHash || null })
+      .returning();
+    
+    const post = await this.getPostById(postId);
+    if (post) {
+      const currentTotal = parseFloat(post.tipsTotal || "0");
+      const newTotal = currentTotal + parseFloat(amount);
+      await db.update(posts).set({ tipsTotal: newTotal.toString() }).where(eq(posts.id, postId));
+    }
+    return tip;
   },
 };
