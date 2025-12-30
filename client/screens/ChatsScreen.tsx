@@ -275,12 +275,25 @@ export default function ChatsScreen() {
   const streamCancelRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    if (Platform.OS === "web" || !isSupported || !client) {
-      return;
-    }
-
     let isCancelled = false;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      isCancelled = true;
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+      if (streamCancelRef.current) {
+        streamCancelRef.current();
+        streamCancelRef.current = null;
+      }
+    };
+
+    if (Platform.OS === "web" || !isSupported || !client) {
+      cleanup();
+      return cleanup;
+    }
 
     const setupStream = async () => {
       try {
@@ -304,6 +317,8 @@ export default function ChatsScreen() {
 
         if (!isCancelled) {
           streamCancelRef.current = cancelStream;
+        } else {
+          cancelStream();
         }
       } catch (error) {
         if (!isCancelled) {
@@ -314,16 +329,7 @@ export default function ChatsScreen() {
 
     setupStream();
 
-    return () => {
-      isCancelled = true;
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-      if (streamCancelRef.current) {
-        streamCancelRef.current();
-        streamCancelRef.current = null;
-      }
-    };
+    return cleanup;
   }, [client, isSupported, loadConversations]);
 
   const handleRefresh = async () => {

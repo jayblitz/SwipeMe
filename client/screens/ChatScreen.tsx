@@ -22,7 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, Message, Chat, getChatBackground, setChatBackground, PRESET_BACKGROUNDS, ChatBackground, DisappearingTimer, getChatDisappearingTimer, setChatDisappearingTimer, getTimerLabel, cleanupExpiredMessages } from "@/lib/storage";
-import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
+import { fetchTokenBalances, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
 import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 import { useXMTP } from "@/contexts/XMTPContext";
@@ -732,7 +732,6 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
   const [showAssetSelector, setShowAssetSelector] = useState(false);
   
   const selectedBalance = tokenBalances[selectedTokenIndex] || { token: TEMPO_TOKENS[0], balanceUsd: 0 };
-  const _totalBalance = getTotalBalance(tokenBalances);
 
   const handleSend = () => {
     const numAmount = parseFloat(amount);

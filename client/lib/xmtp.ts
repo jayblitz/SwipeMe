@@ -186,7 +186,12 @@ export async function streamAllMessages(
     await Promise.resolve(onMessage(message));
   });
   
+  const client = xmtpClient;
   return () => {
-    // Stream is managed by the SDK - return cleanup function
+    try {
+      client.conversations.cancelStream();
+    } catch (e) {
+      // Ignore cancellation errors
+    }
   };
 }
