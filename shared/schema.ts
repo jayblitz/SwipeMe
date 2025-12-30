@@ -342,11 +342,71 @@ export const postTips = pgTable("post_tips", {
   index("post_tips_from_user_idx").on(table.fromUserId),
 ]);
 
+// Revenue tracking tables
+export const revenueLedger = pgTable("revenue_ledger", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  transactionId: varchar("transaction_id"),
+  tipId: varchar("tip_id"),
+  revenueSource: text("revenue_source").notNull(), // 'tip_fee', 'p2p_fee', 'mini_app_fee'
+  grossAmount: text("gross_amount").notNull(),
+  feeAmount: text("fee_amount").notNull(),
+  feePercentage: text("fee_percentage").notNull(),
+  netToRecipient: text("net_to_recipient").notNull(),
+  currency: text("currency").notNull().default("pathUSD"),
+  tempoTxHash: text("tempo_tx_hash"),
+  createdAt: timestamp("created_at").defaultNow(),
+  recordedAt: timestamp("recorded_at"),
+}, (table) => [
+  index("revenue_ledger_source_idx").on(table.revenueSource),
+  index("revenue_ledger_created_idx").on(table.createdAt),
+  index("revenue_ledger_transaction_idx").on(table.transactionId),
+  index("revenue_ledger_tip_idx").on(table.tipId),
+]);
+
+export const creatorBalances = pgTable("creator_balances", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").notNull().references(() => users.id).unique(),
+  totalEarned: text("total_earned").notNull().default("0"),
+  totalWithdrawn: text("total_withdrawn").notNull().default("0"),
+  pendingBalance: text("pending_balance").notNull().default("0"),
+  totalTipsReceived: text("total_tips_received").notNull().default("0"),
+  totalFeesPaid: text("total_fees_paid").notNull().default("0"),
+  lastWithdrawalAt: timestamp("last_withdrawal_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("creator_balances_creator_idx").on(table.creatorId),
+]);
+
+export const creatorWithdrawals = pgTable("creator_withdrawals", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").notNull().references(() => users.id),
+  amount: text("amount").notNull(),
+  currency: text("currency").notNull().default("pathUSD"),
+  destinationWallet: text("destination_wallet").notNull(),
+  tempoTxHash: text("tempo_tx_hash"),
+  status: text("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+}, (table) => [
+  index("creator_withdrawals_creator_idx").on(table.creatorId),
+  index("creator_withdrawals_status_idx").on(table.status),
+]);
+
 export type Follow = typeof follows.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type PostLike = typeof postLikes.$inferSelect;
 export type PostComment = typeof postComments.$inferSelect;
 export type PostTip = typeof postTips.$inferSelect;
+export type RevenueLedger = typeof revenueLedger.$inferSelect;
+export type CreatorBalance = typeof creatorBalances.$inferSelect;
+export type CreatorWithdrawal = typeof creatorWithdrawals.$inferSelect;
 
 export const createPostSchema = z.object({
   content: z.string().min(1).max(2000).optional(),
