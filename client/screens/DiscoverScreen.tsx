@@ -157,6 +157,188 @@ function LoadingState() {
   );
 }
 
+interface MiniApp {
+  id: string;
+  name: string;
+  icon: keyof typeof Feather.glyphMap;
+  color: string;
+  category: "finance" | "utilities" | "games" | "social";
+}
+
+const MINI_APPS: MiniApp[] = [
+  { id: "swap", name: "Swap", icon: "repeat", color: "#6366F1", category: "finance" },
+  { id: "bridge", name: "Bridge", icon: "git-merge", color: "#8B5CF6", category: "finance" },
+  { id: "stake", name: "Stake", icon: "trending-up", color: "#10B981", category: "finance" },
+  { id: "nft", name: "NFTs", icon: "image", color: "#F59E0B", category: "finance" },
+  { id: "calculator", name: "Calculator", icon: "hash", color: "#3B82F6", category: "utilities" },
+  { id: "scanner", name: "QR Scanner", icon: "maximize", color: "#EC4899", category: "utilities" },
+  { id: "converter", name: "Converter", icon: "refresh-cw", color: "#14B8A6", category: "utilities" },
+  { id: "notes", name: "Notes", icon: "file-text", color: "#F97316", category: "utilities" },
+];
+
+function MiniAppsSection({ onAppPress }: { onAppPress: (app: MiniApp) => void }) {
+  const { theme } = useTheme();
+
+  return (
+    <View style={styles.miniAppsSection}>
+      <View style={styles.miniAppsSectionHeader}>
+        <ThemedText style={styles.miniAppsSectionTitle}>Mini Apps</ThemedText>
+        <Pressable style={styles.seeAllButton}>
+          <ThemedText style={[styles.seeAllText, { color: theme.primary }]}>See All</ThemedText>
+          <Feather name="chevron-right" size={16} color={theme.primary} />
+        </Pressable>
+      </View>
+      <View style={styles.miniAppsGrid}>
+        {MINI_APPS.map((app) => (
+          <Pressable
+            key={app.id}
+            onPress={() => onAppPress(app)}
+            style={({ pressed }) => [
+              styles.miniAppItem,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <View style={[styles.miniAppIcon, { backgroundColor: app.color + "20" }]}>
+              <Feather name={app.icon} size={24} color={app.color} />
+            </View>
+            <ThemedText style={styles.miniAppName} numberOfLines={1}>
+              {app.name}
+            </ThemedText>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function CalculatorMiniApp({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { theme } = useTheme();
+  const [display, setDisplay] = useState("0");
+  const [previousValue, setPreviousValue] = useState<string | null>(null);
+  const [operation, setOperation] = useState<string | null>(null);
+  const [waitingForOperand, setWaitingForOperand] = useState(false);
+
+  const handleNumber = (num: string) => {
+    if (waitingForOperand) {
+      setDisplay(num);
+      setWaitingForOperand(false);
+    } else {
+      setDisplay(display === "0" ? num : display + num);
+    }
+  };
+
+  const handleOperation = (op: string) => {
+    if (previousValue === null) {
+      setPreviousValue(display);
+    } else if (operation) {
+      const result = calculate();
+      setDisplay(String(result));
+      setPreviousValue(String(result));
+    }
+    setOperation(op);
+    setWaitingForOperand(true);
+  };
+
+  const calculate = () => {
+    const prev = parseFloat(previousValue || "0");
+    const current = parseFloat(display);
+    switch (operation) {
+      case "+": return prev + current;
+      case "-": return prev - current;
+      case "*": return prev * current;
+      case "/": return current !== 0 ? prev / current : 0;
+      default: return current;
+    }
+  };
+
+  const handleEquals = () => {
+    if (operation && previousValue !== null) {
+      const result = calculate();
+      setDisplay(String(result));
+      setPreviousValue(null);
+      setOperation(null);
+      setWaitingForOperand(true);
+    }
+  };
+
+  const handleClear = () => {
+    setDisplay("0");
+    setPreviousValue(null);
+    setOperation(null);
+    setWaitingForOperand(false);
+  };
+
+  const handleDecimal = () => {
+    if (!display.includes(".")) {
+      setDisplay(display + ".");
+    }
+  };
+
+  const CalcButton = ({ label, onPress, color, wide }: { label: string; onPress: () => void; color?: string; wide?: boolean }) => (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.calcButton,
+        { backgroundColor: pressed ? theme.backgroundDefault : (color || theme.border) },
+        wide ? styles.calcButtonWide : null,
+      ]}
+    >
+      <ThemedText style={[styles.calcButtonText, color ? { color: "#FFFFFF" } : null]}>{label}</ThemedText>
+    </Pressable>
+  );
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.calculatorContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <View style={styles.calculatorHeader}>
+          <ThemedText type="h4">Calculator</ThemedText>
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <Feather name="x" size={24} color={theme.text} />
+          </Pressable>
+        </View>
+        
+        <View style={[styles.calculatorDisplay, { backgroundColor: theme.backgroundDefault }]}>
+          <ThemedText style={styles.calculatorDisplayText} numberOfLines={1} adjustsFontSizeToFit>
+            {display}
+          </ThemedText>
+        </View>
+        
+        <View style={styles.calculatorKeypad}>
+          <View style={styles.calcRow}>
+            <CalcButton label="C" onPress={handleClear} />
+            <CalcButton label="+/-" onPress={() => setDisplay(String(-parseFloat(display)))} />
+            <CalcButton label="%" onPress={() => setDisplay(String(parseFloat(display) / 100))} />
+            <CalcButton label="/" onPress={() => handleOperation("/")} color="#F59E0B" />
+          </View>
+          <View style={styles.calcRow}>
+            <CalcButton label="7" onPress={() => handleNumber("7")} />
+            <CalcButton label="8" onPress={() => handleNumber("8")} />
+            <CalcButton label="9" onPress={() => handleNumber("9")} />
+            <CalcButton label="x" onPress={() => handleOperation("*")} color="#F59E0B" />
+          </View>
+          <View style={styles.calcRow}>
+            <CalcButton label="4" onPress={() => handleNumber("4")} />
+            <CalcButton label="5" onPress={() => handleNumber("5")} />
+            <CalcButton label="6" onPress={() => handleNumber("6")} />
+            <CalcButton label="-" onPress={() => handleOperation("-")} color="#F59E0B" />
+          </View>
+          <View style={styles.calcRow}>
+            <CalcButton label="1" onPress={() => handleNumber("1")} />
+            <CalcButton label="2" onPress={() => handleNumber("2")} />
+            <CalcButton label="3" onPress={() => handleNumber("3")} />
+            <CalcButton label="+" onPress={() => handleOperation("+")} color="#F59E0B" />
+          </View>
+          <View style={styles.calcRow}>
+            <CalcButton label="0" onPress={() => handleNumber("0")} wide />
+            <CalcButton label="." onPress={handleDecimal} />
+            <CalcButton label="=" onPress={handleEquals} color={Colors.light.primary} />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 interface FABMenuProps {
   visible: boolean;
   onClose: () => void;
@@ -591,6 +773,7 @@ export default function DiscoverScreen() {
   const [showMenu, setShowMenu] = useState(false);
   const [showNewContact, setShowNewContact] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<Contacts.PermissionStatus | null>(null);
 
   const requestPermission = async () => {
@@ -762,6 +945,18 @@ export default function DiscoverScreen() {
     }
   };
 
+  const handleMiniAppPress = (app: MiniApp) => {
+    if (app.id === "calculator") {
+      setShowCalculator(true);
+    } else {
+      Alert.alert(
+        app.name,
+        `${app.name} mini-app coming soon! This will be a ${app.category} application.`,
+        [{ text: "OK" }]
+      );
+    }
+  };
+
   const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (contact.phone && contact.phone.includes(searchQuery))
@@ -854,28 +1049,36 @@ export default function DiscoverScreen() {
           filteredContacts.length === 0 && styles.emptyListContent,
         ]}
         ListHeaderComponent={
-          <View style={styles.searchContainer}>
-            <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
-              <Feather name="search" size={18} color={theme.textSecondary} />
-              <TextInput
-                style={[styles.searchInput, { color: theme.text }]}
-                placeholder="Search contacts..."
-                placeholderTextColor={theme.textSecondary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              {searchQuery ? (
-                <Pressable onPress={() => setSearchQuery("")}>
-                  <Feather name="x-circle" size={18} color={theme.textSecondary} />
-                </Pressable>
-              ) : null}
-            </View>
+          <View>
+            <MiniAppsSection onAppPress={handleMiniAppPress} />
             
-            <Pressable 
-              style={[styles.qrButton, { backgroundColor: theme.primary }]}
-            >
-              <Feather name="maximize" size={20} color="#FFFFFF" />
-            </Pressable>
+            <ThemedText style={[styles.contactsSectionTitle, { color: theme.textSecondary }]}>
+              Contacts on SwipeMe
+            </ThemedText>
+            
+            <View style={styles.searchContainer}>
+              <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
+                <Feather name="search" size={18} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.searchInput, { color: theme.text }]}
+                  placeholder="Search contacts..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery ? (
+                  <Pressable onPress={() => setSearchQuery("")}>
+                    <Feather name="x-circle" size={18} color={theme.textSecondary} />
+                  </Pressable>
+                ) : null}
+              </View>
+              
+              <Pressable 
+                style={[styles.qrButton, { backgroundColor: theme.primary }]}
+              >
+                <Feather name="maximize" size={20} color="#FFFFFF" />
+              </Pressable>
+            </View>
           </View>
         }
         ListEmptyComponent={loading ? <LoadingState /> : <EmptyState searchQuery={searchQuery} isWeb={Platform.OS === "web"} />}
@@ -911,6 +1114,11 @@ export default function DiscoverScreen() {
         onClose={() => setShowNewGroup(false)}
         contacts={contacts}
         onCreateGroup={handleCreateGroup}
+      />
+
+      <CalculatorMiniApp
+        visible={showCalculator}
+        onClose={() => setShowCalculator(false)}
       />
       
       <Pressable
@@ -1220,5 +1428,104 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
+  },
+  miniAppsSection: {
+    marginBottom: Spacing.lg,
+  },
+  miniAppsSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.md,
+  },
+  miniAppsSectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  seeAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  miniAppsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.md,
+  },
+  miniAppItem: {
+    width: "22%",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  miniAppIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.xs,
+  },
+  miniAppName: {
+    fontSize: 12,
+    textAlign: "center",
+  },
+  contactsSectionTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: Spacing.md,
+  },
+  calculatorContainer: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  calculatorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.xl,
+  },
+  calculatorDisplay: {
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    minHeight: 80,
+    justifyContent: "center",
+    alignItems: "flex-end",
+  },
+  calculatorDisplayText: {
+    fontSize: 48,
+    fontWeight: "300",
+  },
+  calculatorKeypad: {
+    flex: 1,
+    justifyContent: "flex-end",
+    gap: Spacing.sm,
+  },
+  calcRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+  },
+  calcButton: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: BorderRadius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    maxHeight: 80,
+  },
+  calcButtonWide: {
+    flex: 2.1,
+    aspectRatio: undefined,
+  },
+  calcButtonText: {
+    fontSize: 28,
+    fontWeight: "500",
   },
 });
