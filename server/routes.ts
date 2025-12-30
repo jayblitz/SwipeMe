@@ -38,7 +38,6 @@ import {
 } from "./wallet";
 import { sendPaymentNotification, sendMessageNotification } from "./pushNotifications";
 import { pool } from "./db";
-import { registerChatRoutes } from "./replit_integrations/chat";
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -59,9 +58,6 @@ function requireSameUser(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Register AI chat routes (Grok via OpenRouter)
-  registerChatRoutes(app);
-  
   // Digital Asset Links for Android passkey association with swipeme.org
   // This file proves the app is authorized to create passkeys for this domain
   app.get("/.well-known/assetlinks.json", (_req: Request, res: Response) => {
