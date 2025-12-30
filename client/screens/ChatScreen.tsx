@@ -348,12 +348,13 @@ interface MessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
   recipientUsername?: string;
+  isHighlighted?: boolean;
 }
 
 const { width: screenWidth } = Dimensions.get("window");
 const IMAGE_MAX_WIDTH = screenWidth * 0.65;
 
-function MessageBubble({ message, isOwnMessage, recipientUsername }: MessageBubbleProps) {
+function MessageBubble({ message, isOwnMessage, recipientUsername, isHighlighted }: MessageBubbleProps) {
   const { theme } = useTheme();
   
   const handleExplorerPress = async () => {
@@ -437,6 +438,28 @@ function MessageBubble({ message, isOwnMessage, recipientUsername }: MessageBubb
     const imageWidth = Math.min(IMAGE_MAX_WIDTH, message.imageAttachment.width || IMAGE_MAX_WIDTH);
     const imageHeight = imageWidth / aspectRatio;
     
+    const getImageStatusIcon = () => {
+      if (!isOwnMessage) return null;
+      const status = message.status || "sent";
+      const iconColor = status === "read" ? "#53BDEB" : "rgba(255,255,255,0.9)";
+      
+      if (status === "sending") {
+        return <Feather name="clock" size={10} color="rgba(255,255,255,0.7)" style={{ marginLeft: 3 }} />;
+      }
+      if (status === "sent") {
+        return <Feather name="check" size={10} color={iconColor} style={{ marginLeft: 3 }} />;
+      }
+      if (status === "delivered" || status === "read") {
+        return (
+          <View style={{ flexDirection: "row", marginLeft: 3 }}>
+            <Feather name="check" size={10} color={iconColor} style={{ marginRight: -5 }} />
+            <Feather name="check" size={10} color={iconColor} />
+          </View>
+        );
+      }
+      return null;
+    };
+
     return (
       <View style={[
         styles.imageBubble,
@@ -447,12 +470,15 @@ function MessageBubble({ message, isOwnMessage, recipientUsername }: MessageBubb
           style={[styles.imageMessage, { width: imageWidth, height: imageHeight }]}
           contentFit="cover"
         />
-        <ThemedText style={[
-          styles.imageTime,
-          { color: "rgba(255,255,255,0.9)" }
-        ]}>
-          {formatTime(message.timestamp)}
-        </ThemedText>
+        <View style={{ flexDirection: "row", alignItems: "center", position: "absolute", bottom: 8, right: 12 }}>
+          <ThemedText style={[
+            styles.imageTime,
+            { color: "rgba(255,255,255,0.9)" }
+          ]}>
+            {formatTime(message.timestamp)}
+          </ThemedText>
+          {getImageStatusIcon()}
+        </View>
       </View>
     );
   }
@@ -483,12 +509,27 @@ function MessageBubble({ message, isOwnMessage, recipientUsername }: MessageBubb
             {latitude.toFixed(6)}, {longitude.toFixed(6)}
           </ThemedText>
         </View>
-        <ThemedText style={[
-          styles.messageTime,
-          { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
-        ]}>
-          {formatTime(message.timestamp)}
-        </ThemedText>
+        <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-end" }}>
+          <ThemedText style={[
+            styles.messageTime,
+            { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
+          ]}>
+            {formatTime(message.timestamp)}
+          </ThemedText>
+          {isOwnMessage ? (() => {
+            const status = message.status || "sent";
+            const iconColor = status === "read" ? "#53BDEB" : "rgba(255,255,255,0.7)";
+            if (status === "sending") return <Feather name="clock" size={10} color="rgba(255,255,255,0.5)" style={{ marginLeft: 3 }} />;
+            if (status === "sent") return <Feather name="check" size={10} color={iconColor} style={{ marginLeft: 3 }} />;
+            if (status === "delivered" || status === "read") return (
+              <View style={{ flexDirection: "row", marginLeft: 3 }}>
+                <Feather name="check" size={10} color={iconColor} style={{ marginRight: -5 }} />
+                <Feather name="check" size={10} color={iconColor} />
+              </View>
+            );
+            return null;
+          })() : null}
+        </View>
       </View>
     );
   }
@@ -523,12 +564,27 @@ function MessageBubble({ message, isOwnMessage, recipientUsername }: MessageBubb
             ) : null}
           </View>
         </View>
-        <ThemedText style={[
-          styles.messageTime,
-          { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
-        ]}>
-          {formatTime(message.timestamp)}
-        </ThemedText>
+        <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-end" }}>
+          <ThemedText style={[
+            styles.messageTime,
+            { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
+          ]}>
+            {formatTime(message.timestamp)}
+          </ThemedText>
+          {isOwnMessage ? (() => {
+            const status = message.status || "sent";
+            const iconColor = status === "read" ? "#53BDEB" : "rgba(255,255,255,0.7)";
+            if (status === "sending") return <Feather name="clock" size={10} color="rgba(255,255,255,0.5)" style={{ marginLeft: 3 }} />;
+            if (status === "sent") return <Feather name="check" size={10} color={iconColor} style={{ marginLeft: 3 }} />;
+            if (status === "delivered" || status === "read") return (
+              <View style={{ flexDirection: "row", marginLeft: 3 }}>
+                <Feather name="check" size={10} color={iconColor} style={{ marginRight: -5 }} />
+                <Feather name="check" size={10} color={iconColor} />
+              </View>
+            );
+            return null;
+          })() : null}
+        </View>
       </View>
     );
   }
@@ -563,12 +619,27 @@ function MessageBubble({ message, isOwnMessage, recipientUsername }: MessageBubb
             </ThemedText>
           </View>
         </View>
-        <ThemedText style={[
-          styles.messageTime,
-          { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
-        ]}>
-          {formatTime(message.timestamp)}
-        </ThemedText>
+        <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-end" }}>
+          <ThemedText style={[
+            styles.messageTime,
+            { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
+          ]}>
+            {formatTime(message.timestamp)}
+          </ThemedText>
+          {isOwnMessage ? (() => {
+            const status = message.status || "sent";
+            const iconColor = status === "read" ? "#53BDEB" : "rgba(255,255,255,0.7)";
+            if (status === "sending") return <Feather name="clock" size={10} color="rgba(255,255,255,0.5)" style={{ marginLeft: 3 }} />;
+            if (status === "sent") return <Feather name="check" size={10} color={iconColor} style={{ marginLeft: 3 }} />;
+            if (status === "delivered" || status === "read") return (
+              <View style={{ flexDirection: "row", marginLeft: 3 }}>
+                <Feather name="check" size={10} color={iconColor} style={{ marginRight: -5 }} />
+                <Feather name="check" size={10} color={iconColor} />
+              </View>
+            );
+            return null;
+          })() : null}
+        </View>
       </View>
     );
   }
@@ -593,11 +664,35 @@ function MessageBubble({ message, isOwnMessage, recipientUsername }: MessageBubb
     );
   }
 
+  const renderStatusIcon = () => {
+    if (!isOwnMessage) return null;
+    
+    const status = message.status || "sent";
+    const iconColor = status === "read" ? "#53BDEB" : "rgba(255,255,255,0.7)";
+    
+    if (status === "sending") {
+      return <Feather name="clock" size={12} color="rgba(255,255,255,0.5)" style={{ marginLeft: 4 }} />;
+    }
+    if (status === "sent") {
+      return <Feather name="check" size={12} color={iconColor} style={{ marginLeft: 4 }} />;
+    }
+    if (status === "delivered" || status === "read") {
+      return (
+        <View style={{ flexDirection: "row", marginLeft: 4 }}>
+          <Feather name="check" size={12} color={iconColor} style={{ marginRight: -6 }} />
+          <Feather name="check" size={12} color={iconColor} />
+        </View>
+      );
+    }
+    return null;
+  };
+
   return (
     <View style={[
       styles.messageBubble,
       isOwnMessage ? [styles.ownMessage, { backgroundColor: theme.sentMessage }] 
-                   : [styles.otherMessage, { backgroundColor: theme.receivedMessage }]
+                   : [styles.otherMessage, { backgroundColor: theme.receivedMessage }],
+      isHighlighted && styles.highlightedMessage,
     ]}>
       <ThemedText style={[
         styles.messageText,
@@ -605,12 +700,15 @@ function MessageBubble({ message, isOwnMessage, recipientUsername }: MessageBubb
       ]}>
         {message.content}
       </ThemedText>
-      <ThemedText style={[
-        styles.messageTime,
-        { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
-      ]}>
-        {formatTime(message.timestamp)}
-      </ThemedText>
+      <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-end" }}>
+        <ThemedText style={[
+          styles.messageTime,
+          { color: isOwnMessage ? "rgba(255,255,255,0.7)" : theme.textSecondary }
+        ]}>
+          {formatTime(message.timestamp)}
+        </ThemedText>
+        {renderStatusIcon()}
+      </View>
     </View>
   );
 }
@@ -821,6 +919,130 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
   );
 }
 
+interface MessageSearchModalProps {
+  visible: boolean;
+  onClose: () => void;
+  messages: Message[];
+  onSelectMessage: (messageId: string) => void;
+}
+
+function MessageSearchModal({ visible, onClose, messages, onSelectMessage }: MessageSearchModalProps) {
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState("");
+  
+  const filteredMessages = useMemo(() => {
+    if (!query.trim()) return [];
+    const searchTerm = query.toLowerCase();
+    return messages.filter(msg => 
+      msg.content.toLowerCase().includes(searchTerm) ||
+      msg.paymentMemo?.toLowerCase().includes(searchTerm)
+    ).slice(0, 50);
+  }, [messages, query]);
+
+  const highlightText = (text: string, highlight: string) => {
+    if (!highlight.trim()) return <ThemedText style={{ color: theme.text }}>{text}</ThemedText>;
+    
+    const parts = text.split(new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+    
+    return (
+      <ThemedText style={{ color: theme.text }}>
+        {parts.map((part, index) => 
+          part.toLowerCase() === highlight.toLowerCase() ? (
+            <ThemedText key={index} style={{ backgroundColor: "#FFEB3B", color: "#000" }}>{part}</ThemedText>
+          ) : (
+            <ThemedText key={index} style={{ color: theme.text }}>{part}</ThemedText>
+          )
+        )}
+      </ThemedText>
+    );
+  };
+
+  const handleSelectMessage = (messageId: string) => {
+    onSelectMessage(messageId);
+    setQuery("");
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={[styles.searchModalContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <View style={[styles.searchModalHeader, { borderBottomColor: theme.border }]}>
+          <View style={[styles.searchInputContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <Feather name="search" size={18} color={theme.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.text }]}
+              placeholder="Search messages..."
+              placeholderTextColor={theme.textSecondary}
+              value={query}
+              onChangeText={setQuery}
+              autoFocus
+            />
+            {query ? (
+              <Pressable onPress={() => setQuery("")}>
+                <Feather name="x-circle" size={18} color={theme.textSecondary} />
+              </Pressable>
+            ) : null}
+          </View>
+          <Pressable onPress={onClose} style={styles.searchCancelButton}>
+            <ThemedText style={{ color: theme.primary }}>Cancel</ThemedText>
+          </Pressable>
+        </View>
+        
+        {query.trim() ? (
+          filteredMessages.length > 0 ? (
+            <FlatList
+              data={filteredMessages}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.lg }}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[styles.searchResultItem, { borderBottomColor: theme.border }]}
+                  onPress={() => handleSelectMessage(item.id)}
+                >
+                  <View style={styles.searchResultContent}>
+                    <ThemedText style={[styles.searchResultTime, { color: theme.textSecondary }]}>
+                      {formatTime(item.timestamp)} - {new Date(item.timestamp).toLocaleDateString()}
+                    </ThemedText>
+                    <View style={styles.searchResultText}>
+                      {highlightText(
+                        item.type === "payment" 
+                          ? `$${item.paymentAmount?.toFixed(2)}${item.paymentMemo ? ` - ${item.paymentMemo}` : ""}`
+                          : item.content,
+                        query
+                      )}
+                    </View>
+                  </View>
+                  <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                </Pressable>
+              )}
+            />
+          ) : (
+            <View style={styles.searchEmptyState}>
+              <Feather name="search" size={48} color={theme.textSecondary} />
+              <ThemedText style={[styles.searchEmptyText, { color: theme.textSecondary }]}>
+                No messages found for "{query}"
+              </ThemedText>
+            </View>
+          )
+        ) : (
+          <View style={styles.searchEmptyState}>
+            <Feather name="message-circle" size={48} color={theme.textSecondary} />
+            <ThemedText style={[styles.searchEmptyText, { color: theme.textSecondary }]}>
+              Search for messages in this chat
+            </ThemedText>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
 interface DeviceContact {
   id: string;
   name: string;
@@ -913,6 +1135,9 @@ export default function ChatScreen() {
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [showDisappearingSettings, setShowDisappearingSettings] = useState(false);
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [disappearingTimer, setDisappearingTimer] = useState<DisappearingTimer>(null);
   const [chatBackground, setChatBackgroundState] = useState<ChatBackground | null>(null);
   const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
@@ -921,8 +1146,28 @@ export default function ChatScreen() {
     TEMPO_TOKENS.map(token => ({ token, balance: "0", balanceFormatted: "0", balanceUsd: 0 }))
   );
   const [chat, setChat] = useState<Chat | null>(null);
+  const [contactProfile, setContactProfile] = useState<{
+    username?: string;
+    profileImage?: string;
+    lastSeenAt?: Date;
+  } | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const streamCancelRef = useRef<(() => void) | null>(null);
+
+  const getOnlineStatus = useCallback(() => {
+    if (!contactProfile?.lastSeenAt) return null;
+    const now = new Date();
+    const diffMs = now.getTime() - new Date(contactProfile.lastSeenAt).getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    
+    if (diffMins < 5) return "Online";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    
+    return null;
+  }, [contactProfile?.lastSeenAt]);
 
   const handleOpenContactDetails = useCallback(() => {
     const participantId = contactId || chat?.participants?.[0]?.id;
@@ -930,22 +1175,55 @@ export default function ChatScreen() {
   }, [navigation, chatId, name, peerAddress, avatarId, contactId, chat?.participants]);
 
   useLayoutEffect(() => {
+    const onlineStatus = getOnlineStatus();
     navigation.setOptions({
       headerTitle: () => (
         <Pressable onPress={handleOpenContactDetails} style={{ flexDirection: "row", alignItems: "center" }}>
-          <ThemedText style={{ fontSize: 17, fontWeight: "600" }}>{name}</ThemedText>
-          <Feather name="chevron-right" size={18} color={theme.textSecondary} style={{ marginLeft: 2 }} />
+          <View style={{ position: "relative", marginRight: 10 }}>
+            <Avatar avatarId={avatarId || "coral"} imageUri={contactProfile?.profileImage} size={36} />
+            {onlineStatus === "Online" ? (
+              <View style={{ 
+                position: "absolute", 
+                bottom: 0, 
+                right: 0, 
+                width: 12, 
+                height: 12, 
+                borderRadius: 6, 
+                backgroundColor: "#22C55E",
+                borderWidth: 2,
+                borderColor: theme.backgroundRoot,
+              }} />
+            ) : null}
+          </View>
+          <View>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <ThemedText style={{ fontSize: 17, fontWeight: "600" }}>{name}</ThemedText>
+              <Feather name="chevron-right" size={18} color={theme.textSecondary} style={{ marginLeft: 2 }} />
+            </View>
+            {contactProfile?.username ? (
+              <ThemedText style={{ fontSize: 12, color: onlineStatus === "Online" ? "#22C55E" : theme.textSecondary }}>
+                {onlineStatus === "Online" ? "Online" : (onlineStatus ? `Active ${onlineStatus}` : `@${contactProfile.username}`)}
+              </ThemedText>
+            ) : onlineStatus ? (
+              <ThemedText style={{ fontSize: 12, color: onlineStatus === "Online" ? "#22C55E" : theme.textSecondary }}>
+                {onlineStatus === "Online" ? "Online" : `Active ${onlineStatus}`}
+              </ThemedText>
+            ) : null}
+          </View>
         </Pressable>
       ),
       headerRight: () => (
         <View style={{ flexDirection: "row", gap: 8 }}>
+          <HeaderButton onPress={() => setShowMessageSearch(true)}>
+            <Feather name="search" size={20} color={theme.primary} />
+          </HeaderButton>
           <HeaderButton onPress={() => setShowPayment(true)}>
             <Feather name="dollar-sign" size={20} color={theme.primary} />
           </HeaderButton>
         </View>
       ),
     });
-  }, [navigation, theme, name, chatId, avatarId, handleOpenContactDetails]);
+  }, [navigation, theme, name, chatId, avatarId, handleOpenContactDetails, contactProfile, getOnlineStatus]);
 
   const loadData = useCallback(async () => {
     // Load chat background (reset to null if none set)
@@ -1006,6 +1284,38 @@ export default function ChatScreen() {
       loadData();
     }, [loadData])
   );
+
+  useEffect(() => {
+    const fetchContactProfile = async () => {
+      const participantId = contactId || chat?.participants?.[0]?.id;
+      if (!participantId) return;
+      
+      try {
+        const baseUrl = getApiUrl();
+        const response = await fetch(new URL(`/api/users/${participantId}/public`, baseUrl), {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          setContactProfile({
+            username: userData.username,
+            profileImage: userData.profileImage,
+            lastSeenAt: userData.lastSeenAt ? new Date(userData.lastSeenAt) : undefined,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch contact profile:", error);
+      }
+    };
+    
+    fetchContactProfile();
+    
+    const interval = setInterval(fetchContactProfile, 60000);
+    return () => clearInterval(interval);
+  }, [contactId, chat?.participants]);
 
   useEffect(() => {
     if (!useXMTPMode || !xmtpDm) return;
@@ -1084,6 +1394,7 @@ export default function ChatScreen() {
           content: messageText,
           timestamp: Date.now(),
           type: "text",
+          status: "sent",
         };
         setMessages(prev => [newMessage, ...prev]);
         
@@ -1518,7 +1829,12 @@ export default function ChatScreen() {
               
               return (
                 <>
-                  <MessageBubble message={item} isOwnMessage={item.senderId === "me"} recipientUsername={participant?.username} />
+                  <MessageBubble 
+                    message={item} 
+                    isOwnMessage={item.senderId === "me"} 
+                    recipientUsername={participant?.username}
+                    isHighlighted={highlightedMessageId === item.id}
+                  />
                   {showDateSeparator ? <DateSeparator timestamp={item.timestamp} /> : null}
                 </>
               );
@@ -1611,6 +1927,20 @@ export default function ChatScreen() {
         onClose={() => setShowContactPicker(false)}
         onSelectContact={handleSelectContact}
         contacts={deviceContacts}
+      />
+
+      <MessageSearchModal
+        visible={showMessageSearch}
+        onClose={() => setShowMessageSearch(false)}
+        messages={messages}
+        onSelectMessage={(messageId) => {
+          setHighlightedMessageId(messageId);
+          const messageIndex = messages.findIndex(m => m.id === messageId);
+          if (messageIndex !== -1 && flatListRef.current) {
+            flatListRef.current.scrollToIndex({ index: messageIndex, animated: true, viewPosition: 0.5 });
+            setTimeout(() => setHighlightedMessageId(null), 2000);
+          }
+        }}
       />
 
       <Modal
@@ -2525,5 +2855,66 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     textAlign: "center",
+  },
+  searchModalContainer: {
+    flex: 1,
+  },
+  searchModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    gap: Spacing.sm,
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: 10,
+    gap: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  searchCancelButton: {
+    paddingHorizontal: Spacing.sm,
+  },
+  searchResultItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  searchResultContent: {
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  searchResultTime: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  searchResultText: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  searchEmptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.md,
+  },
+  searchEmptyText: {
+    fontSize: 16,
+    textAlign: "center",
+    maxWidth: "80%",
+  },
+  highlightedMessage: {
+    borderWidth: 2,
+    borderColor: "#FFEB3B",
   },
 });

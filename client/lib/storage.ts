@@ -62,6 +62,8 @@ export interface AudioAttachment {
   duration: number;
 }
 
+export type MessageStatus = "sending" | "sent" | "delivered" | "read";
+
 export interface Message {
   id: string;
   chatId: string;
@@ -69,6 +71,7 @@ export interface Message {
   content: string;
   timestamp: number;
   type: MessageType;
+  status?: MessageStatus;
   paymentAmount?: number;
   paymentMemo?: string;
   paymentStatus?: "pending" | "completed" | "failed";
@@ -172,6 +175,7 @@ export async function sendMessage(chatId: string, content: string, senderId: str
     content,
     timestamp: now,
     type: "text",
+    status: senderId === "me" ? "sent" : undefined,
     expiresAt: timer ? now + getTimerDuration(timer) : undefined,
   };
   
@@ -245,6 +249,7 @@ export async function sendAttachmentMessage(
     content,
     timestamp: now,
     type,
+    status: senderId === "me" ? "sent" : undefined,
     imageAttachment: attachment.image,
     locationAttachment: attachment.location,
     contactAttachment: attachment.contact,
@@ -296,6 +301,7 @@ export async function sendAudioMessage(
     content: `Voice message (${durationFormatted})`,
     timestamp: now,
     type: "audio",
+    status: senderId === "me" ? "sent" : undefined,
     audioAttachment: {
       uri: audioUri,
       duration,
@@ -348,6 +354,7 @@ export async function sendPayment(
     content: `$${amount.toFixed(2)}`,
     timestamp: now,
     type: "payment",
+    status: "sent",
     paymentAmount: amount,
     paymentMemo: memo,
     paymentStatus: "completed",

@@ -76,6 +76,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    
+    const pingPresence = async () => {
+      try {
+        const baseUrl = getApiUrl();
+        await fetch(new URL("/api/users/presence/ping", baseUrl), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+      } catch (error) {
+        // Silently fail - presence is not critical
+      }
+    };
+    
+    pingPresence();
+    const interval = setInterval(pingPresence, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const loadStoredAuth = async () => {
     try {
       const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);

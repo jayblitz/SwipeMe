@@ -553,9 +553,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         id: user.id,
         email: user.email,
+        username: user.username,
         displayName: user.displayName,
         profileImage: user.profileImage,
         walletAddress: wallet?.address || null,
+        lastSeenAt: user.lastSeenAt,
       });
     } catch (error) {
       console.error("Get user public profile error:", error);
@@ -577,6 +579,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Save push token error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/users/presence/ping", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      await storage.updateUserPresence(userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Presence ping error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/chats/:chatId/mute", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { chatId } = req.params;
+      const { duration } = req.body;
+      const userId = req.session.userId!;
+      
+      let mutedUntil: Date | null = null;
+      
+      if (duration === "forever") {
+        mutedUntil = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000);
+      } else if (duration === "1h") {
+        mutedUntil = new Date(Date.now() + 60 * 60 * 1000);
+      } else if (duration === "8h") {
+        mutedUntil = new Date(Date.now() + 8 * 60 * 60 * 1000);
+      } else if (duration === "1d") {
+        mutedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      } else if (duration === "1w") {
+        mutedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      } else {
+        return res.status(400).json({ error: "Invalid duration. Use: 1h, 8h, 1d, 1w, or forever" });
+      }
+      
+      await storage.getOrCreateChatParticipant(chatId, userId);
+      const success = await storage.setChatMute(chatId, userId, mutedUntil);
+      
+      res.json({ success, mutedUntil });
+    } catch (error) {
+      console.error("Mute chat error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/chats/:chatId/unmute", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { chatId } = req.params;
+      const userId = req.session.userId!;
+      
+      const success = await storage.setChatMute(chatId, userId, null);
+      res.json({ success });
+    } catch (error) {
+      console.error("Unmute chat error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/chats/:chatId/mute-status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { chatId } = req.params;
+      const userId = req.session.userId!;
+      
+      const mutedUntil = await storage.getChatMuteStatus(chatId, userId);
+      const isMuted = mutedUntil ? new Date(mutedUntil) > new Date() : false;
+      
+      res.json({ isMuted, mutedUntil });
+    } catch (error) {
+      console.error("Get mute status error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

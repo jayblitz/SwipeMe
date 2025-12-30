@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   twoFactorSecret: text("two_factor_secret"),
   themePreference: text("theme_preference").default("system"),
   pushToken: text("push_token"),
+  lastSeenAt: timestamp("last_seen_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -76,6 +77,7 @@ export const chatParticipants = pgTable("chat_participants", {
     .default(sql`gen_random_uuid()`),
   chatId: varchar("chat_id").notNull().references(() => chats.id),
   userId: varchar("user_id").notNull().references(() => users.id),
+  mutedUntil: timestamp("muted_until"),
   joinedAt: timestamp("joined_at").defaultNow(),
 }, (table) => [
   index("chat_participants_chat_idx").on(table.chatId),

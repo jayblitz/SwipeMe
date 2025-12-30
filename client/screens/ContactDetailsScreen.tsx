@@ -176,11 +176,14 @@ export default function ContactDetailsScreen() {
   const [documentItems, setDocumentItems] = useState<DocumentItem[]>([]);
   const [activeMediaTab, setActiveMediaTab] = useState<MediaTabType>("media");
   const [payments, setPayments] = useState<Transaction[]>([]);
-  const [nickname, setNickname] = useState<string>("");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
+  const [mutedUntil, setMutedUntil] = useState<Date | null>(null);
+  const [showMuteModal, setShowMuteModal] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [contactEmail, setContactEmail] = useState<string>("");
+  const [contactUsername, setContactUsername] = useState<string>("");
   const [contactProfileImage, setContactProfileImage] = useState<string | null>(null);
+  const [lastSeenAt, setLastSeenAt] = useState<Date | null>(null);
   
   useEffect(() => {
     loadContactData();
@@ -209,7 +212,21 @@ export default function ContactDetailsScreen() {
         if (response.ok) {
           const userData = await response.json();
           if (userData.email) setContactEmail(userData.email);
+          if (userData.username) setContactUsername(userData.username);
           if (userData.profileImage) setContactProfileImage(userData.profileImage);
+          if (userData.lastSeenAt) setLastSeenAt(new Date(userData.lastSeenAt));
+        }
+        
+        const muteResponse = await fetch(new URL(`/api/chats/${chatId}/mute-status`, baseUrl), {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+        
+        if (muteResponse.ok) {
+          const muteData = await muteResponse.json();
+          setNotificationsMuted(muteData.isMuted);
+          if (muteData.mutedUntil) setMutedUntil(new Date(muteData.mutedUntil));
         }
       } catch (error) {
         console.error("Failed to fetch contact profile:", error);
@@ -291,7 +308,71 @@ export default function ContactDetailsScreen() {
   };
   
   const handleMuteToggle = () => {
-    setNotificationsMuted(!notificationsMuted);
+    if (notificationsMuted) {
+      handleUnmute();
+    } else {
+      setShowMuteModal(true);
+    }
+  };
+  
+  const handleMuteDuration = async (duration: "1h" | "8h" | "1d" | "1w" | "forever") => {
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(new URL(`/api/chats/${chatId}/mute`, baseUrl), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ duration }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setNotificationsMuted(true);
+        setMutedUntil(new Date(data.mutedUntil));
+        setShowMuteModal(false);
+      }
+    } catch (error) {
+      console.error("Failed to mute chat:", error);
+      Alert.alert("Error", "Failed to mute notifications");
+    }
+  };
+  
+  const handleUnmute = async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(new URL(`/api/chats/${chatId}/unmute`, baseUrl), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      
+      if (response.ok) {
+        setNotificationsMuted(false);
+        setMutedUntil(null);
+      }
+    } catch (error) {
+      console.error("Failed to unmute chat:", error);
+      Alert.alert("Error", "Failed to unmute notifications");
+    }
+  };
+  
+  const getOnlineStatus = () => {
+    if (!lastSeenAt) return null;
+    const now = new Date();
+    const diffMs = now.getTime() - lastSeenAt.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    
+    if (diffMins < 5) return "Online";
+    if (diffMins < 60) return `Active ${diffMins}m ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `Active ${diffHours}h ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return "Active yesterday";
+    if (diffDays < 7) return `Active ${diffDays} days ago`;
+    
+    return `Last seen ${lastSeenAt.toLocaleDateString()}`;
   };
   
   const handleBlockUser = () => {
@@ -368,11 +449,26 @@ export default function ContactDetailsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.profileHeader, { backgroundColor: theme.backgroundRoot }]}>
-          <Avatar avatarId={avatarId || "coral"} imageUri={contactProfileImage} size={100} />
+          <View style={styles.avatarContainer}>
+            <Avatar avatarId={avatarId || "coral"} imageUri={contactProfileImage} size={100} />
+            {getOnlineStatus() === "Online" ? (
+              <View style={[styles.onlineIndicator, { backgroundColor: "#22C55E" }]} />
+            ) : null}
+          </View>
           <ThemedText style={styles.profileName}>{name}</ThemedText>
+          {contactUsername ? (
+            <ThemedText style={[styles.profileUsername, { color: theme.primary }]}>
+              @{contactUsername}
+            </ThemedText>
+          ) : null}
           {contactEmail ? (
             <ThemedText style={[styles.profileEmail, { color: theme.textSecondary }]}>
               {contactEmail}
+            </ThemedText>
+          ) : null}
+          {getOnlineStatus() ? (
+            <ThemedText style={[styles.onlineStatus, { color: getOnlineStatus() === "Online" ? "#22C55E" : theme.textSecondary }]}>
+              {getOnlineStatus()}
             </ThemedText>
           ) : null}
           {peerAddress ? (
@@ -399,20 +495,15 @@ export default function ContactDetailsScreen() {
             onPress={() => setShowDisappearingModal(true)}
           />
           <SettingsRow
-            icon="edit-3"
-            label="Nickname"
-            value={nickname || "None"}
-            onPress={() => Alert.alert("Coming Soon", "Nickname feature coming soon.")}
-          />
-          <SettingsRow
             icon="droplet"
             label="Chat Color & Wallpaper"
             onPress={() => setShowThemeModal(true)}
           />
           <SettingsRow
-            icon="bell"
-            label="Sounds & Notifications"
-            onPress={() => Alert.alert("Coming Soon", "Notification settings coming soon.")}
+            icon={notificationsMuted ? "bell-off" : "bell"}
+            label="Notifications"
+            value={notificationsMuted ? (mutedUntil && mutedUntil.getTime() < Date.now() + 99 * 365 * 24 * 60 * 60 * 1000 ? `Until ${mutedUntil.toLocaleDateString()}` : "Muted") : "On"}
+            onPress={handleMuteToggle}
           />
         </View>
         
@@ -703,6 +794,40 @@ export default function ContactDetailsScreen() {
           </View>
         </View>
       </Modal>
+      
+      <Modal
+        visible={showMuteModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowMuteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalOverlayTouch} onPress={() => setShowMuteModal(false)} />
+          <View style={[styles.modalSheet, { backgroundColor: theme.backgroundRoot, paddingBottom: insets.bottom + Spacing.lg }]}>
+            <View style={styles.modalHandle} />
+            <ThemedText style={styles.modalTitle}>Mute Notifications</ThemedText>
+            <ThemedText style={[styles.modalDescription, { color: theme.textSecondary }]}>
+              Choose how long to mute notifications from this chat.
+            </ThemedText>
+            
+            {([
+              { key: "1h", label: "1 hour" },
+              { key: "8h", label: "8 hours" },
+              { key: "1d", label: "1 day" },
+              { key: "1w", label: "1 week" },
+              { key: "forever", label: "Until I unmute" },
+            ] as { key: "1h" | "8h" | "1d" | "1w" | "forever"; label: string }[]).map((option) => (
+              <Pressable
+                key={option.key}
+                style={[styles.timerOption, { borderBottomColor: theme.border }]}
+                onPress={() => handleMuteDuration(option.key)}
+              >
+                <ThemedText style={styles.timerLabel}>{option.label}</ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -715,13 +840,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.xl,
   },
+  avatarContainer: {
+    position: "relative",
+  },
+  onlineIndicator: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 3,
+    borderColor: "#fff",
+  },
   profileName: {
     fontSize: 24,
     fontWeight: "600",
     marginTop: Spacing.md,
   },
+  profileUsername: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginTop: Spacing.xs,
+  },
   profileEmail: {
     fontSize: 14,
+    marginTop: Spacing.xs,
+  },
+  onlineStatus: {
+    fontSize: 13,
     marginTop: Spacing.xs,
   },
   profileAddress: {

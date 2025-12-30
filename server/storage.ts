@@ -15,7 +15,8 @@ import {
   type VerificationCode,
   type Wallet,
   type WaitlistSignup,
-  type Passkey
+  type Passkey,
+  type ChatParticipant
 } from "@shared/schema";
 import { randomBytes, createHash, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -296,5 +297,54 @@ export const storage = {
         )
       );
     return !!participant;
+  },
+
+  async updateUserPresence(userId: string): Promise<void> {
+    await db.update(users)
+      .set({ lastSeenAt: new Date() })
+      .where(eq(users.id, userId));
+  },
+
+  async setChatMute(chatId: string, userId: string, mutedUntil: Date | null): Promise<boolean> {
+    const result = await db.update(chatParticipants)
+      .set({ mutedUntil })
+      .where(
+        and(
+          eq(chatParticipants.chatId, chatId),
+          eq(chatParticipants.userId, userId)
+        )
+      )
+      .returning();
+    return result.length > 0;
+  },
+
+  async getChatMuteStatus(chatId: string, userId: string): Promise<Date | null> {
+    const [participant] = await db.select()
+      .from(chatParticipants)
+      .where(
+        and(
+          eq(chatParticipants.chatId, chatId),
+          eq(chatParticipants.userId, userId)
+        )
+      );
+    return participant?.mutedUntil || null;
+  },
+
+  async getOrCreateChatParticipant(chatId: string, userId: string): Promise<ChatParticipant> {
+    const [existing] = await db.select()
+      .from(chatParticipants)
+      .where(
+        and(
+          eq(chatParticipants.chatId, chatId),
+          eq(chatParticipants.userId, userId)
+        )
+      );
+    
+    if (existing) return existing;
+    
+    const [newParticipant] = await db.insert(chatParticipants)
+      .values({ chatId, userId })
+      .returning();
+    return newParticipant;
   },
 };
