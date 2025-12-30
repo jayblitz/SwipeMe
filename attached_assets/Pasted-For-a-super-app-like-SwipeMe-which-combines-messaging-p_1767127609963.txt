@@ -1,0 +1,30 @@
+For a super app like SwipeMe, which combines messaging, payments, and utilities in a seamless experience, color themes should be consistent, intuitive, and evocative—building trust (like fintech blues for security), energy (vibrant accents for swipes/transfers), and calmness (neutrals for long chats). Drawing from super apps like Telegram (cool blues for tech-savvy feel), WeChat (greens for growth/money), WhatsApp (teals for connectivity), and Signal (muted blues for privacy), I’d suggest a primary theme anchored in your logo’s blue-white scheme. This ensures “sameness” across tabs (Chats, Wallet, Discover, Profile) while allowing subtle variations for modes (e.g., dark theme for night use).
+Suggested Color Themes
+	1	Primary Theme: Oceanic Trust (Default Light Mode)
+	◦	Rationale: Blue dominates for reliability (common in fintech/super apps like Telegram/PingMe), white for clean minimalism. Accents evoke speed/swipes. Inspired by modern palettes emphasizing accessibility (4.5:1 contrast).
+	◦	Palette:
+	▪	Primary: #0066FF (Deep Blue – actions, buttons, swipes)
+	▪	Secondary: #00BFFF (Light Cyan – highlights, success notifications)
+	▪	Neutral: #FFFFFF (Background) / #F3F4F6 (Message Bubbles)
+	▪	Accent: #10B981 (Green – money transfers, tips)
+	▪	Text: #1F2937 (Dark Gray – readable on white)
+	◦	Usage: Hero elements in onboarding; blue swipes in chats; green for “Sent” confirmations. 0 “LARGE” 
+	2	Dark Mode: Midnight Flow
+	◦	Rationale: Matches system preferences (like WhatsApp/Signal) for eye comfort; inverts light theme while keeping “flow” feel. Super apps like WeChat use dark modes to boost retention (up to 20% more nightly use).
+	◦	Palette:
+	▪	Primary: #0044CC (Darker Blue – actions)
+	▪	Secondary: #0099CC (Muted Cyan – highlights)
+	▪	Neutral: #1F2937 (Background) / #374151 (Bubbles)
+	▪	Accent: #059669 (Dark Green – transfers)
+	▪	Text: #F3F4F6 (Light Gray – on dark)
+	◦	Usage: Auto-toggle; dimmed for voice calls; green glow for incoming tips. 1 “LARGE” 
+	3	Accent Theme: Energetic Wave (Custom/User-Selectable)
+	◦	Rationale: For personalization (like Telegram themes), adding vibrancy for creators/tips. Pastel accents prevent fatigue in long sessions, common in super apps.
+	◦	Palette:
+	▪	Primary: #0066FF (Core Blue)
+	▪	Secondary: #A5F3FC (Pastel Cyan – waves/swipes)
+	▪	Neutral: #FFFFFF (Background)
+	▪	Accent: #34D399 (Vibrant Green – money/positives)
+	▪	Text: #111827 (Blackish Gray)
+	◦	Usage: User profiles; mini-apps; green for live tipping animations. 2 “LARGE” 
+These themes “speak the same” by sharing blue as the unifying color (trust/speed), with whites/neutrals for clarity and greens for financial positives. They’re versatile for your super app’s facets: Blues for secure chats, greens for payments. Implement in theme.ts (e.g., via Tailwind or StyleSheet.create), with a switcher in ProfileTab.tsx. Test for accessibility (WCAG tools free). This creates a cohesive, memorable brand that feels premium and approachable.
