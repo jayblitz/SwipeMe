@@ -1,10 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { Platform } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { 
   initializeXMTPClient, 
   disconnectXMTP, 
-  getXMTPClient,
   isXMTPSupported,
   type XMTPClient 
 } from "@/lib/xmtp";

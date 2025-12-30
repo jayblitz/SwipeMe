@@ -21,7 +21,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, Message, Chat, getContactWalletAddress, getChatBackground, setChatBackground, PRESET_BACKGROUNDS, ChatBackground, DisappearingTimer, getChatDisappearingTimer, setChatDisappearingTimer, getTimerLabel, cleanupExpiredMessages } from "@/lib/storage";
+import { getMessages, sendMessage, sendPayment, sendAttachmentMessage, getChats, Message, Chat, getChatBackground, setChatBackground, PRESET_BACKGROUNDS, ChatBackground, DisappearingTimer, getChatDisappearingTimer, setChatDisappearingTimer, getTimerLabel, cleanupExpiredMessages } from "@/lib/storage";
 import { fetchTokenBalances, getTotalBalance, TokenBalance, TEMPO_TOKENS, TempoToken } from "@/lib/tempo-tokens";
 import { getApiUrl } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
@@ -732,7 +732,7 @@ function PaymentModal({ visible, onClose, onSend, recipientName, recipientAvatar
   const [showAssetSelector, setShowAssetSelector] = useState(false);
   
   const selectedBalance = tokenBalances[selectedTokenIndex] || { token: TEMPO_TOKENS[0], balanceUsd: 0 };
-  const totalBalance = getTotalBalance(tokenBalances);
+  const _totalBalance = getTotalBalance(tokenBalances);
 
   const handleSend = () => {
     const numAmount = parseFloat(amount);
@@ -1136,7 +1136,7 @@ export default function ChatScreen() {
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [showDisappearingSettings, setShowDisappearingSettings] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [_searchQuery, _setSearchQuery] = useState("");
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [disappearingTimer, setDisappearingTimer] = useState<DisappearingTimer>(null);
   const [chatBackground, setChatBackgroundState] = useState<ChatBackground | null>(null);
