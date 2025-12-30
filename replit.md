@@ -6,6 +6,12 @@ SwipeMe is a WeChat-inspired super app that integrates end-to-end encrypted mess
 ## Project Status
 Transitioned from MVP stage to production build phase. Focus is on stability, polished UX, and EAS build compatibility.
 
+**Completed Features:**
+- Moments social feed with text posts, likes, comments
+- Blockchain tipping for posts using pathUSD on Tempo testnet
+- Mini-apps marketplace with functional Calculator app
+- AI Assistant was removed due to security concerns
+
 ## User Preferences
 - iOS 26 liquid glass UI design aesthetic
 - Mobile-first responsive design
