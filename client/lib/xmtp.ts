@@ -174,3 +174,19 @@ export async function syncConversations(): Promise<void> {
   }
   await xmtpClient.conversations.sync();
 }
+
+export async function streamAllMessages(
+  onMessage: (message: DecodedMessage) => void | Promise<void>
+): Promise<() => void> {
+  if (!xmtpClient) {
+    throw new Error("XMTP client not initialized");
+  }
+
+  await xmtpClient.conversations.streamAllMessages(async (message: DecodedMessage) => {
+    await Promise.resolve(onMessage(message));
+  });
+  
+  return () => {
+    // Stream is managed by the SDK - return cleanup function
+  };
+}

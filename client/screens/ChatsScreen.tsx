@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useLayoutEffect } from "react";
+import React, { useState, useCallback, useLayoutEffect, useEffect, useRef } from "react";
 import { View, StyleSheet, FlatList, Pressable, RefreshControl, Platform, ActivityIndicator, TextInput } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -9,10 +9,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Avatar } from "@/components/Avatar";
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Spacing, BorderRadius } from "@/constants/theme";
 import { getChats, Chat, saveChat, generateChatId } from "@/lib/storage";
 import { useXMTP } from "@/contexts/XMTPContext";
-import { getConversations, getMessages, type ConversationInfo, type XMTPConversation } from "@/lib/xmtp";
+import { getConversations, getMessages, streamAllMessages, type XMTPConversation } from "@/lib/xmtp";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 import { NewMessageScreen } from "@/screens/NewMessageScreen";
 import * as Contacts from "expo-contacts";
@@ -271,6 +271,60 @@ export default function ChatsScreen() {
       loadContacts();
     }, [loadConversations, loadContacts])
   );
+
+  const streamCancelRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS === "web" || !isSupported || !client) {
+      return;
+    }
+
+    let isCancelled = false;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const setupStream = async () => {
+      try {
+        if (streamCancelRef.current) {
+          streamCancelRef.current();
+          streamCancelRef.current = null;
+        }
+
+        const cancelStream = await streamAllMessages(() => {
+          if (isCancelled) return;
+
+          if (debounceTimer) {
+            clearTimeout(debounceTimer);
+          }
+          debounceTimer = setTimeout(() => {
+            if (!isCancelled) {
+              loadConversations();
+            }
+          }, 500);
+        });
+
+        if (!isCancelled) {
+          streamCancelRef.current = cancelStream;
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Failed to setup conversation stream:", error);
+        }
+      }
+    };
+
+    setupStream();
+
+    return () => {
+      isCancelled = true;
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      if (streamCancelRef.current) {
+        streamCancelRef.current();
+        streamCancelRef.current = null;
+      }
+    };
+  }, [client, isSupported, loadConversations]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
