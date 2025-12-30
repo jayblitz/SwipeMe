@@ -213,7 +213,6 @@ function AudioMessageBubble({ message, isOwnMessage }: AudioMessageBubbleProps) 
   
   const handlePlayPause = async () => {
     if (!player || !audioUri) {
-      console.log("No player or audio URI");
       return;
     }
     
