@@ -30,12 +30,10 @@ Notifications.setNotificationHandler({
 
 export async function registerForPushNotifications(): Promise<string | null> {
   if (Platform.OS === "web") {
-    console.log("Push notifications not available on web");
     return null;
   }
 
   if (!Device.isDevice) {
-    console.log("Push notifications require a physical device");
     return null;
   }
 
@@ -49,7 +47,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
     }
 
     if (finalStatus !== "granted") {
-      console.log("Push notification permission not granted");
       return null;
     }
 
@@ -89,14 +86,12 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
 export async function registerAndSavePushToken(userId: string): Promise<string | null> {
   if (!userId) {
-    console.log("Cannot register push token: no user ID");
     return null;
   }
   
   try {
     const token = await registerForPushNotifications();
     if (!token) {
-      console.log("Push notification registration returned no token (permission denied or unsupported)");
       return null;
     }
     
@@ -110,8 +105,6 @@ export async function registerAndSavePushToken(userId: string): Promise<string |
     
     if (!response.ok) {
       console.error("Failed to save push token to server:", await response.text());
-    } else {
-      console.log("Push token registered with server");
     }
     
     return token;
@@ -160,7 +153,7 @@ export async function scheduleLocalNotification(
   title: string,
   body: string,
   data?: Record<string, unknown>,
-  channelId: string = "default"
+  _channelId: string = "default"
 ): Promise<string | null> {
   try {
     const id = await Notifications.scheduleNotificationAsync({

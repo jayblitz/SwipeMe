@@ -43,13 +43,8 @@ export async function getResendClient() {
 
 export async function sendVerificationEmail(email: string, code: string, type: string = "signup"): Promise<boolean> {
   try {
-    console.log(`Sending ${type} email to: ${email}`);
-    const { client, fromEmail } = await getResendClient();
-    console.log(`Using from email: ${fromEmail}`);
-    
+    const { client } = await getResendClient();
     const senderEmail = 'SwipeMe <noreply@swipeme.org>';
-    
-    console.log(`Sending from: ${senderEmail}`);
     
     const isPasswordReset = type === "password_reset";
     const subject = isPasswordReset ? 'Reset your password' : 'Confirm your email address';
@@ -97,14 +92,11 @@ export async function sendVerificationEmail(email: string, code: string, type: s
       `
     });
     
-    console.log('Resend API response:', JSON.stringify(result));
-    
     if (result.error) {
       console.error('Resend error:', result.error);
       return false;
     }
     
-    console.log('Email sent successfully with ID:', result.data?.id);
     return true;
   } catch (error) {
     console.error('Failed to send verification email:', error);

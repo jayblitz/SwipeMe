@@ -29,7 +29,6 @@ export async function sendPushNotification(
   channelId: string = "default"
 ): Promise<boolean> {
   if (!pushToken || !pushToken.startsWith("ExponentPushToken")) {
-    console.log("Invalid push token:", pushToken?.slice(0, 20));
     return false;
   }
 
@@ -61,7 +60,6 @@ export async function sendPushNotification(
       return false;
     }
 
-    console.log("Push notification sent successfully to:", pushToken.slice(0, 30));
     return true;
   } catch (error) {
     console.error("Failed to send push notification:", error);

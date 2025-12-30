@@ -15,8 +15,8 @@ let Passkey: any = null;
 if (Platform.OS !== "web") {
   try {
     Passkey = require("react-native-passkeys").Passkey;
-  } catch (e) {
-    console.log("react-native-passkeys not available");
+  } catch {
+    // Passkeys not available on this platform
   }
 }
 

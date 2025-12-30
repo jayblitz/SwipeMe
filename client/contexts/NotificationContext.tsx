@@ -55,7 +55,6 @@ export function NotificationProvider({ children, onNotificationTap }: Notificati
 
   const requestPermission = useCallback(async () => {
     if (Platform.OS === "web") {
-      console.log("Push notifications not available on web");
       return;
     }
     await registerToken();
