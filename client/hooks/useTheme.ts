@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useColorScheme as useSystemColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Colors } from "@/constants/theme";
+import { Colors, ThemeColors } from "@/constants/theme";
 
-export type ThemeMode = "light" | "dark" | "system";
+export type ThemeMode = "light" | "dark" | "system" | "energetic";
 
 interface ThemeContextValue {
-  theme: typeof Colors.light;
+  theme: ThemeColors;
   isDark: boolean;
   mode: ThemeMode;
   setMode: (mode: ThemeMode) => void;
@@ -19,7 +19,6 @@ const THEME_STORAGE_KEY = "@swipeme_theme_mode";
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemColorScheme = useSystemColorScheme();
   const [mode, setModeState] = useState<ThemeMode>("system");
-  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     loadSavedMode();
@@ -28,13 +27,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const loadSavedMode = async () => {
     try {
       const savedMode = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-      if (savedMode && (savedMode === "light" || savedMode === "dark" || savedMode === "system")) {
+      if (savedMode && (savedMode === "light" || savedMode === "dark" || savedMode === "system" || savedMode === "energetic")) {
         setModeState(savedMode as ThemeMode);
       }
     } catch (error) {
       console.error("Failed to load theme mode:", error);
     }
-    setIsLoaded(true);
   };
 
   const setMode = async (newMode: ThemeMode) => {
@@ -46,9 +44,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const effectiveColorScheme = mode === "system" ? systemColorScheme : mode;
-  const isDark = effectiveColorScheme === "dark";
-  const theme = Colors[effectiveColorScheme ?? "light"];
+  const getTheme = (): ThemeColors => {
+    if (mode === "energetic") {
+      return Colors.energetic;
+    }
+    const effectiveScheme = mode === "system" ? systemColorScheme : mode;
+    return Colors[effectiveScheme ?? "light"];
+  };
+
+  const isDark = mode === "dark" || (mode === "system" && systemColorScheme === "dark");
+  const theme = getTheme();
 
   const value: ThemeContextValue = {
     theme,
