@@ -60,7 +60,7 @@ function requireSameUser(req: Request, res: Response, next: NextFunction) {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Digital Asset Links for Android passkey association with swipeme.org
   // This file proves the app is authorized to create passkeys for this domain
-  app.get("/.well-known/assetlinks.json", (req: Request, res: Response) => {
+  app.get("/.well-known/assetlinks.json", (_req: Request, res: Response) => {
     res.setHeader("Content-Type", "application/json");
     res.json([{
       "relation": [
@@ -466,7 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/waitlist", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/waitlist", requireAuth, async (_req: Request, res: Response) => {
     try {
       const signups = await storage.getAllWaitlistSignups();
       res.json({ signups });
@@ -478,7 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/contacts/match", async (req: Request, res: Response) => {
     try {
-      const { emails, phones } = req.body;
+      const { emails } = req.body;
       
       if (!emails || !Array.isArray(emails)) {
         return res.status(400).json({ error: "emails array is required" });
@@ -892,7 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/contacts/invite", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { email, name } = req.body;
+      const { email } = req.body;
       const userId = req.session.userId;
       
       if (!email) {

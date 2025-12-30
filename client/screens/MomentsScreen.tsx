@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import * as WebBrowser from "expo-web-browser";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
@@ -121,8 +122,25 @@ export default function MomentsScreen() {
       const response = await apiRequest("POST", `/api/moments/${tipPostId}/tip`, { amount: tipAmount });
       const result = await response.json();
       if (result.success) {
-        Alert.alert("Tip Sent!", `Your tip of $${tipAmount} was sent successfully.`);
         queryClient.invalidateQueries({ queryKey: ["/api/moments"] });
+        const explorerUrl = result.explorer;
+        Alert.alert(
+          "Tip Sent!",
+          `Your tip of $${tipAmount} was sent successfully.`,
+          explorerUrl ? [
+            { 
+              text: "View Transaction", 
+              onPress: async () => {
+                try {
+                  await WebBrowser.openBrowserAsync(explorerUrl);
+                } catch {
+                  Alert.alert("Error", "Could not open transaction explorer");
+                }
+              }
+            },
+            { text: "Done", style: "cancel" }
+          ] : [{ text: "Done" }]
+        );
       } else {
         Alert.alert("Tip Failed", result.error || "Could not send tip");
       }
