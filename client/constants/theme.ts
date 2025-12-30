@@ -35,7 +35,7 @@ export const Colors = {
     textSecondary: "#9CA3AF",
     buttonText: "#FFFFFF",
     tabIconDefault: "#9BA1A6",
-    tabIconSelected: "#0066FF",
+    tabIconSelected: "#0044CC",
     link: "#0099CC",
     backgroundRoot: "#1F2937",
     backgroundDefault: "#2A3441",

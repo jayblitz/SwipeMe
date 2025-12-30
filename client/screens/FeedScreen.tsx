@@ -481,7 +481,7 @@ export default function FeedScreen() {
                   style={[
                     styles.tipAmountButton,
                     { borderColor: theme.border },
-                    tipAmount === amount && { backgroundColor: theme.primary, borderColor: theme.primary }
+                    tipAmount === amount && { backgroundColor: theme.money, borderColor: theme.money }
                   ]}
                   onPress={() => setTipAmount(amount)}
                 >
@@ -516,7 +516,7 @@ export default function FeedScreen() {
                 <Text style={{ color: theme.text }}>Cancel</Text>
               </Pressable>
               <Pressable 
-                style={[styles.tipSendButton, { backgroundColor: theme.primary }]}
+                style={[styles.tipSendButton, { backgroundColor: theme.money }]}
                 onPress={handleSendTip}
                 disabled={!tipAmount || tipLoading}
               >
