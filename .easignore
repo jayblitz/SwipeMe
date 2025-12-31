@@ -1,0 +1,63 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# Git
+.git/
+
+# Development tools
+.vscode/
+.idea/
+*.log
+.DS_Store
+
+# Testing
+__tests__/
+coverage/
+*.test.js
+*.spec.js
+*.test.ts
+*.spec.ts
+jest.config.js
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Attached assets (not needed for build)
+attached_assets/
+
+# Temporary files
+/tmp/
+*.tmp
+*.temp
+
+# Large media files not needed for build
+*.mp4
+*.mov
+*.avi
+*.psd
+*.ai
+*.sketch
+*.fig
+
+# Build artifacts
+build/
+*.apk
+*.aab
+*.ipa
+
+# Server files (not needed for mobile build)
+server/
+
+# Shared types (will be bundled anyway)
+shared/
