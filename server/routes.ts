@@ -886,6 +886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         platformFee: feeAmount.toFixed(6),
         platformFeePercent: FEE_PERCENTAGE,
         netToCreator: netToCreator.toFixed(6),
+        feeCollected: feeTxHash ? true : false,
         success: true 
       });
     } catch (error) {
