@@ -40,6 +40,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/with-bouncycastle-fix.js",
       [
         "expo-splash-screen",
         {
