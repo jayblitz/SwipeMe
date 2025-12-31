@@ -56,7 +56,7 @@ The application is built with an Expo/React Native frontend and an Express.js ba
   - CSP meta tag on landing page
   - XMTP encryption keys stored in expo-secure-store
 - **Database:** PostgreSQL with schemas for users, wallets, chats, messages, transactions, and authentication-related data (verification codes, passkeys).
-- **Revenue System:** On-chain fee collection with split payments. Database tables: revenue_ledger (all platform fees with collection status), creator_balances (creator earnings), and creator_withdrawals (payout history). Fee structure: 5% on tips (to treasury), 1% on P2P transfers (to treasury). When tips/transfers occur, two transactions execute: net amount to recipient, fee to PLATFORM_TREASURY_ADDRESS. Revenue ledger tracks feeCollected status to distinguish between expected and actually collected fees. Creator Earnings dashboard shows earnings, available balance, and withdrawal options.
+- **Revenue System:** Treasury-first model with weekly withdrawals. Database tables: revenue_ledger (all platform fees with collection status), creator_balances (creator earnings), and creator_withdrawals (payout history). Tips: 100% goes to PLATFORM_TREASURY_ADDRESS (creators see balance increase in real-time, can withdraw once per week on Mondays UTC). P2P Transfers: 1% fee to treasury, 99% to recipient. Creator Earnings dashboard shows total earned, available balance, next withdrawal window countdown, and withdrawal history.
 
 ## External Dependencies
 - **Resend:** For email verification code delivery.

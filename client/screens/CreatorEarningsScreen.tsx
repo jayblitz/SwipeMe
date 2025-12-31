@@ -20,6 +20,13 @@ import { Card } from "@/components/Card";
 import { Spacing } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 
+interface WithdrawalWindow {
+  canWithdrawNow: boolean;
+  nextWithdrawalDate: string;
+  daysUntilWithdrawal: number;
+  withdrawalDay: string;
+}
+
 interface CreatorEarnings {
   totalEarned: string;
   totalWithdrawn: string;
@@ -27,6 +34,7 @@ interface CreatorEarnings {
   totalTipsReceived: string;
   totalFeesPaid: string;
   lastWithdrawalAt: string | null;
+  withdrawalWindow?: WithdrawalWindow;
 }
 
 interface StatCardProps {
@@ -124,8 +132,19 @@ export default function CreatorEarningsScreen() {
   const totalEarned = parseFloat(earnings?.totalEarned || "0").toFixed(2);
   const pendingBalance = parseFloat(earnings?.pendingBalance || "0").toFixed(2);
   const totalWithdrawn = parseFloat(earnings?.totalWithdrawn || "0").toFixed(2);
-  const totalFeesPaid = parseFloat(earnings?.totalFeesPaid || "0").toFixed(2);
   const tipsCount = earnings?.totalTipsReceived || "0";
+  const withdrawalWindow = earnings?.withdrawalWindow;
+  const canWithdraw = withdrawalWindow?.canWithdrawNow && parseFloat(pendingBalance) > 0;
+  
+  const formatNextWithdrawalDate = () => {
+    if (!withdrawalWindow?.nextWithdrawalDate) return "";
+    const date = new Date(withdrawalWindow.nextWithdrawalDate);
+    return date.toLocaleDateString("en-US", { 
+      weekday: "long", 
+      month: "short", 
+      day: "numeric" 
+    });
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -165,7 +184,7 @@ export default function CreatorEarningsScreen() {
           <StatCard
             title="Available"
             value={pendingBalance}
-            subtitle="Ready to withdraw"
+            subtitle="Held in treasury"
             icon="dollar-sign"
             color={theme.primary}
           />
@@ -179,45 +198,66 @@ export default function CreatorEarningsScreen() {
             color={theme.textSecondary}
           />
           <StatCard
-            title="Platform Fees"
-            value={totalFeesPaid}
-            subtitle="5% on tips"
-            icon="percent"
-            color={theme.warning}
+            title="Tips Count"
+            value={tipsCount}
+            subtitle="Total tips"
+            icon="heart"
+            color={theme.error}
           />
         </View>
 
         <Card style={styles.infoCard} elevation={1}>
           <View style={styles.infoRow}>
-            <Feather name="info" size={20} color={theme.primary} />
+            <Feather name="calendar" size={20} color={theme.primary} />
             <View style={styles.infoContent}>
-              <ThemedText style={styles.infoTitle}>How it works</ThemedText>
+              <ThemedText style={styles.infoTitle}>Weekly Withdrawals</ThemedText>
               <ThemedText style={[styles.infoText, { color: theme.textSecondary }]}>
-                When someone tips your post, you receive 95% of the tip amount directly to your wallet. The 5% platform fee helps keep SwipeMe running.
+                Tips are held securely in the platform treasury. You can withdraw your full balance once per week on Mondays (UTC).
               </ThemedText>
             </View>
           </View>
         </Card>
 
+        {!withdrawalWindow?.canWithdrawNow && withdrawalWindow?.daysUntilWithdrawal ? (
+          <View style={[styles.nextWithdrawalCard, { backgroundColor: `${theme.primary}10` }]}>
+            <Feather name="clock" size={18} color={theme.primary} />
+            <View style={styles.nextWithdrawalContent}>
+              <ThemedText style={[styles.nextWithdrawalLabel, { color: theme.textSecondary }]}>
+                Next withdrawal window
+              </ThemedText>
+              <ThemedText style={[styles.nextWithdrawalDate, { color: theme.text }]}>
+                {formatNextWithdrawalDate()}
+              </ThemedText>
+              <ThemedText style={[styles.nextWithdrawalDays, { color: theme.primary }]}>
+                {withdrawalWindow.daysUntilWithdrawal === 1 
+                  ? "Tomorrow" 
+                  : `${withdrawalWindow.daysUntilWithdrawal} days`}
+              </ThemedText>
+            </View>
+          </View>
+        ) : null}
+
         <Pressable
           style={[
             styles.withdrawButton,
             {
-              backgroundColor: parseFloat(pendingBalance) > 0 ? theme.money : theme.backgroundTertiary,
+              backgroundColor: canWithdraw ? theme.money : theme.backgroundTertiary,
             },
           ]}
           onPress={handleWithdraw}
-          disabled={parseFloat(pendingBalance) <= 0 || withdrawMutation.isPending}
+          disabled={!canWithdraw || withdrawMutation.isPending}
         >
           {withdrawMutation.isPending ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <>
-              <Feather name="download" size={20} color="#FFFFFF" />
-              <ThemedText style={styles.withdrawButtonText}>
-                {parseFloat(pendingBalance) > 0
+              <Feather name="download" size={20} color={canWithdraw ? "#FFFFFF" : theme.textSecondary} />
+              <ThemedText style={[styles.withdrawButtonText, { color: canWithdraw ? "#FFFFFF" : theme.textSecondary }]}>
+                {canWithdraw
                   ? `Withdraw $${pendingBalance}`
-                  : "No balance to withdraw"}
+                  : parseFloat(pendingBalance) > 0
+                    ? "Withdrawals open on Mondays"
+                    : "No balance to withdraw"}
               </ThemedText>
             </>
           )}
@@ -324,5 +364,29 @@ const styles = StyleSheet.create({
   lastWithdrawal: {
     fontSize: 12,
     textAlign: "center",
+  },
+  nextWithdrawalCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    gap: Spacing.md,
+    borderRadius: 12,
+  },
+  nextWithdrawalContent: {
+    flex: 1,
+  },
+  nextWithdrawalLabel: {
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  nextWithdrawalDate: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  nextWithdrawalDays: {
+    fontSize: 13,
+    fontWeight: "500",
   },
 });

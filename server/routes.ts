@@ -787,12 +787,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Post author does not have a wallet to receive tips" });
       }
       
-      // Calculate platform fee (5%) - ON-CHAIN FEE COLLECTION
-      // Fee goes to treasury, net amount goes to creator
-      const FEE_PERCENTAGE = 5;
-      const grossAmount = parseFloat(amount);
-      const feeAmount = grossAmount * (FEE_PERCENTAGE / 100);
-      const netToCreator = grossAmount - feeAmount;
+      // TREASURY-FIRST MODEL: 100% of tips go to treasury
+      // Creators can only withdraw once per week on Mondays
+      const tipAmount = parseFloat(amount);
       
       // Use pathUSD by default (decimals: 6 for Tempo stablecoins)
       const tipTokenAddress = tokenAddress || "0x20c0000000000000000000000000000000000000";
@@ -816,52 +813,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const walletClient = createWalletClientForAccount(signingKey);
       
-      // Execute split payment: net to creator, fee to treasury
-      // Transaction 1: Send net amount to creator
-      const creatorTxHash = await transferERC20Token(walletClient, {
+      // Send 100% of tip to platform treasury (creators withdraw weekly on Mondays)
+      const txHash = await transferERC20Token(walletClient, {
         tokenAddress: tipTokenAddress,
-        toAddress: authorWallet.address,
-        amount: netToCreator.toFixed(6),
+        toAddress: treasuryAddress,
+        amount: tipAmount.toFixed(6),
         decimals,
       } as TransferParams);
-      
-      // Transaction 2: Send fee to platform treasury
-      let feeTxHash = "";
-      if (feeAmount > 0) {
-        try {
-          feeTxHash = await transferERC20Token(walletClient, {
-            tokenAddress: tipTokenAddress,
-            toAddress: treasuryAddress,
-            amount: feeAmount.toFixed(6),
-            decimals,
-          } as TransferParams);
-        } catch (feeError) {
-          console.error("Fee transfer failed (creator still received funds):", feeError);
-        }
-      }
-      
-      const txHash = creatorTxHash;
       
       // Record the tip in database
       const tip = await storage.addPostTip(postId, userId, amount, currency || "pathUSD", txHash);
       
-      // Record revenue in ledger (fee was collected on-chain to treasury)
+      // Record revenue in ledger (full amount held in treasury for creator)
       await storage.recordRevenueEntry({
         tipId: tip.id,
         revenueSource: 'tip_fee',
-        grossAmount: grossAmount.toFixed(6),
-        feeAmount: feeAmount.toFixed(6),
-        feePercentage: FEE_PERCENTAGE.toString(),
-        netToRecipient: netToCreator.toFixed(6),
+        grossAmount: tipAmount.toFixed(6),
+        feeAmount: tipAmount.toFixed(6),
+        feePercentage: "100",
+        netToRecipient: "0",
         currency: currency || "pathUSD",
         tempoTxHash: txHash,
-        feeTxHash: feeTxHash || undefined,
-        feeCollected: feeTxHash ? true : false,
+        feeTxHash: txHash,
+        feeCollected: true,
       });
       
-      // Update creator balance - only count fees as paid if actually collected
-      const actualFeesPaid = feeTxHash ? feeAmount.toFixed(6) : "0";
-      await storage.updateCreatorBalance(post.authorId, netToCreator.toFixed(6), actualFeesPaid);
+      // Update creator balance - full amount is tracked as pending (held in treasury)
+      await storage.updateCreatorBalance(post.authorId, tipAmount.toFixed(6), "0");
       
       // Send notification to author
       const author = await storage.getUserById(post.authorId);
@@ -883,10 +861,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...tip, 
         txHash,
         explorer: explorerUrl,
-        platformFee: feeAmount.toFixed(6),
-        platformFeePercent: FEE_PERCENTAGE,
-        netToCreator: netToCreator.toFixed(6),
-        feeCollected: feeTxHash ? true : false,
+        tipAmount: tipAmount.toFixed(6),
+        heldInTreasury: true,
+        withdrawableOn: "Monday",
         success: true 
       });
     } catch (error) {
@@ -2073,6 +2050,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const withdrawals = await storage.getCreatorWithdrawals(userId, 10);
       const wallet = await storage.getWalletByUserId(userId);
       
+      // Calculate withdrawal window info (Monday-only withdrawals)
+      const now = new Date();
+      const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
+      const isMonday = dayOfWeek === 1;
+      const daysUntilMonday = isMonday ? 0 : (dayOfWeek === 0 ? 1 : 8 - dayOfWeek);
+      const nextMonday = new Date(now);
+      if (!isMonday) {
+        nextMonday.setUTCDate(now.getUTCDate() + daysUntilMonday);
+      }
+      nextMonday.setUTCHours(0, 0, 0, 0);
+      
+      const withdrawalWindow = {
+        canWithdrawNow: isMonday,
+        nextWithdrawalDate: nextMonday.toISOString(),
+        daysUntilWithdrawal: daysUntilMonday,
+        withdrawalDay: "Monday",
+      };
+      
       if (!balance) {
         return res.json({
           creatorId: userId,
@@ -2083,6 +2078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalFeesPaid: "0",
           walletAddress: wallet?.address || null,
           recentWithdrawals: [],
+          withdrawalWindow,
         });
       }
       
@@ -2104,6 +2100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           createdAt: w.createdAt,
           completedAt: w.completedAt,
         })),
+        withdrawalWindow,
       });
     } catch (error) {
       console.error("Get creator earnings error:", error);
@@ -2115,6 +2112,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.session.userId!;
       const { amount, currency = "pathUSD" } = req.body;
+      
+      // MONDAY-ONLY WITHDRAWALS: Check if today is Monday (UTC)
+      const now = new Date();
+      const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
+      const isMonday = dayOfWeek === 1;
+      
+      if (!isMonday) {
+        // Calculate next Monday
+        const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+        const nextMonday = new Date(now);
+        nextMonday.setUTCDate(now.getUTCDate() + daysUntilMonday);
+        nextMonday.setUTCHours(0, 0, 0, 0);
+        
+        return res.status(400).json({ 
+          error: "Withdrawals are only available on Mondays",
+          nextWithdrawalDate: nextMonday.toISOString(),
+          daysUntilWithdrawal: daysUntilMonday
+        });
+      }
       
       if (!amount || parseFloat(amount) <= 0) {
         return res.status(400).json({ error: "Valid withdrawal amount is required" });
