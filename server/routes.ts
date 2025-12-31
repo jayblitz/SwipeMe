@@ -787,17 +787,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Post author does not have a wallet to receive tips" });
       }
       
-      // Calculate platform fee (5%) - TRACKING ONLY for testnet
-      // Full amount is transferred on-chain; fee is recorded for analytics
-      // Production: implement split payment (net to creator, fee to platform wallet)
+      // Calculate platform fee (5%) - ON-CHAIN FEE COLLECTION
+      // Fee goes to treasury, net amount goes to creator
       const FEE_PERCENTAGE = 5;
       const grossAmount = parseFloat(amount);
       const feeAmount = grossAmount * (FEE_PERCENTAGE / 100);
       const netToCreator = grossAmount - feeAmount;
       
-      // Use pathUSD by default (decimals: 18)
-      const tipTokenAddress = tokenAddress || "0x7d08bd4f2b9548e99715691d4de8ec5f01f0a82b";
-      const decimals = 18;
+      // Use pathUSD by default (decimals: 6 for Tempo stablecoins)
+      const tipTokenAddress = tokenAddress || "0x20c0000000000000000000000000000000000000";
+      const decimals = 6;
+      
+      // Get platform treasury address
+      const treasuryAddress = process.env.PLATFORM_TREASURY_ADDRESS;
+      if (!treasuryAddress) {
+        return res.status(500).json({ error: "Platform treasury not configured" });
+      }
       
       // Get signing key for tipper
       let signingKey: string;
@@ -809,19 +814,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No signing key available for your wallet" });
       }
       
-      // Execute the transfer (full amount goes to creator, fee tracked separately)
       const walletClient = createWalletClientForAccount(signingKey);
-      const txHash = await transferERC20Token(walletClient, {
+      
+      // Execute split payment: net to creator, fee to treasury
+      // Transaction 1: Send net amount to creator
+      const creatorTxHash = await transferERC20Token(walletClient, {
         tokenAddress: tipTokenAddress,
         toAddress: authorWallet.address,
-        amount,
+        amount: netToCreator.toFixed(6),
         decimals,
       } as TransferParams);
+      
+      // Transaction 2: Send fee to platform treasury
+      let feeTxHash = "";
+      if (feeAmount > 0) {
+        try {
+          feeTxHash = await transferERC20Token(walletClient, {
+            tokenAddress: tipTokenAddress,
+            toAddress: treasuryAddress,
+            amount: feeAmount.toFixed(6),
+            decimals,
+          } as TransferParams);
+        } catch (feeError) {
+          console.error("Fee transfer failed (creator still received funds):", feeError);
+        }
+      }
+      
+      const txHash = creatorTxHash;
       
       // Record the tip in database
       const tip = await storage.addPostTip(postId, userId, amount, currency || "pathUSD", txHash);
       
-      // Record revenue in ledger
+      // Record revenue in ledger (fee was collected on-chain to treasury)
       await storage.recordRevenueEntry({
         tipId: tip.id,
         revenueSource: 'tip_fee',
@@ -831,10 +855,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         netToRecipient: netToCreator.toFixed(6),
         currency: currency || "pathUSD",
         tempoTxHash: txHash,
+        feeTxHash: feeTxHash || undefined,
+        feeCollected: feeTxHash ? true : false,
       });
       
-      // Update creator balance
-      await storage.updateCreatorBalance(post.authorId, amount, feeAmount.toFixed(6));
+      // Update creator balance - only count fees as paid if actually collected
+      const actualFeesPaid = feeTxHash ? feeAmount.toFixed(6) : "0";
+      await storage.updateCreatorBalance(post.authorId, netToCreator.toFixed(6), actualFeesPaid);
       
       // Send notification to author
       const author = await storage.getUserById(post.authorId);
@@ -1478,36 +1505,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No signing key available for this wallet" });
       }
       
-      // Create wallet client and send transaction
+      // Create wallet client
       const walletClient = createWalletClientForAccount(signingKey);
       
-      const txHash = await transferERC20Token(walletClient, {
-        tokenAddress,
-        toAddress,
-        amount,
-        decimals,
-      } as TransferParams);
-      
-      logWalletAction("TRANSFER", userId, true, `To: ${toAddress.slice(0, 10)}... Amount: ${amount}`);
-      
-      const explorerUrl = `${tempoTestnet.blockExplorers?.default.url || "https://explorer.testnet.tempo.xyz"}/tx/${txHash}`;
-      
-      // Check if recipient is a platform user (P2P payment)
+      // Check if recipient is a platform user (P2P payment with fee)
       const recipientWallet = await storage.getWalletByAddress(toAddress);
       let platformFee = "0";
       let netToRecipient = amount;
+      let txHash: string;
+      let feeTxHash = "";
       
       if (recipientWallet) {
-        // P2P payment fee (1%) - TRACKING ONLY for testnet
-        // Full amount is transferred on-chain; fee is recorded for analytics
-        // Production: implement split payment or fee deduction
+        // P2P payment with 1% fee - ON-CHAIN FEE COLLECTION
         const P2P_FEE_PERCENTAGE = 1;
         const grossAmount = parseFloat(amount);
         const feeAmount = grossAmount * (P2P_FEE_PERCENTAGE / 100);
         platformFee = feeAmount.toFixed(6);
         netToRecipient = (grossAmount - feeAmount).toFixed(6);
         
-        // Record P2P fee in revenue ledger
+        // Get platform treasury address
+        const treasuryAddress = process.env.PLATFORM_TREASURY_ADDRESS;
+        if (!treasuryAddress) {
+          return res.status(500).json({ error: "Platform treasury not configured" });
+        }
+        
+        // Transaction 1: Send net amount to recipient
+        txHash = await transferERC20Token(walletClient, {
+          tokenAddress,
+          toAddress,
+          amount: netToRecipient,
+          decimals,
+        } as TransferParams);
+        
+        // Transaction 2: Send fee to platform treasury
+        if (feeAmount > 0) {
+          try {
+            feeTxHash = await transferERC20Token(walletClient, {
+              tokenAddress,
+              toAddress: treasuryAddress,
+              amount: platformFee,
+              decimals,
+            } as TransferParams);
+          } catch (feeError) {
+            console.error("Fee transfer failed (recipient still received funds):", feeError);
+          }
+        }
+        
+        // Record P2P fee in revenue ledger (fee collected on-chain)
         await storage.recordRevenueEntry({
           revenueSource: 'p2p_fee',
           grossAmount: grossAmount.toFixed(6),
@@ -1516,6 +1560,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           netToRecipient,
           currency: "pathUSD",
           tempoTxHash: txHash,
+          feeTxHash: feeTxHash || undefined,
+          feeCollected: feeTxHash ? true : false,
         });
         
         // Send notification
@@ -1526,12 +1572,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sendPaymentNotification(
             recipient.pushToken,
             senderUsername,
-            amount,
+            netToRecipient,
             "USD",
             txHash
           ).catch(err => console.error("Push notification error:", err));
         }
+      } else {
+        // External transfer - no platform fee
+        txHash = await transferERC20Token(walletClient, {
+          tokenAddress,
+          toAddress,
+          amount,
+          decimals,
+        } as TransferParams);
       }
+      
+      logWalletAction("TRANSFER", userId, true, `To: ${toAddress.slice(0, 10)}... Amount: ${amount}`);
+      
+      const explorerUrl = `${tempoTestnet.blockExplorers?.default.url || "https://explorer.testnet.tempo.xyz"}/tx/${txHash}`;
       
       res.json({
         success: true,
@@ -1539,6 +1597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         explorer: explorerUrl,
         platformFee,
         netToRecipient,
+        feeCollected: feeTxHash ? true : false,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {

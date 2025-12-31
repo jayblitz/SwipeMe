@@ -1117,6 +1117,18 @@ export default function ProfileScreen() {
 
         <Card style={styles.section} elevation={1}>
           <ThemedText style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+            CREATOR
+          </ThemedText>
+          <MenuItem
+            icon="dollar-sign"
+            title="Creator Earnings"
+            subtitle="View tips and earnings from your posts"
+            onPress={() => navigation.navigate("CreatorEarnings")}
+          />
+        </Card>
+
+        <Card style={styles.section} elevation={1}>
+          <ThemedText style={[styles.sectionTitle, { color: theme.textSecondary }]}>
             SUPPORT
           </ThemedText>
           <MenuItem

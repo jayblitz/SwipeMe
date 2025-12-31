@@ -356,6 +356,8 @@ export const revenueLedger = pgTable("revenue_ledger", {
   netToRecipient: text("net_to_recipient").notNull(),
   currency: text("currency").notNull().default("pathUSD"),
   tempoTxHash: text("tempo_tx_hash"),
+  feeTxHash: text("fee_tx_hash"), // Transaction hash for fee sent to treasury
+  feeCollected: boolean("fee_collected").default(false), // Whether fee was actually collected on-chain
   createdAt: timestamp("created_at").defaultNow(),
   recordedAt: timestamp("recorded_at"),
 }, (table) => [

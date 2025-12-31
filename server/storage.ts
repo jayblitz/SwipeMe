@@ -561,9 +561,7 @@ export const storage = {
   },
 
   // Revenue tracking functions
-  // Note: This is a TRACKING-ONLY model for testnet development
-  // Fees are calculated and recorded for analytics/reporting but not actually collected on-chain
-  // Production implementation would require: split payments, fee collection to platform wallet, etc.
+  // Fees are collected on-chain: 5% tips go to treasury, 95% to creator
   async recordRevenueEntry(data: {
     transactionId?: string;
     tipId?: string;
@@ -574,6 +572,8 @@ export const storage = {
     netToRecipient: string;
     currency: string;
     tempoTxHash?: string;
+    feeTxHash?: string;
+    feeCollected?: boolean;
   }): Promise<RevenueLedger> {
     const [entry] = await db.insert(revenueLedger)
       .values({
@@ -586,6 +586,8 @@ export const storage = {
         netToRecipient: data.netToRecipient,
         currency: data.currency,
         tempoTxHash: data.tempoTxHash || null,
+        feeTxHash: data.feeTxHash || null,
+        feeCollected: data.feeCollected || false,
         recordedAt: new Date(),
       })
       .returning();
@@ -594,32 +596,53 @@ export const storage = {
 
   async getRevenueStats(): Promise<{
     totalRevenue: string;
+    collectedRevenue: string;
     tipFees: string;
     p2pFees: string;
     miniAppFees: string;
+    collectedTipFees: string;
+    collectedP2pFees: string;
     entryCount: number;
+    collectedCount: number;
   }> {
     const entries = await db.select().from(revenueLedger);
     
     let totalRevenue = 0;
+    let collectedRevenue = 0;
     let tipFees = 0;
     let p2pFees = 0;
     let miniAppFees = 0;
+    let collectedTipFees = 0;
+    let collectedP2pFees = 0;
+    let collectedCount = 0;
     
     for (const entry of entries) {
       const fee = parseFloat(entry.feeAmount);
       totalRevenue += fee;
+      
       if (entry.revenueSource === 'tip_fee') tipFees += fee;
       if (entry.revenueSource === 'p2p_fee') p2pFees += fee;
       if (entry.revenueSource === 'mini_app_fee') miniAppFees += fee;
+      
+      // Only count fees that were actually collected on-chain
+      if (entry.feeCollected) {
+        collectedRevenue += fee;
+        collectedCount++;
+        if (entry.revenueSource === 'tip_fee') collectedTipFees += fee;
+        if (entry.revenueSource === 'p2p_fee') collectedP2pFees += fee;
+      }
     }
     
     return {
       totalRevenue: totalRevenue.toFixed(6),
+      collectedRevenue: collectedRevenue.toFixed(6),
       tipFees: tipFees.toFixed(6),
       p2pFees: p2pFees.toFixed(6),
       miniAppFees: miniAppFees.toFixed(6),
+      collectedTipFees: collectedTipFees.toFixed(6),
+      collectedP2pFees: collectedP2pFees.toFixed(6),
       entryCount: entries.length,
+      collectedCount,
     };
   },
 
@@ -636,14 +659,13 @@ export const storage = {
     return created;
   },
 
-  async updateCreatorBalance(creatorId: string, tipAmount: string, feeAmount: string): Promise<CreatorBalance> {
+  async updateCreatorBalance(creatorId: string, netAmount: string, feeAmount: string): Promise<CreatorBalance> {
     const balance = await this.getOrCreateCreatorBalance(creatorId);
     
-    // Note: Currently tracking fees for analytics only - full amount goes to creator on-chain
-    // In production with actual fee collection, creator would receive (tipAmount - feeAmount)
-    // For now, totalEarned = full amount received, totalFeesPaid = tracked platform fees
-    const newTotalEarned = parseFloat(balance.totalEarned) + parseFloat(tipAmount);
-    const newPendingBalance = parseFloat(balance.pendingBalance) + parseFloat(tipAmount);
+    // Creator receives net amount (after 5% fee deducted on-chain)
+    // totalEarned = net amount received, totalFeesPaid = platform fees sent to treasury
+    const newTotalEarned = parseFloat(balance.totalEarned) + parseFloat(netAmount);
+    const newPendingBalance = parseFloat(balance.pendingBalance) + parseFloat(netAmount);
     const newTotalTipsReceived = parseInt(balance.totalTipsReceived) + 1;
     const newTotalFeesPaid = parseFloat(balance.totalFeesPaid) + parseFloat(feeAmount);
     
