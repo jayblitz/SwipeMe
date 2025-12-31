@@ -272,21 +272,6 @@ function configureExpoAndLanding(app: express.Application) {
 
   log("Serving static Expo files with dynamic manifest routing");
 
-  app.get("/privy-wallet", (_req: Request, res: Response) => {
-    const privyTemplatePath = path.resolve(
-      process.cwd(),
-      "server",
-      "templates",
-      "privy-wallet.html",
-    );
-    let privyTemplate = fs.readFileSync(privyTemplatePath, "utf-8");
-    privyTemplate = privyTemplate
-      .replace(/\{\{PRIVY_APP_ID\}\}/g, process.env.PRIVY_APP_ID || "")
-      .replace(/\{\{PRIVY_CLIENT_ID_WEB\}\}/g, process.env.PRIVY_CLIENT_ID_WEB || "");
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.status(200).send(privyTemplate);
-  });
-
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api")) {
       return next();
