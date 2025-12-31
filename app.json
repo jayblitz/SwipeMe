@@ -32,6 +32,14 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.BLUETOOTH",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK"
       ]
     },
@@ -62,6 +70,9 @@
         "projectId": "26540cf7-4cc6-4892-881f-a4070c21b3f2"
       }
     },
-    "owner": "crypto4eva"
+    "owner": "crypto4eva",
+    "updates": {
+      "url": "https://u.expo.dev/26540cf7-4cc6-4892-881f-a4070c21b3f2"
+    }
   }
 }
