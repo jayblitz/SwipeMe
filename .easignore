@@ -59,5 +59,4 @@ build/
 # Server files (not needed for mobile build)
 server/
 
-# Shared types (will be bundled anyway)
-shared/
+# Note: shared/ is needed for the build (contains schema types)
