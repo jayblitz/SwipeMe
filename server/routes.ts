@@ -38,6 +38,7 @@ import {
 } from "./wallet";
 import { sendPaymentNotification, sendMessageNotification } from "./pushNotifications";
 import { pool } from "./db";
+import { realtimeService } from "./websocket";
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -872,6 +873,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: error.message });
       }
       res.status(500).json({ error: "Tip transaction failed" });
+    }
+  });
+
+  app.post("/api/moments/:postId/engagement", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { postId } = req.params;
+      const { eventType, durationMs, wasSkipped } = req.body;
+      
+      if (!eventType) {
+        return res.status(400).json({ error: "Event type is required" });
+      }
+      
+      console.log(`Engagement: ${eventType} on post ${postId} by user ${userId}`, {
+        durationMs,
+        wasSkipped
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Engagement tracking error:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -2216,6 +2239,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/realtime/token", requireAuth, (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const token = realtimeService.generateAuthToken(userId);
+      res.json({ token });
+    } catch (error) {
+      console.error("Generate realtime token error:", error);
+      res.status(500).json({ error: "Failed to generate realtime token" });
+    }
+  });
+
+  app.get("/api/realtime/status/:userId", requireAuth, (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const isOnline = realtimeService.isUserOnline(userId);
+    res.json({ userId, isOnline });
+  });
+
   const httpServer = createServer(app);
+  
+  realtimeService.initialize(httpServer);
+  
   return httpServer;
 }

@@ -1,0 +1,140 @@
+Signal-style real-time chat depends on persistent connections (WebSockets) plus push notifications, while a TikTok-like Moments tab depends on a two-stage recommendation system backed by heavy event logging and ranking models.[1][2]
+
+## 1. Real-time messaging like Signal
+
+Signal’s “instant” feel is not magic encryption; it is architecture: a push-based delivery path with persistent connections for foreground clients.[3][4]
+
+To get your chat feeling real-time:  
+- **Use WebSockets for active sessions**  
+  - Maintain one WebSocket per logged-in device (e.g., via `wss://api.swipeme.org/realtime`).[1]
+  - Server keeps a routing table: `user_id -> [connection_ids]`.  
+  - On “send message”, write to DB, then immediately publish to a **Pub/Sub or MQ** topic (Redis Pub/Sub, Kafka, RabbitMQ) and fan-out to all connected recipients.[5][6]
+
+- **Use push notifications for offline/background**  
+  - When a device is not connected, publish to FCM/APNs with a lightweight payload (chat id, sender, snippet), not the full encrypted blob.[4]
+  - Client wakes up, opens WebSocket/HTTPS, pulls missing messages, and decrypts locally.  
+
+- **Guarantee delivery and order**  
+  - Store messages with a monotonically increasing `message_index` per conversation; clients render based on this index.[7][3]
+  - Use **acknowledgements** on WebSocket:  
+    - Client sends `message_id`.  
+    - Server responds `ack` and includes the canonical `message_index`.  
+    - If client doesn’t see an `ack` in N seconds, it marks as “sending…” and retries with idempotent IDs.[7]
+
+- **Practical blueprint for SwipeMe**  
+  - **Backend:**  
+    - Add a `realtime-gateway` service that terminates WebSockets and authenticates via your existing JWT/session.  
+    - Use Redis or Kafka as the **message bus** between your HTTP API (where you currently create messages) and the realtime gateway.[6][5]
+  - **Client (React Native / web):**  
+    - On login, open WebSocket and subscribe to `user_id` and each open conversation.  
+    - On receiving an event, update local store (e.g., Zustand/Redux) so UI updates instantly.  
+  - **Fallback:**  
+    - If WebSocket fails (corporate networks), fall back to **short polling** every 3–5 seconds, but keep this as a backup path only.[1]
+
+This combination—persistent WebSocket for live users, push for offline, plus MQ for fan-out—is essentially what large chat apps use to achieve real-time delivery at scale.[8][3]
+
+## 2. TikTok-like algorithm for Moments
+
+TikTok’s core loop is a **two-stage recommendation pipeline**: fast candidate generation followed by personalized ranking, fed by dense user-behavior logging.[2][9][10]
+
+For a “Mini TikTok” Moments tab in SwipeMe, implement a simplified version:  
+
+### 2.1 Data and signals to collect
+
+TikTok tracks almost every interaction as a ranking signal. For Moments, log at least:[11][2]
+- Video-level: views, watch time, completion rate, replays, skips, likes, comments, shares, tips.  
+- User-level: which creators a user follows, which categories/tags they engage with, device/region.  
+
+Store these events in an **append-only log** (e.g., Kafka) plus a warehouse (Postgres + nightly jobs at first; data lake later).[9][2]
+
+### 2.2 Candidate generation (stage 1)
+
+Goal: from all Moments, produce a few hundred “maybe relevant” items per user quickly.[2][9]
+
+For your current scale, you can approximate TikTok’s big stack with simpler components:  
+- **Heuristic candidate sources:**  
+  - Fresh global videos (e.g., last 24–72 hours) with minimum basic quality (e.g., 3+ full views).[2]
+  - Popular in user’s country.  
+  - From creators the user follows.  
+  - Similar tags or audio to content the user engaged with.  
+
+- **Storage/indexing:**  
+  - Use Postgres + composite indexes on `(created_at, country)`, `(tag, created_at)`, `(creator_id, created_at)` to quickly grab candidates.  
+  - Optionally, precompute daily “trending” lists per tag/region and cache in Redis.[10][2]
+
+### 2.3 Ranking (stage 2)
+
+On each feed refresh / swipe, take ~100–200 candidates and rank them.[9][2]
+
+Start with a **scoring function** rather than full deep learning:  
+- Features per (user, video) pair:  
+  - Video: global CTR, avg watch time %, completion rate, recent velocity (views in last N minutes/hours).  
+  - User-video: whether followed, past interactions with creator, overlap of interests (tags).  
+- Score: simple weighted sum or logistic regression initially.  
+
+Example:  
+- `score = w1 * completion_rate + w2 * like_rate + w3 * creator_similarity + w4 * recency + w5 * country_match`.  
+
+Serve videos sorted by this score; log outcomes (was it watched, skipped, liked?) to continuously update features.[9][2]
+
+### 2.4 Product behaviour of a “Mini TikTok”
+
+To make the Moments tab *feel* like TikTok:  
+- **Single-column, swipe feed**  
+  - Preload next 2–3 videos in the background (prefetch URLs) to ensure instant swipes.[10]
+- **Autoplay with sound** (respecting OS mute), short-loop videos, captions.  
+- **Feedback loop:**  
+  - “Not interested” button and long-press menus feed back negative signals.  
+  - Likes, tips, follows, shares feed positive signals.  
+- **Session-based personalization**  
+  - After a few videos in one session, bias towards whatever they are currently engaging with (e.g., tech vs comedy) using recency-weighted behavior.[11][2]
+
+### 2.5 Architecture outline for Moments
+
+Drawing from TikTok’s described architecture:  
+- **Upload pipeline:**  
+  - User uploads video → API → object storage (S3/Cloud Storage) → background job creates multiple resolutions and thumbnails.[12][10]
+- **Metadata & feed service:**  
+  - Store metadata (creator_id, duration, tags, language, country, created_at) in Postgres.  
+  - A `feed-service` handles candidate generation and ranking, reading from cached feature tables.[2][9]
+- **Event ingestion:**  
+  - All interactions send small events (view_started, view_completed, like, skip, share, tip) to Kafka / event queue.[12][2]
+  - Batch jobs / streaming jobs (Flink/Spark later, cron jobs now) update video and user features.  
+
+This gives you a realistic, incrementally buildable “Mini TikTok” that can start simple and evolve toward proper ML models later.  
+
+## 3. Concrete next steps for SwipeMe
+
+- **Messaging**  
+  - Add a dedicated WebSocket gateway and MQ-based fan-out; wire your existing Tempo/XMTP message creation to emit events into this pipeline.[5][3][1]
+  - Implement client-side reconnect, ack, and message ordering logic.  
+
+- **Moments (Mini TikTok)**  
+  - Redesign Moments UI to be a vertical swipe feed with prefetch.  
+  - Implement a basic two-stage recommender: heuristic candidate generation + weighted-score ranking using the interaction data you have.  
+  - Start logging all core engagement events and build daily offline jobs to refresh ranking features.  
+
+These patterns mirror how large messaging apps and TikTok-style feeds work, but are scoped so your current early-stage codebase can realistically adopt them.
+
+[1](https://finchtrade.com/glossary/websocket-push-notifications)
+[2](https://www.techaheadcorp.com/blog/decoding-tiktok-system-design-architecture/)
+[3](https://www.rst.software/blog/chat-app-architecture)
+[4](https://www.qed42.com/insights/developing-a-real-time-secure-chat-application-like-whatsapp-signal-with-end-to-end-encryption)
+[5](https://volosoft.com/blog/RealTime-Messaging-Distributed-Architecture-Abp-SingalR-RabbitMQ)
+[6](https://doc.oroinc.com/backend/websockets/)
+[7](https://www.pubnub.com/blog/methods-to-help-reliable-message-delivery-for-real-time-apps/)
+[8](https://slack.engineering/real-time-messaging/)
+[9](https://dev.to/techahead/how-tiktok-works-decoding-system-design-architecture-with-recommendation-system-ok3)
+[10](https://grokkingthesystemdesign.com/guides/tiktok-system-design/)
+[11](https://spectrum.library.concordia.ca/994540/1/Mastantuono_MA_F2024.pdf)
+[12](https://www.systemdesignhandbook.com/guides/tiktok-system-design-interview/)
+[13](https://github.com/jayblitz/SwipeMe)
+[14](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/157469350/8929c614-e7b9-4e81-973b-e06c0f115d11/55642ba3-5a85-4868-83ff-7f064a747780.jpg)
+[15](https://www.sciencedirect.com/science/article/abs/pii/S0164121216000510)
+[16](https://engineering.uipath.com/building-reliable-real-time-messaging-with-signalr-handling-large-payloads-and-guaranteed-delivery-7178a28458e2)
+[17](https://signal.org/blog/)
+[18](https://dev.to/conquerym/tiktok-live-streaming-feature-technical-details-and-architecture-1n0j)
+[19](https://codesignal.com/learn/courses/adding-enterprise-features-to-the-gin-todo-app/lessons/enabling-real-time-notifications-with-websockets)
+[20](https://lightyear.ai/tips/websocket-versus-push-notification)
+[21](https://www.reddit.com/r/MachineLearning/comments/1hcp4xw/d_what_makes_tiktoks_recommendation_algorithm_so/)
+[22](https://itnext.io/system-design-building-tiktok-style-video-feed-for-100-million-users-2b3e332678d8)

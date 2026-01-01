@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -8,22 +8,26 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
-  RefreshControl,
+  Dimensions,
   Platform,
   KeyboardAvoidingView,
   Alert,
+  Animated,
+  type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
+import * as Haptics from "expo-haptics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/query-client";
-import { Colors, Spacing, BorderRadius, Typography } from "@/constants/theme";
-import { Card } from "@/components/Card";
+import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface PostAuthor {
   id: string;
@@ -53,13 +57,18 @@ interface Comment {
   author: PostAuthor;
 }
 
+interface ViewableItem {
+  viewableItems: ViewToken[];
+  changed: ViewToken[];
+}
+
 export default function MomentsScreen() {
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
 
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [composeText, setComposeText] = useState("");
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -68,8 +77,11 @@ export default function MomentsScreen() {
   const [showTipModal, setShowTipModal] = useState(false);
   const [tipPostId, setTipPostId] = useState<string | null>(null);
   const [tipLoading, setTipLoading] = useState(false);
+  
+  const viewStartTimeRef = useRef<number>(0);
+  const likeAnimations = useRef<Map<string, Animated.Value>>(new Map());
 
-  const { data: posts = [], isLoading, refetch, isRefetching } = useQuery<Post[]>({
+  const { data: posts = [], isLoading } = useQuery<Post[]>({
     queryKey: ["/api/moments"],
     enabled: !!user,
   });
@@ -79,7 +91,44 @@ export default function MomentsScreen() {
     enabled: !!selectedPostId,
   });
 
-  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  const styles = useMemo(() => createStyles(theme, isDark, insets), [theme, isDark, insets]);
+
+  const trackEngagement = useCallback(async (postId: string, eventType: string, data?: Record<string, unknown>) => {
+    try {
+      await apiRequest("POST", `/api/moments/${postId}/engagement`, {
+        eventType,
+        ...data,
+      });
+    } catch {
+    }
+  }, []);
+
+  const onViewableItemsChanged = useCallback(({ viewableItems }: ViewableItem) => {
+    if (viewableItems.length > 0) {
+      const visibleItem = viewableItems[0];
+      const newIndex = visibleItem.index ?? 0;
+      
+      if (currentIndex !== newIndex && posts[currentIndex]) {
+        const viewDuration = Date.now() - viewStartTimeRef.current;
+        trackEngagement(posts[currentIndex].id, "view_completed", { 
+          durationMs: viewDuration,
+          wasSkipped: viewDuration < 2000
+        });
+      }
+      
+      setCurrentIndex(newIndex);
+      viewStartTimeRef.current = Date.now();
+      
+      if (posts[newIndex]) {
+        trackEngagement(posts[newIndex].id, "view_started");
+      }
+    }
+  }, [currentIndex, posts, trackEngagement]);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 80,
+    minimumViewTime: 100,
+  }).current;
 
   const createPostMutation = useMutation({
     mutationFn: async (data: { content: string }) => {
@@ -134,16 +183,17 @@ export default function MomentsScreen() {
       const result = await response.json();
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/moments"] });
-        const explorerUrl = result.explorer;
+        trackEngagement(tipPostId, "tip", { amount: tipAmount });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert(
           "Tip Sent!",
           `Your tip of $${tipAmount} was sent successfully.`,
-          explorerUrl ? [
+          result.explorer ? [
             { 
               text: "View Transaction", 
               onPress: async () => {
                 try {
-                  await WebBrowser.openBrowserAsync(explorerUrl);
+                  await WebBrowser.openBrowserAsync(result.explorer);
                 } catch {
                   Alert.alert("Error", "Could not open transaction explorer");
                 }
@@ -163,11 +213,31 @@ export default function MomentsScreen() {
       setTipAmount("");
       setTipPostId(null);
     }
-  }, [tipPostId, tipAmount, queryClient]);
+  }, [tipPostId, tipAmount, queryClient, trackEngagement]);
 
-  const handleLike = useCallback((postId: string) => {
+  const handleLike = useCallback((postId: string, isLiked: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    let animation = likeAnimations.current.get(postId);
+    if (!animation) {
+      animation = new Animated.Value(1);
+      likeAnimations.current.set(postId, animation);
+    }
+    
+    Animated.sequence([
+      Animated.spring(animation, { toValue: 1.3, useNativeDriver: true }),
+      Animated.spring(animation, { toValue: 1, useNativeDriver: true }),
+    ]).start();
+    
     likeMutation.mutate(postId);
-  }, [likeMutation]);
+    trackEngagement(postId, isLiked ? "unlike" : "like");
+  }, [likeMutation, trackEngagement]);
+
+  const handleDoubleTap = useCallback((postId: string, isLiked: boolean) => {
+    if (!isLiked) {
+      handleLike(postId, false);
+    }
+  }, [handleLike]);
 
   const formatTime = useCallback((dateString: string) => {
     const date = new Date(dateString);
@@ -184,113 +254,154 @@ export default function MomentsScreen() {
     return date.toLocaleDateString();
   }, []);
 
-  const renderPost = useCallback(({ item }: { item: Post }) => {
+  const formatNumber = useCallback((num: string | number) => {
+    const n = typeof num === "string" ? parseInt(num) : num;
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+    return n.toString();
+  }, []);
+
+  const renderPost = useCallback(({ item, index }: { item: Post; index: number }) => {
     const authorName = item.author.displayName || item.author.username || "Anonymous";
     const authorUsername = item.author.username ? `@${item.author.username}` : "";
+    const hasMedia = item.mediaUrls && item.mediaUrls.length > 0;
+    const likeAnimation = likeAnimations.current.get(item.id) || new Animated.Value(1);
 
     return (
-      <Card style={styles.postCard}>
-        <View style={styles.postHeader}>
-          <View style={[styles.avatar, { backgroundColor: theme.border }]}>
-            {item.author.profileImage ? (
-              <Image source={{ uri: item.author.profileImage }} style={styles.avatarImage} />
-            ) : (
-              <Feather name="user" size={20} color={theme.textSecondary} />
-            )}
-          </View>
-          <View style={styles.postHeaderText}>
-            <Text style={[styles.authorName, { color: theme.text }]}>{authorName}</Text>
-            <View style={styles.metaRow}>
-              {authorUsername ? (
-                <Text style={[styles.username, { color: theme.textSecondary }]}>{authorUsername}</Text>
-              ) : null}
-              <Text style={[styles.time, { color: theme.textSecondary }]}>
-                {authorUsername ? " · " : ""}{formatTime(item.createdAt)}
-              </Text>
+      <Pressable 
+        style={styles.postContainer}
+        onPress={() => {
+          handleDoubleTap(item.id, item.isLiked);
+        }}
+      >
+        {hasMedia ? (
+          <Image
+            source={{ uri: item.mediaUrls![0] }}
+            style={styles.fullScreenMedia}
+            contentFit="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={isDark ? ["#1a1a2e", "#16213e", "#0f3460"] : ["#667eea", "#764ba2", "#f64f59"]}
+            style={styles.gradientBackground}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+        )}
+        
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.8)"]}
+          style={styles.bottomGradient}
+        />
+
+        <View style={styles.contentOverlay}>
+          <View style={styles.authorRow}>
+            <View style={styles.authorAvatar}>
+              {item.author.profileImage ? (
+                <Image source={{ uri: item.author.profileImage }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarInitial}>
+                    {authorName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
             </View>
+            <View style={styles.authorInfo}>
+              <Text style={styles.authorName}>{authorName}</Text>
+              {authorUsername ? (
+                <Text style={styles.authorUsername}>{authorUsername}</Text>
+              ) : null}
+            </View>
+            <Pressable style={styles.followButton}>
+              <Text style={styles.followButtonText}>Follow</Text>
+            </Pressable>
           </View>
-          <Pressable style={styles.moreButton}>
-            <Feather name="more-horizontal" size={20} color={theme.textSecondary} />
-          </Pressable>
+
+          {item.content ? (
+            <Text style={styles.postContent} numberOfLines={3}>
+              {item.content}
+            </Text>
+          ) : null}
+
+          <View style={styles.postMeta}>
+            <Feather name="clock" size={12} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.postTime}>{formatTime(item.createdAt)}</Text>
+          </View>
         </View>
 
-        {item.content ? (
-          <Text style={[styles.postContent, { color: theme.text }]}>{item.content}</Text>
-        ) : null}
-
-        {item.mediaUrls && item.mediaUrls.length > 0 ? (
-          <View style={styles.mediaGrid}>
-            {item.mediaUrls.slice(0, 4).map((url, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.mediaItem,
-                  item.mediaUrls!.length === 1 && styles.mediaSingle,
-                  item.mediaUrls!.length === 2 && styles.mediaDouble,
-                ]}
-              >
-                <Image source={{ uri: url }} style={styles.mediaImage} contentFit="cover" />
-                {index === 3 && item.mediaUrls!.length > 4 ? (
-                  <View style={styles.moreOverlay}>
-                    <Text style={styles.moreText}>+{item.mediaUrls!.length - 4}</Text>
-                  </View>
-                ) : null}
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        <View style={styles.postActions}>
+        <View style={styles.sideActions}>
           <Pressable
-            style={styles.actionButton}
-            onPress={() => handleLike(item.id)}
+            style={styles.sideActionButton}
+            onPress={() => handleLike(item.id, item.isLiked)}
           >
-            <Feather
-              name="heart"
-              size={20}
-              color={item.isLiked ? theme.error : theme.textSecondary}
-              style={item.isLiked ? { opacity: 1 } : undefined}
-            />
-            <Text style={[styles.actionCount, { color: theme.textSecondary }]}>
-              {parseInt(item.likesCount) > 0 ? item.likesCount : ""}
+            <Animated.View style={{ transform: [{ scale: likeAnimation }] }}>
+              <Feather
+                name="heart"
+                size={28}
+                color={item.isLiked ? "#FF2D55" : "#FFF"}
+              />
+            </Animated.View>
+            <Text style={styles.sideActionCount}>
+              {formatNumber(item.likesCount)}
             </Text>
           </Pressable>
 
           <Pressable
-            style={styles.actionButton}
-            onPress={() => setSelectedPostId(item.id)}
+            style={styles.sideActionButton}
+            onPress={() => {
+              setSelectedPostId(item.id);
+              trackEngagement(item.id, "comment_opened");
+            }}
           >
-            <Feather name="message-circle" size={20} color={theme.textSecondary} />
-            <Text style={[styles.actionCount, { color: theme.textSecondary }]}>
-              {parseInt(item.commentsCount) > 0 ? item.commentsCount : ""}
+            <Feather name="message-circle" size={28} color="#FFF" />
+            <Text style={styles.sideActionCount}>
+              {formatNumber(item.commentsCount)}
             </Text>
           </Pressable>
 
           <Pressable
-            style={styles.actionButton}
+            style={styles.sideActionButton}
             onPress={() => {
               setTipPostId(item.id);
               setShowTipModal(true);
             }}
           >
-            <Feather name="dollar-sign" size={20} color={theme.textSecondary} />
-            <Text style={[styles.actionCount, { color: theme.textSecondary }]}>
-              {parseFloat(item.tipsTotal) > 0 ? `$${item.tipsTotal}` : ""}
+            <Feather name="dollar-sign" size={28} color="#FFF" />
+            <Text style={styles.sideActionCount}>
+              {parseFloat(item.tipsTotal) > 0 ? `$${item.tipsTotal}` : "Tip"}
             </Text>
           </Pressable>
 
-          <Pressable style={styles.actionButton}>
-            <Feather name="share" size={20} color={theme.textSecondary} />
+          <Pressable
+            style={styles.sideActionButton}
+            onPress={() => {
+              trackEngagement(item.id, "share");
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+          >
+            <Feather name="share" size={28} color="#FFF" />
+            <Text style={styles.sideActionCount}>Share</Text>
+          </Pressable>
+
+          <Pressable style={styles.sideActionButton}>
+            <Feather name="more-horizontal" size={28} color="#FFF" />
           </Pressable>
         </View>
-      </Card>
+
+        <View style={styles.progressIndicator}>
+          <Text style={styles.progressText}>
+            {index + 1} / {posts.length}
+          </Text>
+        </View>
+      </Pressable>
     );
-  }, [theme, formatTime, handleLike, styles]);
+  }, [theme, formatTime, formatNumber, handleLike, handleDoubleTap, posts.length, styles, isDark, trackEngagement]);
 
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={Colors.light.primary} />
+        <ActivityIndicator size="large" color="#FFF" />
       </View>
     );
   }
@@ -301,35 +412,54 @@ export default function MomentsScreen() {
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={renderPost}
-        contentContainerStyle={{
-          paddingTop: headerHeight + Spacing.md,
-          paddingBottom: insets.bottom + 80,
-          paddingHorizontal: Spacing.md,
-        }}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor={Colors.light.primary}
-          />
-        }
+        pagingEnabled
+        showsVerticalScrollIndicator={false}
+        snapToInterval={SCREEN_HEIGHT}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={(_, index) => ({
+          length: SCREEN_HEIGHT,
+          offset: SCREEN_HEIGHT * index,
+          index,
+        })}
+        windowSize={3}
+        maxToRenderPerBatch={2}
+        initialNumToRender={1}
+        removeClippedSubviews={Platform.OS === "android"}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Feather name="image" size={48} color={theme.textSecondary} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No Moments Yet</Text>
-            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-              Share your first moment with friends
-            </Text>
+          <View style={[styles.postContainer, styles.emptyState]}>
+            <LinearGradient
+              colors={["#667eea", "#764ba2"]}
+              style={styles.gradientBackground}
+            />
+            <View style={styles.emptyContent}>
+              <Feather name="camera" size={64} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.emptyTitle}>No Moments Yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Be the first to share a moment
+              </Text>
+              <Pressable
+                style={styles.createFirstButton}
+                onPress={() => setIsComposeOpen(true)}
+              >
+                <Text style={styles.createFirstText}>Create Moment</Text>
+              </Pressable>
+            </View>
           </View>
         }
       />
 
-      <Pressable
-        style={[styles.fab, { backgroundColor: Colors.light.primary }]}
-        onPress={() => setIsComposeOpen(true)}
-      >
-        <Feather name="plus" size={24} color="#FFF" />
-      </Pressable>
+      <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
+        <Text style={styles.topBarTitle}>Moments</Text>
+        <Pressable
+          style={styles.createButton}
+          onPress={() => setIsComposeOpen(true)}
+        >
+          <Feather name="plus" size={24} color="#FFF" />
+        </Pressable>
+      </View>
 
       <Modal
         visible={isComposeOpen}
@@ -341,7 +471,7 @@ export default function MomentsScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}
         >
-          <View style={styles.modalHeader}>
+          <View style={[styles.modalHeader, { paddingTop: insets.top }]}>
             <Pressable onPress={() => setIsComposeOpen(false)}>
               <Text style={[styles.cancelText, { color: theme.textSecondary }]}>Cancel</Text>
             </Pressable>
@@ -352,12 +482,8 @@ export default function MomentsScreen() {
             >
               <Text
                 style={[
-                  styles.postButton,
-                  {
-                    color: !composeText.trim()
-                      ? theme.textSecondary
-                      : Colors.light.primary,
-                  },
+                  styles.postButtonText,
+                  { color: !composeText.trim() ? theme.textSecondary : Colors.light.primary },
                 ]}
               >
                 {createPostMutation.isPending ? "Posting..." : "Post"}
@@ -386,7 +512,7 @@ export default function MomentsScreen() {
         onRequestClose={() => setSelectedPostId(null)}
       >
         <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
-          <View style={styles.modalHeader}>
+          <View style={[styles.modalHeader, { paddingTop: insets.top }]}>
             <Pressable onPress={() => setSelectedPostId(null)}>
               <Feather name="x" size={24} color={theme.text} />
             </Pressable>
@@ -397,12 +523,12 @@ export default function MomentsScreen() {
           <FlatList
             data={comments}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: Spacing.md }}
+            contentContainerStyle={{ padding: Spacing.md, flexGrow: 1 }}
             ListEmptyComponent={
               commentsLoading ? (
                 <ActivityIndicator size="small" color={Colors.light.primary} />
               ) : (
-                <Text style={[styles.emptySubtitle, { color: theme.textSecondary, textAlign: "center" }]}>
+                <Text style={[styles.emptyComments, { color: theme.textSecondary }]}>
                   No comments yet. Be the first!
                 </Text>
               )
@@ -411,7 +537,7 @@ export default function MomentsScreen() {
               <View style={styles.commentItem}>
                 <View style={[styles.commentAvatar, { backgroundColor: theme.border }]}>
                   {item.author.profileImage ? (
-                    <Image source={{ uri: item.author.profileImage }} style={styles.avatarImage} />
+                    <Image source={{ uri: item.author.profileImage }} style={styles.smallAvatar} />
                   ) : (
                     <Feather name="user" size={14} color={theme.textSecondary} />
                   )}
@@ -429,7 +555,7 @@ export default function MomentsScreen() {
             )}
           />
 
-          <View style={[styles.commentInputRow, { borderTopColor: theme.border, paddingBottom: insets.bottom + Spacing.sm }]}>
+          <View style={[styles.commentInputRow, { paddingBottom: insets.bottom + Spacing.sm, borderTopColor: theme.border }]}>
             <TextInput
               style={[styles.commentInput, { color: theme.text, backgroundColor: theme.backgroundSecondary }]}
               placeholder="Add a comment..."
@@ -524,7 +650,7 @@ export default function MomentsScreen() {
                 {tipLoading ? (
                   <ActivityIndicator size="small" color="#FFF" />
                 ) : (
-                  <Text style={styles.tipConfirmText}>Tip ${tipAmount || "0"}</Text>
+                  <Text style={styles.tipConfirmText}>Send Tip</Text>
                 )}
               </Pressable>
             </View>
@@ -535,165 +661,212 @@ export default function MomentsScreen() {
   );
 }
 
-function createStyles(theme: typeof Colors.light, _isDark: boolean) {
+function createStyles(theme: ReturnType<typeof useTheme>["theme"], _isDark: boolean, insets: ReturnType<typeof useSafeAreaInsets>) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.backgroundRoot,
+      backgroundColor: "#000",
     },
     centerContent: {
       justifyContent: "center",
       alignItems: "center",
     },
-    postCard: {
-      marginBottom: Spacing.md,
-      padding: Spacing.md,
+    postContainer: {
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+      position: "relative",
     },
-    postHeader: {
+    fullScreenMedia: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    gradientBackground: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    bottomGradient: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: SCREEN_HEIGHT * 0.4,
+    },
+    contentOverlay: {
+      position: "absolute",
+      bottom: 100,
+      left: Spacing.lg,
+      right: 80,
+    },
+    authorRow: {
       flexDirection: "row",
       alignItems: "center",
-      marginBottom: Spacing.sm,
+      marginBottom: Spacing.md,
     },
-    avatar: {
+    authorAvatar: {
       width: 44,
       height: 44,
       borderRadius: 22,
-      justifyContent: "center",
-      alignItems: "center",
+      borderWidth: 2,
+      borderColor: "#FFF",
       overflow: "hidden",
     },
     avatarImage: {
       width: "100%",
       height: "100%",
     },
-    postHeaderText: {
+    avatarPlaceholder: {
+      width: "100%",
+      height: "100%",
+      backgroundColor: Colors.light.primary,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    avatarInitial: {
+      color: "#FFF",
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    authorInfo: {
       flex: 1,
       marginLeft: Spacing.sm,
     },
     authorName: {
-      fontSize: Typography.body.fontSize,
+      color: "#FFF",
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    authorUsername: {
+      color: "rgba(255,255,255,0.7)",
+      fontSize: 13,
+    },
+    followButton: {
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.xs,
+      borderRadius: BorderRadius.sm,
+      borderWidth: 1,
+      borderColor: "#FFF",
+    },
+    followButtonText: {
+      color: "#FFF",
+      fontSize: 13,
       fontWeight: "600",
     },
-    metaRow: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    username: {
-      fontSize: Typography.caption.fontSize,
-    },
-    time: {
-      fontSize: Typography.caption.fontSize,
-    },
-    moreButton: {
-      padding: Spacing.xs,
-    },
     postContent: {
-      fontSize: Typography.body.fontSize,
+      color: "#FFF",
+      fontSize: 15,
       lineHeight: 22,
       marginBottom: Spacing.sm,
     },
-    mediaGrid: {
+    postMeta: {
       flexDirection: "row",
-      flexWrap: "wrap",
-      marginTop: Spacing.xs,
-      marginBottom: Spacing.sm,
+      alignItems: "center",
       gap: 4,
     },
-    mediaItem: {
-      width: "48%",
-      aspectRatio: 1,
-      borderRadius: BorderRadius.md,
-      overflow: "hidden",
+    postTime: {
+      color: "rgba(255,255,255,0.7)",
+      fontSize: 12,
     },
-    mediaSingle: {
-      width: "100%",
-      aspectRatio: 16 / 9,
-    },
-    mediaDouble: {
-      width: "49%",
-    },
-    mediaImage: {
-      width: "100%",
-      height: "100%",
-    },
-    moreOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(0,0,0,0.5)",
-      justifyContent: "center",
+    sideActions: {
+      position: "absolute",
+      right: Spacing.md,
+      bottom: 120,
       alignItems: "center",
+      gap: Spacing.lg,
     },
-    moreText: {
+    sideActionButton: {
+      alignItems: "center",
+      gap: 4,
+    },
+    sideActionCount: {
       color: "#FFF",
-      fontSize: Typography.h3.fontSize,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    progressIndicator: {
+      position: "absolute",
+      top: insets.top + 60,
+      right: Spacing.md,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 4,
+      borderRadius: BorderRadius.sm,
+    },
+    progressText: {
+      color: "#FFF",
+      fontSize: 12,
+    },
+    topBar: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: Spacing.lg,
+      paddingBottom: Spacing.sm,
+    },
+    topBarTitle: {
+      color: "#FFF",
+      fontSize: 20,
       fontWeight: "700",
     },
-    postActions: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingTop: Spacing.sm,
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-    },
-    actionButton: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
+    createButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: "rgba(255,255,255,0.2)",
       justifyContent: "center",
-      paddingVertical: Spacing.xs,
-    },
-    actionCount: {
-      marginLeft: Spacing.xs,
-      fontSize: Typography.caption.fontSize,
+      alignItems: "center",
     },
     emptyState: {
-      alignItems: "center",
-      paddingTop: 100,
-    },
-    emptyTitle: {
-      fontSize: Typography.h3.fontSize,
-      fontWeight: "600",
-      marginTop: Spacing.md,
-    },
-    emptySubtitle: {
-      fontSize: Typography.body.fontSize,
-      marginTop: Spacing.xs,
-    },
-    fab: {
-      position: "absolute",
-      right: Spacing.lg,
-      bottom: 100,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
       justifyContent: "center",
       alignItems: "center",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
-      elevation: 5,
+    },
+    emptyContent: {
+      alignItems: "center",
+      gap: Spacing.md,
+    },
+    emptyTitle: {
+      color: "#FFF",
+      fontSize: 24,
+      fontWeight: "700",
+    },
+    emptySubtitle: {
+      color: "rgba(255,255,255,0.7)",
+      fontSize: 16,
+    },
+    createFirstButton: {
+      marginTop: Spacing.lg,
+      paddingHorizontal: Spacing.xl,
+      paddingVertical: Spacing.md,
+      backgroundColor: Colors.light.primary,
+      borderRadius: BorderRadius.lg,
+    },
+    createFirstText: {
+      color: "#FFF",
+      fontSize: 16,
+      fontWeight: "600",
     },
     modalContainer: {
       flex: 1,
     },
     modalHeader: {
       flexDirection: "row",
-      alignItems: "center",
       justifyContent: "space-between",
+      alignItems: "center",
       paddingHorizontal: Spacing.md,
       paddingVertical: Spacing.md,
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
     },
+    cancelText: {
+      fontSize: 16,
+    },
     modalTitle: {
-      fontSize: Typography.h3.fontSize,
+      fontSize: 18,
       fontWeight: "600",
     },
-    cancelText: {
-      fontSize: Typography.body.fontSize,
-    },
-    postButton: {
-      fontSize: Typography.body.fontSize,
+    postButtonText: {
+      fontSize: 16,
       fontWeight: "600",
     },
     composeContent: {
@@ -701,113 +874,87 @@ function createStyles(theme: typeof Colors.light, _isDark: boolean) {
       padding: Spacing.md,
     },
     composeInput: {
-      fontSize: Typography.body.fontSize,
-      lineHeight: 24,
+      fontSize: 18,
+      lineHeight: 26,
+      minHeight: 200,
       textAlignVertical: "top",
-      minHeight: 120,
-    },
-    imagePreviewGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-      marginTop: Spacing.md,
-    },
-    imagePreview: {
-      width: 80,
-      height: 80,
-      borderRadius: BorderRadius.sm,
-      overflow: "hidden",
-    },
-    previewImage: {
-      width: "100%",
-      height: "100%",
-    },
-    removeImage: {
-      position: "absolute",
-      top: 4,
-      right: 4,
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: "rgba(0,0,0,0.6)",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    composeFooter: {
-      flexDirection: "row",
-      padding: Spacing.md,
-      borderTopWidth: 1,
-    },
-    mediaButton: {
-      padding: Spacing.sm,
-      marginRight: Spacing.sm,
     },
     commentItem: {
       flexDirection: "row",
       marginBottom: Spacing.md,
     },
     commentAvatar: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       justifyContent: "center",
       alignItems: "center",
       overflow: "hidden",
+    },
+    smallAvatar: {
+      width: "100%",
+      height: "100%",
     },
     commentContent: {
       flex: 1,
       marginLeft: Spacing.sm,
     },
     commentAuthor: {
-      fontSize: Typography.caption.fontSize,
+      fontSize: 14,
       fontWeight: "600",
     },
     commentText: {
-      fontSize: Typography.body.fontSize,
+      fontSize: 14,
       marginTop: 2,
     },
     commentTime: {
-      fontSize: Typography.small.fontSize,
+      fontSize: 12,
       marginTop: 4,
+    },
+    emptyComments: {
+      textAlign: "center",
+      marginTop: Spacing.xl,
     },
     commentInputRow: {
       flexDirection: "row",
       alignItems: "center",
-      padding: Spacing.md,
+      paddingHorizontal: Spacing.md,
+      paddingTop: Spacing.sm,
       borderTopWidth: 1,
+      gap: Spacing.sm,
     },
     commentInput: {
       flex: 1,
-      height: 40,
-      borderRadius: 20,
       paddingHorizontal: Spacing.md,
-      fontSize: Typography.body.fontSize,
+      paddingVertical: Spacing.sm,
+      borderRadius: BorderRadius.lg,
+      fontSize: 15,
     },
     sendButton: {
-      marginLeft: Spacing.sm,
       padding: Spacing.sm,
     },
     tipModalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
+      backgroundColor: "rgba(0,0,0,0.6)",
       justifyContent: "center",
       alignItems: "center",
       padding: Spacing.lg,
     },
     tipModalContent: {
       width: "100%",
+      maxWidth: 340,
       borderRadius: BorderRadius.lg,
       padding: Spacing.lg,
     },
     tipModalTitle: {
-      fontSize: Typography.h3.fontSize,
+      fontSize: 20,
       fontWeight: "700",
       textAlign: "center",
+      marginBottom: Spacing.xs,
     },
     tipModalSubtitle: {
-      fontSize: Typography.body.fontSize,
+      fontSize: 14,
       textAlign: "center",
-      marginTop: Spacing.xs,
       marginBottom: Spacing.lg,
     },
     tipAmountRow: {
@@ -816,52 +963,49 @@ function createStyles(theme: typeof Colors.light, _isDark: boolean) {
       marginBottom: Spacing.md,
     },
     tipPreset: {
-      flex: 1,
-      marginHorizontal: 4,
+      width: 70,
       paddingVertical: Spacing.sm,
       borderRadius: BorderRadius.md,
       borderWidth: 1,
       alignItems: "center",
     },
     tipPresetText: {
-      fontSize: Typography.body.fontSize,
+      fontSize: 16,
       fontWeight: "600",
     },
     tipInput: {
-      height: 48,
-      borderRadius: BorderRadius.md,
       borderWidth: 1,
+      borderRadius: BorderRadius.md,
       paddingHorizontal: Spacing.md,
-      fontSize: Typography.body.fontSize,
-      textAlign: "center",
+      paddingVertical: Spacing.sm,
+      fontSize: 16,
       marginBottom: Spacing.lg,
     },
     tipModalButtons: {
       flexDirection: "row",
-      gap: Spacing.md,
+      gap: Spacing.sm,
     },
     tipCancelButton: {
       flex: 1,
-      height: 48,
+      paddingVertical: Spacing.md,
       borderRadius: BorderRadius.md,
       borderWidth: 1,
-      justifyContent: "center",
       alignItems: "center",
     },
     tipCancelText: {
-      fontSize: Typography.body.fontSize,
+      fontSize: 16,
       fontWeight: "600",
     },
     tipConfirmButton: {
       flex: 1,
-      height: 48,
+      paddingVertical: Spacing.md,
       borderRadius: BorderRadius.md,
-      justifyContent: "center",
       alignItems: "center",
+      justifyContent: "center",
     },
     tipConfirmText: {
       color: "#FFF",
-      fontSize: Typography.body.fontSize,
+      fontSize: 16,
       fontWeight: "600",
     },
   });
