@@ -45,6 +45,8 @@ export async function sendWaitlistWelcomeEmail(email: string): Promise<boolean> 
   try {
     const { client } = await getResendClient();
     const senderEmail = 'SwipeMe <noreply@swipeme.org>';
+    const baseUrl = process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : 'https://swipeme.replit.app';
+    const logoUrl = `${baseUrl}/assets/images/icon.png`;
     
     const result = await client.emails.send({
       from: senderEmail,
@@ -53,9 +55,7 @@ export async function sendWaitlistWelcomeEmail(email: string): Promise<boolean> 
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #0066FF 0%, #00C8FF 100%); border-radius: 16px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
-              <span style="color: white; font-size: 28px; font-weight: 800;">S</span>
-            </div>
+            <img src="${logoUrl}" alt="SwipeMe" style="width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 16px; display: block;">
             <h1 style="color: #0F172A; font-size: 28px; font-weight: 800; margin: 0; letter-spacing: -0.5px;">
               Thank You for Joining!
             </h1>
@@ -114,6 +114,8 @@ export async function sendVerificationEmail(email: string, code: string, type: s
   try {
     const { client } = await getResendClient();
     const senderEmail = 'SwipeMe <noreply@swipeme.org>';
+    const baseUrl = process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : 'https://swipeme.replit.app';
+    const logoUrl = `${baseUrl}/assets/images/icon.png`;
     
     const isPasswordReset = type === "password_reset";
     const subject = isPasswordReset ? 'Reset your password' : 'Confirm your email address';
@@ -131,6 +133,9 @@ export async function sendVerificationEmail(email: string, code: string, type: s
       subject,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <img src="${logoUrl}" alt="SwipeMe" style="width: 48px; height: 48px; border-radius: 12px; display: block; margin: 0 auto;">
+          </div>
           <h1 style="color: #000000; font-size: 23px; font-weight: 700; margin: 0 0 24px 0; line-height: 1.3;">
             ${heading}
           </h1>
