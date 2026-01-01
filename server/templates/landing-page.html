@@ -71,14 +71,11 @@
     .nav-logo-icon {
       width: 36px;
       height: 36px;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--cyan) 100%);
       border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      overflow: hidden;
     }
 
-    .nav-logo-icon svg { width: 20px; height: 20px; stroke: white; stroke-width: 2.5; fill: none; }
+    .nav-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
     .nav-logo-text { font-weight: 700; font-size: 20px; }
 
     .nav-links { display: flex; align-items: center; gap: 32px; }
@@ -580,14 +577,80 @@
     .footer-logo-icon {
       width: 28px;
       height: 28px;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--cyan) 100%);
       border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .footer-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
+
+    .footer-social {
+      display: flex;
+      gap: 16px;
+    }
+
+    .footer-social-link {
+      width: 36px;
+      height: 36px;
       display: flex;
       align-items: center;
       justify-content: center;
+      background: var(--gray-100);
+      border-radius: 8px;
+      color: var(--gray-600);
+      transition: background 0.2s, color 0.2s;
     }
 
-    .footer-logo-icon svg { width: 16px; height: 16px; stroke: white; stroke-width: 2.5; fill: none; }
+    .footer-social-link:hover {
+      background: var(--primary);
+      color: var(--white);
+    }
+
+    .footer-social-link svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    /* FAQ Section */
+    .faq {
+      padding: 100px 0;
+      background: var(--gray-50);
+    }
+
+    .faq-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .faq-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .faq-item {
+      background: var(--white);
+      padding: 28px;
+      border-radius: 12px;
+      border: 1px solid var(--gray-200);
+    }
+
+    .faq-question {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--dark);
+      margin-bottom: 12px;
+    }
+
+    .faq-answer {
+      font-size: 15px;
+      color: var(--gray-600);
+      line-height: 1.7;
+    }
+
+    @media (max-width: 768px) {
+      .faq-grid { grid-template-columns: 1fr; }
+    }
     .footer-logo-text { font-weight: 600; font-size: 16px; }
 
     .footer-links {
@@ -655,7 +718,7 @@
     <div class="nav-container">
       <a href="#" class="nav-logo">
         <div class="nav-logo-icon">
-          <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <img src="/assets/images/icon.png" alt="SwipeMe">
         </div>
         <span class="nav-logo-text">SwipeMe</span>
       </a>
@@ -968,13 +1031,51 @@
     </div>
   </section>
 
+  <!-- FAQ Section -->
+  <section class="faq" id="faq">
+    <div class="container">
+      <div class="faq-header">
+        <div class="section-label">FAQ</div>
+        <h2 class="section-title">Frequently Asked Questions</h2>
+        <p class="section-subtitle" style="margin: 0 auto;">Everything you need to know about SwipeMe.</p>
+      </div>
+
+      <div class="faq-grid">
+        <div class="faq-item">
+          <h3 class="faq-question">What is SwipeMe?</h3>
+          <p class="faq-answer">SwipeMe is a super app that combines end-to-end encrypted messaging with blockchain-based P2P payments. Send money to friends as easily as sending a message, with all transactions settled instantly on the Tempo blockchain.</p>
+        </div>
+        <div class="faq-item">
+          <h3 class="faq-question">Is my money safe?</h3>
+          <p class="faq-answer">Yes. SwipeMe uses a self-custodial wallet, meaning you control your private keys. Your wallet is secured with AES-256-GCM encryption and protected by biometric authentication. We never have access to your funds.</p>
+        </div>
+        <div class="faq-item">
+          <h3 class="faq-question">What stablecoins are supported?</h3>
+          <p class="faq-answer">SwipeMe supports multiple stablecoins on the Tempo testnet including pathUSD, AlphaUSD, BetaUSD, and ThetaUSD. You can send and receive any of these tokens within the app.</p>
+        </div>
+        <div class="faq-item">
+          <h3 class="faq-question">Are my messages private?</h3>
+          <p class="faq-answer">Absolutely. All messages are encrypted using the XMTP protocol with end-to-end encryption. Only you and your recipient can read your messages - not even SwipeMe can access them.</p>
+        </div>
+        <div class="faq-item">
+          <h3 class="faq-question">How fast are payments?</h3>
+          <p class="faq-answer">Payments are instant. When you send money, it lands in the recipient's wallet before they even receive the notification. Every transaction is verified and recorded on the Tempo blockchain.</p>
+        </div>
+        <div class="faq-item">
+          <h3 class="faq-question">Is SwipeMe available now?</h3>
+          <p class="faq-answer">SwipeMe is currently in early access on the Tempo testnet. Join our waitlist to be among the first to experience the app when we launch publicly.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Footer -->
   <footer class="footer">
     <div class="container">
       <div class="footer-content">
         <a href="#" class="footer-logo">
           <div class="footer-logo-icon">
-            <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            <img src="/assets/images/icon.png" alt="SwipeMe">
           </div>
           <span class="footer-logo-text">SwipeMe</span>
         </a>
@@ -982,7 +1083,16 @@
           <a href="#features" class="footer-link">Features</a>
           <a href="#preview" class="footer-link">App Preview</a>
           <a href="#security" class="footer-link">Security</a>
+          <a href="#faq" class="footer-link">FAQ</a>
           <a href="#waitlist" class="footer-link">Waitlist</a>
+        </div>
+        <div class="footer-social">
+          <a href="https://twitter.com/SwipeMeApp" target="_blank" rel="noopener noreferrer" class="footer-social-link" aria-label="Twitter">
+            <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <a href="https://github.com/SwipeMeApp" target="_blank" rel="noopener noreferrer" class="footer-social-link" aria-label="GitHub">
+            <svg viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          </a>
         </div>
         <p class="footer-copy">2026 SwipeMe. All rights reserved.</p>
       </div>
