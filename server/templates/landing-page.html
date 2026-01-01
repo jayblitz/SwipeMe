@@ -2478,7 +2478,7 @@
       <div class="cta-content animate-on-scroll">
         <h2>Ready to Experience the Future?</h2>
         <p>Join thousands waiting for early access to SwipeMe. Be the first to know when we launch.</p>
-        <form class="cta-form" id="waitlistForm" onsubmit="submitWaitlist(event)">
+        <form class="cta-form" id="waitlistForm">
           <input type="email" class="cta-input" id="waitlistEmail" placeholder="Enter your email address" required>
           <button type="submit" class="cta-submit" id="waitlistSubmit">Join Waitlist</button>
         </form>
@@ -2582,6 +2582,12 @@
           toggleFaq(this);
         });
       });
+      
+      // Attach waitlist form handler
+      const waitlistForm = document.getElementById('waitlistForm');
+      if (waitlistForm) {
+        waitlistForm.addEventListener('submit', submitWaitlist);
+      }
     });
 
     // Waitlist form submission
