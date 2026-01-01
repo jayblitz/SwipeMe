@@ -2562,7 +2562,9 @@
 
     // FAQ accordion
     function toggleFaq(element) {
-      const faqItem = element.parentElement;
+      const faqItem = element.closest('.faq-item');
+      if (!faqItem) return;
+      
       const wasOpen = faqItem.classList.contains('open');
       
       // Close all FAQ items
@@ -2575,6 +2577,16 @@
         faqItem.classList.add('open');
       }
     }
+
+    // Also add event delegation for FAQ clicks as backup
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.faq-question').forEach(question => {
+        question.addEventListener('click', function(e) {
+          e.preventDefault();
+          toggleFaq(this);
+        });
+      });
+    });
 
     // Waitlist form submission
     async function submitWaitlist(event) {
