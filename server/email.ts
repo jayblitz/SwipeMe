@@ -83,8 +83,8 @@ export async function sendWaitlistWelcomeEmail(email: string): Promise<boolean> 
           </p>
           
           <div style="text-align: center; margin: 32px 0;">
-            <a href="https://twitter.com/SwipeMeApp" style="display: inline-block; background: linear-gradient(135deg, #0066FF 0%, #00C8FF 100%); color: white; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 600; font-size: 15px;">
-              Follow @SwipeMeApp
+            <a href="https://x.com/swipemee_" style="display: inline-block; background: linear-gradient(135deg, #0066FF 0%, #00C8FF 100%); color: white; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 600; font-size: 15px;">
+              Follow @swipemee_
             </a>
           </div>
           
