@@ -105,3 +105,54 @@ export async function sendPaymentNotification(
     "payments"
   );
 }
+
+export async function sendXMTPWakeupNotification(
+  pushToken: string,
+  senderName: string,
+  conversationId: string
+): Promise<boolean> {
+  return sendPushNotification(
+    pushToken,
+    senderName,
+    "New encrypted message",
+    { 
+      type: "xmtp_wakeup", 
+      conversationId,
+      action: "fetch_messages"
+    },
+    "messages"
+  );
+}
+
+export async function sendSilentWakeup(
+  pushToken: string,
+  data: Record<string, unknown>
+): Promise<boolean> {
+  if (!pushToken || !pushToken.startsWith("ExponentPushToken")) {
+    return false;
+  }
+
+  const message = {
+    to: pushToken,
+    data: { ...data, _contentAvailable: true },
+    priority: "high" as const,
+  };
+
+  try {
+    const response = await fetch(EXPO_PUSH_URL, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message),
+    });
+
+    const result = await response.json() as { data: ExpoPushReceipt };
+    return result.data?.status !== "error";
+  } catch (error) {
+    console.error("Failed to send silent wakeup:", error);
+    return false;
+  }
+}

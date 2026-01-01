@@ -659,6 +659,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.session.userId!;
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
+      const mode = req.query.mode as string || "chronological";
+      
+      if (mode === "recommended") {
+        const { recommenderService } = await import("./recommender");
+        const recommendations = await recommenderService.getRecommendedFeed(userId, limit);
+        const postIds = recommendations.map(r => r.postId);
+        
+        if (postIds.length === 0) {
+          return res.json([]);
+        }
+        
+        const orderedPosts = await storage.getPostsByIds(postIds, userId);
+        return res.json(orderedPosts);
+      }
       
       const posts = await storage.getPosts(userId, limit, offset);
       res.json(posts);

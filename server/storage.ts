@@ -400,6 +400,35 @@ export const storage = {
     return post;
   },
 
+  async getPostsByIds(postIds: string[], viewerId: string): Promise<(Post & { author: User; isLiked: boolean })[]> {
+    if (postIds.length === 0) return [];
+    
+    const allPosts = await db.select()
+      .from(posts)
+      .where(inArray(posts.id, postIds));
+    
+    const postsById = new Map(allPosts.map(p => [p.id, p]));
+    
+    const orderedPosts = postIds
+      .map(id => postsById.get(id))
+      .filter((p): p is Post => p !== undefined);
+    
+    const postsWithAuthors = await Promise.all(
+      orderedPosts.map(async (post) => {
+        const author = await this.getUserById(post.authorId);
+        const [like] = await db.select()
+          .from(postLikes)
+          .where(and(eq(postLikes.postId, post.id), eq(postLikes.userId, viewerId)));
+        return {
+          ...post,
+          author: author!,
+          isLiked: !!like,
+        };
+      })
+    );
+    return postsWithAuthors;
+  },
+
   async deletePost(postId: string): Promise<boolean> {
     const result = await db.delete(posts).where(eq(posts.id, postId)).returning();
     return result.length > 0;

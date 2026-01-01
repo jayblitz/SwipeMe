@@ -81,8 +81,10 @@ export default function MomentsScreen() {
   const viewStartTimeRef = useRef<number>(0);
   const likeAnimations = useRef<Map<string, Animated.Value>>(new Map());
 
+  const [feedMode, _setFeedMode] = useState<"recommended" | "chronological">("recommended");
+  
   const { data: posts = [], isLoading } = useQuery<Post[]>({
-    queryKey: ["/api/moments"],
+    queryKey: ["/api/moments", { mode: feedMode }],
     enabled: !!user,
   });
 
