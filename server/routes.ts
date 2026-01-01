@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
 import { randomBytes } from "crypto";
 import { storage, verifyPassword } from "./storage";
-import { sendVerificationEmail } from "./email";
+import { sendVerificationEmail, sendWaitlistWelcomeEmail } from "./email";
 import { 
   signupSchema, 
   verifyCodeSchema, 
@@ -457,7 +457,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.createWaitlistSignup(email, "landing_page");
-      res.json({ success: true, message: "You've been added to the waitlist!" });
+      
+      // Send welcome email (don't block response on email sending)
+      sendWaitlistWelcomeEmail(email).catch(err => {
+        console.error("Failed to send waitlist welcome email:", err);
+      });
+      
+      res.json({ success: true, message: "Thank you for joining! Check your inbox for a welcome message from SwipeMe." });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors[0].message });
