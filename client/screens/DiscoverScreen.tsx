@@ -10,8 +10,8 @@ import { Feather } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Clipboard from "expo-clipboard";
 import * as LocalAuthentication from "expo-local-authentication";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import WebView from "react-native-webview";
+import * as SecureStore from "expo-secure-store";
+import WebViewBase from "react-native-webview";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/Button";
@@ -22,6 +22,12 @@ import { apiRequest } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 import { MainTabParamList } from "@/navigation/MainTabNavigator";
 import { DiscoverStackParamList } from "@/navigation/DiscoverStackNavigator";
+
+interface ExtendedWebViewProps extends React.ComponentProps<typeof WebViewBase> {
+  onNavigationStateChange?: (navState: { canGoBack: boolean; canGoForward: boolean; url: string }) => void;
+}
+
+const WebView = WebViewBase as React.ComponentType<ExtendedWebViewProps>;
 
 type NavigationProp = CompositeNavigationProp<
   CompositeNavigationProp<
@@ -384,12 +390,11 @@ function PolymarketMiniApp({ visible, onClose }: { visible: boolean; onClose: ()
             <Feather name="x" size={24} color={theme.text} />
           </Pressable>
         </View>
-        {/* @ts-expect-error: WebView types mismatch with onNavigationStateChange */}
         <WebView
           ref={webViewRef}
           source={{ uri: "https://polymarket.com" }}
           style={styles.webView}
-          onNavigationStateChange={(navState: { canGoBack: boolean; canGoForward: boolean }) => {
+          onNavigationStateChange={(navState) => {
             setCanGoBack(navState.canGoBack);
             setCanGoForward(navState.canGoForward);
           }}
@@ -462,12 +467,11 @@ function BrowserMiniApp({ visible, onClose }: { visible: boolean; onClose: () =>
               <Feather name="arrow-right" size={18} color="#FFFFFF" />
             </Pressable>
           </View>
-          {/* @ts-expect-error: WebView types mismatch with onNavigationStateChange */}
           <WebView
             ref={webViewRef}
             source={{ uri: url }}
             style={styles.webView}
-            onNavigationStateChange={(navState: { canGoBack: boolean; canGoForward: boolean; url: string }) => {
+            onNavigationStateChange={(navState) => {
               setCanGoBack(navState.canGoBack);
               setCanGoForward(navState.canGoForward);
               if (navState.url !== inputUrl) {
@@ -593,7 +597,7 @@ interface DiaryEntry {
   content: string;
 }
 
-const DIARY_STORAGE_KEY = "@swipeme_diary_entries";
+const DIARY_STORAGE_KEY = "swipeme_diary_entries";
 
 function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { theme } = useTheme();
@@ -606,14 +610,20 @@ function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => v
   useEffect(() => {
     if (visible) {
       setIsAuthenticated(false);
+      setEntries([]);
       authenticate();
+    } else {
+      setEntries([]);
+      setIsAuthenticated(false);
     }
   }, [visible]);
 
   const authenticate = async () => {
     if (Platform.OS === "web") {
-      setIsAuthenticated(true);
-      loadEntries();
+      Alert.alert(
+        "Not Available",
+        "Biometric authentication is only available on mobile devices. Please use Expo Go to access your diary securely."
+      );
       return;
     }
 
@@ -623,8 +633,10 @@ function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => v
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
       if (!hasHardware || !isEnrolled) {
-        setIsAuthenticated(true);
-        loadEntries();
+        Alert.alert(
+          "No Biometrics",
+          "Please set up biometric authentication (fingerprint or face) on your device to use the secure diary."
+        );
         return;
       }
 
@@ -635,7 +647,7 @@ function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => v
 
       if (result.success) {
         setIsAuthenticated(true);
-        loadEntries();
+        await loadEntries();
       }
     } catch (error) {
       console.error("Authentication error:", error);
@@ -646,7 +658,7 @@ function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => v
 
   const loadEntries = async () => {
     try {
-      const stored = await AsyncStorage.getItem(DIARY_STORAGE_KEY);
+      const stored = await SecureStore.getItemAsync(DIARY_STORAGE_KEY);
       if (stored) {
         setEntries(JSON.parse(stored));
       }
@@ -668,7 +680,7 @@ function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => v
     setEntries(updatedEntries);
 
     try {
-      await AsyncStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(updatedEntries));
+      await SecureStore.setItemAsync(DIARY_STORAGE_KEY, JSON.stringify(updatedEntries));
     } catch (error) {
       console.error("Failed to save diary entry:", error);
     }
@@ -690,7 +702,7 @@ function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => v
             const updatedEntries = entries.filter((e) => e.id !== id);
             setEntries(updatedEntries);
             try {
-              await AsyncStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(updatedEntries));
+              await SecureStore.setItemAsync(DIARY_STORAGE_KEY, JSON.stringify(updatedEntries));
             } catch (error) {
               console.error("Failed to delete diary entry:", error);
             }
@@ -701,6 +713,7 @@ function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => v
   };
 
   const handleClose = () => {
+    setEntries([]);
     setIsAuthenticated(false);
     setShowNewEntry(false);
     setNewEntryContent("");
@@ -735,6 +748,19 @@ function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => v
                   Authenticating...
                 </ThemedText>
               </>
+            ) : Platform.OS === "web" ? (
+              <>
+                <View style={[styles.authIcon, { backgroundColor: Colors.light.primaryLight }]}>
+                  <Feather name="smartphone" size={40} color={Colors.light.primary} />
+                </View>
+                <ThemedText type="h3" style={styles.authTitle}>Mobile Only</ThemedText>
+                <ThemedText style={[styles.authSubtitle, { color: theme.textSecondary, textAlign: "center" }]}>
+                  The secure diary requires biometric authentication which is only available on mobile devices.
+                </ThemedText>
+                <ThemedText style={[styles.authSubtitle, { color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }]}>
+                  Please use Expo Go on your phone to access your diary.
+                </ThemedText>
+              </>
             ) : (
               <>
                 <View style={[styles.authIcon, { backgroundColor: Colors.light.primaryLight }]}>
@@ -742,13 +768,10 @@ function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => v
                 </View>
                 <ThemedText type="h3" style={styles.authTitle}>Protected Diary</ThemedText>
                 <ThemedText style={[styles.authSubtitle, { color: theme.textSecondary }]}>
-                  {Platform.OS === "web" 
-                    ? "Biometric authentication is not available on web"
-                    : "Use biometric authentication to access your diary"
-                  }
+                  Use biometric authentication to access your diary
                 </ThemedText>
                 <Button onPress={authenticate} style={styles.authButton}>
-                  {Platform.OS === "web" ? "Continue" : "Authenticate"}
+                  Authenticate
                 </Button>
               </>
             )}
@@ -1179,7 +1202,6 @@ function NewGroupModal({ visible, onClose, onCreateGroup }: NewGroupModalProps) 
 export default function DiscoverScreen() {
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
-  const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   
   const [showMenu, setShowMenu] = useState(false);
