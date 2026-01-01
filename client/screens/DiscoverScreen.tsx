@@ -1,16 +1,19 @@
-import React, { useState, useCallback } from "react";
-import { View, StyleSheet, FlatList, Pressable, RefreshControl, TextInput, Modal, Platform, Linking, Alert, ActivityIndicator, KeyboardAvoidingView } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { View, StyleSheet, Pressable, TextInput, Modal, Platform, Linking, Alert, ActivityIndicator, KeyboardAvoidingView, ScrollView, FlatList } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { CompositeNavigationProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
-import * as Contacts from "expo-contacts";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Clipboard from "expo-clipboard";
+import * as LocalAuthentication from "expo-local-authentication";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import WebView from "react-native-webview";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius, Shadows } from "@/constants/theme";
@@ -28,139 +31,6 @@ type NavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<ChatsStackParamList>
 >;
 
-interface ContactItemProps {
-  contact: Contact;
-  onPress: () => void;
-}
-
-function ContactItem({ contact, onPress }: ContactItemProps) {
-  const { theme } = useTheme();
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.contactItem,
-        { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
-      ]}
-    >
-      <Avatar avatarId={contact.avatarId} size={48} />
-      <View style={styles.contactContent}>
-        <ThemedText style={styles.contactName}>{contact.name}</ThemedText>
-        <ThemedText style={[styles.contactPhone, { color: theme.textSecondary }]}>
-          {contact.phone || (contact.walletAddress ? contact.walletAddress.slice(0, 10) + "..." : "")}
-        </ThemedText>
-      </View>
-      <Feather name="message-circle" size={20} color={theme.primary} />
-    </Pressable>
-  );
-}
-
-function PermissionRequest({ onRequestPermission }: { onRequestPermission: () => void }) {
-  const { theme } = useTheme();
-
-  return (
-    <View style={styles.permissionContainer}>
-      <View style={[styles.permissionIcon, { backgroundColor: Colors.light.primaryLight }]}>
-        <Feather name="users" size={40} color={Colors.light.primary} />
-      </View>
-      <ThemedText type="h3" style={styles.permissionTitle}>Find Your Friends</ThemedText>
-      <ThemedText style={[styles.permissionSubtitle, { color: theme.textSecondary }]}>
-        Allow SwipeMe to access your contacts to find friends who are already using the app.
-      </ThemedText>
-      <Button onPress={onRequestPermission} style={styles.permissionButton}>
-        Allow Access
-      </Button>
-      <ThemedText style={[styles.permissionNote, { color: theme.textSecondary }]}>
-        Your contacts are only used to find friends on SwipeMe and are never shared.
-      </ThemedText>
-    </View>
-  );
-}
-
-function PermissionDenied() {
-  const { theme } = useTheme();
-
-  const openSettings = async () => {
-    if (Platform.OS !== "web") {
-      try {
-        await Linking.openSettings();
-      } catch (error) {
-        console.error("Failed to open settings:", error);
-      }
-    }
-  };
-
-  return (
-    <View style={styles.permissionContainer}>
-      <View style={[styles.permissionIcon, { backgroundColor: theme.backgroundDefault }]}>
-        <Feather name="lock" size={40} color={theme.textSecondary} />
-      </View>
-      <ThemedText type="h3" style={styles.permissionTitle}>Contacts Access Required</ThemedText>
-      <ThemedText style={[styles.permissionSubtitle, { color: theme.textSecondary }]}>
-        To find your friends on SwipeMe, please enable contacts access in your device settings.
-      </ThemedText>
-      {Platform.OS !== "web" ? (
-        <Button onPress={openSettings} style={styles.permissionButton}>
-          Open Settings
-        </Button>
-      ) : null}
-    </View>
-  );
-}
-
-function EmptyState({ searchQuery, isWeb }: { searchQuery: string; isWeb: boolean }) {
-  const { theme } = useTheme();
-
-  const getMessage = () => {
-    if (isWeb) {
-      return {
-        title: "Contacts not available on web",
-        subtitle: "Use the SwipeMe app on your phone to find friends from your contacts",
-      };
-    }
-    if (searchQuery) {
-      return {
-        title: "No contacts found",
-        subtitle: "Try a different search term",
-      };
-    }
-    return {
-      title: "No friends on SwipeMe yet",
-      subtitle: "Invite your friends to join SwipeMe",
-    };
-  };
-
-  const { title, subtitle } = getMessage();
-
-  return (
-    <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundDefault }]}>
-        <Feather name={isWeb ? "smartphone" : "users"} size={36} color={theme.textSecondary} />
-      </View>
-      <ThemedText style={[styles.emptyTitle, { fontWeight: "600" }]}>
-        {title}
-      </ThemedText>
-      <ThemedText style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-        {subtitle}
-      </ThemedText>
-    </View>
-  );
-}
-
-function LoadingState() {
-  const { theme } = useTheme();
-
-  return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color={theme.primary} />
-      <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
-        Finding contacts on SwipeMe...
-      </ThemedText>
-    </View>
-  );
-}
-
 interface MiniApp {
   id: string;
   name: string;
@@ -173,24 +43,19 @@ const MINI_APPS: MiniApp[] = [
   { id: "swap", name: "Swap", icon: "repeat", color: "#6366F1", category: "finance" },
   { id: "bridge", name: "Bridge", icon: "git-merge", color: "#8B5CF6", category: "finance" },
   { id: "stake", name: "Stake", icon: "trending-up", color: "#10B981", category: "finance" },
-  { id: "nft", name: "NFTs", icon: "image", color: "#F59E0B", category: "finance" },
+  { id: "predictions", name: "Predictions", icon: "bar-chart-2", color: "#F59E0B", category: "finance" },
   { id: "calculator", name: "Calculator", icon: "hash", color: "#3B82F6", category: "utilities" },
   { id: "scanner", name: "QR Scanner", icon: "maximize", color: "#EC4899", category: "utilities" },
   { id: "converter", name: "Converter", icon: "refresh-cw", color: "#14B8A6", category: "utilities" },
-  { id: "notes", name: "Notes", icon: "file-text", color: "#F97316", category: "utilities" },
+  { id: "diary", name: "Diary", icon: "book", color: "#F97316", category: "utilities" },
+  { id: "browser", name: "Browser", icon: "globe", color: "#6366F1", category: "utilities" },
 ];
 
 function MiniAppsSection({ onAppPress }: { onAppPress: (app: MiniApp) => void }) {
-  const { theme } = useTheme();
-
   return (
     <View style={styles.miniAppsSection}>
       <View style={styles.miniAppsSectionHeader}>
         <ThemedText style={styles.miniAppsSectionTitle}>Mini Apps</ThemedText>
-        <Pressable style={styles.seeAllButton}>
-          <ThemedText style={[styles.seeAllText, { color: theme.primary }]}>See All</ThemedText>
-          <Feather name="chevron-right" size={16} color={theme.primary} />
-        </Pressable>
       </View>
       <View style={styles.miniAppsGrid}>
         {MINI_APPS.map((app) => (
@@ -343,23 +208,653 @@ function CalculatorMiniApp({ visible, onClose }: { visible: boolean; onClose: ()
   );
 }
 
+function QRScannerMiniApp({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { theme } = useTheme();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
+    if (scanned) return;
+    setScanned(true);
+    
+    Alert.alert(
+      "QR Code Scanned",
+      data,
+      [
+        {
+          text: "Copy to Clipboard",
+          onPress: async () => {
+            await Clipboard.setStringAsync(data);
+            Alert.alert("Copied", "QR data copied to clipboard");
+          },
+        },
+        {
+          text: "Scan Again",
+          onPress: () => setScanned(false),
+        },
+        {
+          text: "Close",
+          onPress: onClose,
+          style: "cancel",
+        },
+      ]
+    );
+  };
+
+  const handleClose = () => {
+    setScanned(false);
+    onClose();
+  };
+
+  if (Platform.OS === "web") {
+    return (
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+        <View style={[styles.miniAppContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={styles.miniAppHeader}>
+            <ThemedText type="h4">QR Scanner</ThemedText>
+            <Pressable onPress={handleClose} style={styles.closeButton}>
+              <Feather name="x" size={24} color={theme.text} />
+            </Pressable>
+          </View>
+          <View style={styles.webFallback}>
+            <Feather name="smartphone" size={48} color={theme.textSecondary} />
+            <ThemedText style={[styles.webFallbackText, { color: theme.textSecondary }]}>
+              Run in Expo Go to use QR Scanner
+            </ThemedText>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  if (!permission) {
+    return (
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+        <View style={[styles.miniAppContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={styles.miniAppHeader}>
+            <ThemedText type="h4">QR Scanner</ThemedText>
+            <Pressable onPress={handleClose} style={styles.closeButton}>
+              <Feather name="x" size={24} color={theme.text} />
+            </Pressable>
+          </View>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.primary} />
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  if (!permission.granted) {
+    return (
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+        <View style={[styles.miniAppContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={styles.miniAppHeader}>
+            <ThemedText type="h4">QR Scanner</ThemedText>
+            <Pressable onPress={handleClose} style={styles.closeButton}>
+              <Feather name="x" size={24} color={theme.text} />
+            </Pressable>
+          </View>
+          <View style={styles.permissionContainer}>
+            <View style={[styles.permissionIcon, { backgroundColor: Colors.light.primaryLight }]}>
+              <Feather name="camera" size={40} color={Colors.light.primary} />
+            </View>
+            <ThemedText type="h3" style={styles.permissionTitle}>Camera Access Required</ThemedText>
+            <ThemedText style={[styles.permissionSubtitle, { color: theme.textSecondary }]}>
+              Allow camera access to scan QR codes
+            </ThemedText>
+            {permission.status === "denied" && !permission.canAskAgain ? (
+              <Button onPress={async () => {
+                try {
+                  await Linking.openSettings();
+                } catch (e) {}
+              }} style={styles.permissionButton}>
+                Open Settings
+              </Button>
+            ) : (
+              <Button onPress={requestPermission} style={styles.permissionButton}>
+                Allow Camera Access
+              </Button>
+            )}
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+      <View style={[styles.miniAppContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <View style={styles.miniAppHeader}>
+          <ThemedText type="h4">QR Scanner</ThemedText>
+          <Pressable onPress={handleClose} style={styles.closeButton}>
+            <Feather name="x" size={24} color={theme.text} />
+          </Pressable>
+        </View>
+        <View style={styles.cameraContainer}>
+          <CameraView
+            style={styles.camera}
+            facing="back"
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr"],
+            }}
+            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          />
+          <View style={styles.scanOverlay}>
+            <View style={styles.scanFrame} />
+          </View>
+          <ThemedText style={styles.scanHint}>Point camera at a QR code</ThemedText>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function PolymarketMiniApp({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { theme } = useTheme();
+  const webViewRef = useRef<any>(null);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.miniAppContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <View style={styles.webViewHeader}>
+          <View style={styles.webViewNavButtons}>
+            <Pressable 
+              onPress={() => webViewRef.current?.goBack()} 
+              style={[styles.navButton, !canGoBack && styles.navButtonDisabled]}
+              disabled={!canGoBack}
+            >
+              <Feather name="chevron-left" size={24} color={canGoBack ? theme.text : theme.textSecondary} />
+            </Pressable>
+            <Pressable 
+              onPress={() => webViewRef.current?.goForward()} 
+              style={[styles.navButton, !canGoForward && styles.navButtonDisabled]}
+              disabled={!canGoForward}
+            >
+              <Feather name="chevron-right" size={24} color={canGoForward ? theme.text : theme.textSecondary} />
+            </Pressable>
+            <Pressable onPress={() => webViewRef.current?.reload()} style={styles.navButton}>
+              <Feather name="refresh-cw" size={20} color={theme.text} />
+            </Pressable>
+          </View>
+          <ThemedText type="h4" style={styles.webViewTitle}>Predictions</ThemedText>
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <Feather name="x" size={24} color={theme.text} />
+          </Pressable>
+        </View>
+        {/* @ts-expect-error: WebView types mismatch with onNavigationStateChange */}
+        <WebView
+          ref={webViewRef}
+          source={{ uri: "https://polymarket.com" }}
+          style={styles.webView}
+          onNavigationStateChange={(navState: { canGoBack: boolean; canGoForward: boolean }) => {
+            setCanGoBack(navState.canGoBack);
+            setCanGoForward(navState.canGoForward);
+          }}
+        />
+      </View>
+    </Modal>
+  );
+}
+
+function BrowserMiniApp({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { theme } = useTheme();
+  const webViewRef = useRef<any>(null);
+  const [url, setUrl] = useState("https://google.com");
+  const [inputUrl, setInputUrl] = useState("https://google.com");
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
+
+  const handleGo = () => {
+    let newUrl = inputUrl.trim();
+    if (!newUrl.startsWith("http://") && !newUrl.startsWith("https://")) {
+      newUrl = "https://" + newUrl;
+    }
+    setUrl(newUrl);
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
+        <View style={[styles.miniAppContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={styles.browserHeader}>
+            <View style={styles.webViewNavButtons}>
+              <Pressable 
+                onPress={() => webViewRef.current?.goBack()} 
+                style={[styles.navButton, !canGoBack && styles.navButtonDisabled]}
+                disabled={!canGoBack}
+              >
+                <Feather name="chevron-left" size={24} color={canGoBack ? theme.text : theme.textSecondary} />
+              </Pressable>
+              <Pressable 
+                onPress={() => webViewRef.current?.goForward()} 
+                style={[styles.navButton, !canGoForward && styles.navButtonDisabled]}
+                disabled={!canGoForward}
+              >
+                <Feather name="chevron-right" size={24} color={canGoForward ? theme.text : theme.textSecondary} />
+              </Pressable>
+              <Pressable onPress={() => webViewRef.current?.reload()} style={styles.navButton}>
+                <Feather name="refresh-cw" size={20} color={theme.text} />
+              </Pressable>
+            </View>
+            <Pressable onPress={onClose} style={styles.closeButton}>
+              <Feather name="x" size={24} color={theme.text} />
+            </Pressable>
+          </View>
+          <View style={[styles.urlBar, { backgroundColor: theme.backgroundDefault }]}>
+            <TextInput
+              style={[styles.urlInput, { color: theme.text }]}
+              value={inputUrl}
+              onChangeText={setInputUrl}
+              onSubmitEditing={handleGo}
+              placeholder="Enter URL"
+              placeholderTextColor={theme.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            <Pressable onPress={handleGo} style={[styles.goButton, { backgroundColor: theme.primary }]}>
+              <Feather name="arrow-right" size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+          {/* @ts-expect-error: WebView types mismatch with onNavigationStateChange */}
+          <WebView
+            ref={webViewRef}
+            source={{ uri: url }}
+            style={styles.webView}
+            onNavigationStateChange={(navState: { canGoBack: boolean; canGoForward: boolean; url: string }) => {
+              setCanGoBack(navState.canGoBack);
+              setCanGoForward(navState.canGoForward);
+              if (navState.url !== inputUrl) {
+                setInputUrl(navState.url);
+              }
+            }}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const EXCHANGE_RATES: Record<string, Record<string, number>> = {
+  USD: { USD: 1, EUR: 0.92, GBP: 0.79, JPY: 149.50, ETH: 0.00028, BTC: 0.000011 },
+  EUR: { USD: 1.09, EUR: 1, GBP: 0.86, JPY: 162.50, ETH: 0.00031, BTC: 0.000012 },
+  GBP: { USD: 1.27, EUR: 1.16, GBP: 1, JPY: 189.20, ETH: 0.00036, BTC: 0.000014 },
+  JPY: { USD: 0.0067, EUR: 0.0062, GBP: 0.0053, JPY: 1, ETH: 0.0000019, BTC: 0.000000074 },
+  ETH: { USD: 3550, EUR: 3260, GBP: 2800, JPY: 530000, ETH: 1, BTC: 0.038 },
+  BTC: { USD: 93000, EUR: 85500, GBP: 73400, JPY: 13900000, ETH: 26.2, BTC: 1 },
+};
+
+const CURRENCIES = ["USD", "EUR", "GBP", "JPY", "ETH", "BTC"];
+
+function ConverterMiniApp({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { theme } = useTheme();
+  const [amount, setAmount] = useState("1");
+  const [fromCurrency, setFromCurrency] = useState("USD");
+  const [toCurrency, setToCurrency] = useState("EUR");
+
+  const convert = () => {
+    const numAmount = parseFloat(amount) || 0;
+    const rate = EXCHANGE_RATES[fromCurrency]?.[toCurrency] || 0;
+    return (numAmount * rate).toFixed(toCurrency === "BTC" ? 8 : toCurrency === "ETH" ? 6 : 2);
+  };
+
+  const swapCurrencies = () => {
+    const temp = fromCurrency;
+    setFromCurrency(toCurrency);
+    setToCurrency(temp);
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.miniAppContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <View style={styles.miniAppHeader}>
+          <ThemedText type="h4">Converter</ThemedText>
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <Feather name="x" size={24} color={theme.text} />
+          </Pressable>
+        </View>
+        
+        <View style={styles.converterContent}>
+          <View style={[styles.converterCard, { backgroundColor: theme.backgroundDefault }]}>
+            <ThemedText style={[styles.converterLabel, { color: theme.textSecondary }]}>From</ThemedText>
+            <TextInput
+              style={[styles.converterInput, { color: theme.text }]}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              placeholderTextColor={theme.textSecondary}
+            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyPicker}>
+              {CURRENCIES.map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => setFromCurrency(c)}
+                  style={[
+                    styles.currencyChip,
+                    { 
+                      backgroundColor: fromCurrency === c ? theme.primary : theme.border,
+                    },
+                  ]}
+                >
+                  <ThemedText style={[styles.currencyChipText, { color: fromCurrency === c ? "#FFFFFF" : theme.text }]}>
+                    {c}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <Pressable onPress={swapCurrencies} style={[styles.swapButton, { backgroundColor: theme.primary }]}>
+            <Feather name="repeat" size={20} color="#FFFFFF" />
+          </Pressable>
+
+          <View style={[styles.converterCard, { backgroundColor: theme.backgroundDefault }]}>
+            <ThemedText style={[styles.converterLabel, { color: theme.textSecondary }]}>To</ThemedText>
+            <ThemedText style={styles.converterResult}>{convert()}</ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyPicker}>
+              {CURRENCIES.map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => setToCurrency(c)}
+                  style={[
+                    styles.currencyChip,
+                    { 
+                      backgroundColor: toCurrency === c ? theme.primary : theme.border,
+                    },
+                  ]}
+                >
+                  <ThemedText style={[styles.currencyChipText, { color: toCurrency === c ? "#FFFFFF" : theme.text }]}>
+                    {c}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <ThemedText style={[styles.rateInfo, { color: theme.textSecondary }]}>
+            1 {fromCurrency} = {EXCHANGE_RATES[fromCurrency]?.[toCurrency]?.toFixed(toCurrency === "BTC" ? 8 : toCurrency === "ETH" ? 6 : 4)} {toCurrency}
+          </ThemedText>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+interface DiaryEntry {
+  id: string;
+  date: string;
+  content: string;
+}
+
+const DIARY_STORAGE_KEY = "@swipeme_diary_entries";
+
+function DiaryMiniApp({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { theme } = useTheme();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [showNewEntry, setShowNewEntry] = useState(false);
+  const [newEntryContent, setNewEntryContent] = useState("");
+
+  useEffect(() => {
+    if (visible) {
+      setIsAuthenticated(false);
+      authenticate();
+    }
+  }, [visible]);
+
+  const authenticate = async () => {
+    if (Platform.OS === "web") {
+      setIsAuthenticated(true);
+      loadEntries();
+      return;
+    }
+
+    setIsAuthenticating(true);
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        setIsAuthenticated(true);
+        loadEntries();
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Authenticate to access your diary",
+        fallbackLabel: "Use Passcode",
+      });
+
+      if (result.success) {
+        setIsAuthenticated(true);
+        loadEntries();
+      }
+    } catch (error) {
+      console.error("Authentication error:", error);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const loadEntries = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(DIARY_STORAGE_KEY);
+      if (stored) {
+        setEntries(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error("Failed to load diary entries:", error);
+    }
+  };
+
+  const saveEntry = async () => {
+    if (!newEntryContent.trim()) return;
+
+    const newEntry: DiaryEntry = {
+      id: Date.now().toString(),
+      date: new Date().toISOString(),
+      content: newEntryContent.trim(),
+    };
+
+    const updatedEntries = [newEntry, ...entries];
+    setEntries(updatedEntries);
+
+    try {
+      await AsyncStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(updatedEntries));
+    } catch (error) {
+      console.error("Failed to save diary entry:", error);
+    }
+
+    setNewEntryContent("");
+    setShowNewEntry(false);
+  };
+
+  const deleteEntry = async (id: string) => {
+    Alert.alert(
+      "Delete Entry",
+      "Are you sure you want to delete this entry?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const updatedEntries = entries.filter((e) => e.id !== id);
+            setEntries(updatedEntries);
+            try {
+              await AsyncStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(updatedEntries));
+            } catch (error) {
+              console.error("Failed to delete diary entry:", error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClose = () => {
+    setIsAuthenticated(false);
+    setShowNewEntry(false);
+    setNewEntryContent("");
+    onClose();
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, { 
+      weekday: "short", 
+      month: "short", 
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+        <View style={[styles.miniAppContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={styles.miniAppHeader}>
+            <ThemedText type="h4">Diary</ThemedText>
+            <Pressable onPress={handleClose} style={styles.closeButton}>
+              <Feather name="x" size={24} color={theme.text} />
+            </Pressable>
+          </View>
+          <View style={styles.authContainer}>
+            {isAuthenticating ? (
+              <>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <ThemedText style={[styles.authText, { color: theme.textSecondary }]}>
+                  Authenticating...
+                </ThemedText>
+              </>
+            ) : (
+              <>
+                <View style={[styles.authIcon, { backgroundColor: Colors.light.primaryLight }]}>
+                  <Feather name="lock" size={40} color={Colors.light.primary} />
+                </View>
+                <ThemedText type="h3" style={styles.authTitle}>Protected Diary</ThemedText>
+                <ThemedText style={[styles.authSubtitle, { color: theme.textSecondary }]}>
+                  {Platform.OS === "web" 
+                    ? "Biometric authentication is not available on web"
+                    : "Use biometric authentication to access your diary"
+                  }
+                </ThemedText>
+                <Button onPress={authenticate} style={styles.authButton}>
+                  {Platform.OS === "web" ? "Continue" : "Authenticate"}
+                </Button>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
+        <View style={[styles.miniAppContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={styles.diaryHeader}>
+            <ThemedText type="h4">Diary</ThemedText>
+            <View style={styles.diaryHeaderButtons}>
+              <Pressable 
+                onPress={() => setShowNewEntry(true)} 
+                style={[styles.addButton, { backgroundColor: theme.primary }]}
+              >
+                <Feather name="plus" size={20} color="#FFFFFF" />
+              </Pressable>
+              <Pressable onPress={handleClose} style={styles.closeButton}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+          </View>
+
+          {showNewEntry ? (
+            <View style={styles.newEntryContainer}>
+              <TextInput
+                style={[styles.newEntryInput, { backgroundColor: theme.backgroundDefault, color: theme.text }]}
+                placeholder="Write your thoughts..."
+                placeholderTextColor={theme.textSecondary}
+                value={newEntryContent}
+                onChangeText={setNewEntryContent}
+                multiline
+                autoFocus
+              />
+              <View style={styles.newEntryButtons}>
+                <Pressable 
+                  onPress={() => { setShowNewEntry(false); setNewEntryContent(""); }} 
+                  style={[styles.newEntryBtn, { backgroundColor: theme.border }]}
+                >
+                  <ThemedText>Cancel</ThemedText>
+                </Pressable>
+                <Pressable 
+                  onPress={saveEntry} 
+                  style={[styles.newEntryBtn, { backgroundColor: theme.primary }]}
+                >
+                  <ThemedText style={{ color: "#FFFFFF" }}>Save</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
+          <FlatList
+            data={entries}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.entriesList}
+            ListEmptyComponent={
+              <View style={styles.emptyDiary}>
+                <Feather name="book-open" size={48} color={theme.textSecondary} />
+                <ThemedText style={[styles.emptyDiaryText, { color: theme.textSecondary }]}>
+                  No entries yet. Tap + to add your first entry.
+                </ThemedText>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <View style={[styles.diaryEntry, { backgroundColor: theme.backgroundDefault }]}>
+                <View style={styles.entryHeader}>
+                  <ThemedText style={[styles.entryDate, { color: theme.textSecondary }]}>
+                    {formatDate(item.date)}
+                  </ThemedText>
+                  <Pressable onPress={() => deleteEntry(item.id)}>
+                    <Feather name="trash-2" size={16} color={theme.textSecondary} />
+                  </Pressable>
+                </View>
+                <ThemedText style={styles.entryContent}>{item.content}</ThemedText>
+              </View>
+            )}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 interface FABMenuProps {
   visible: boolean;
   onClose: () => void;
   onNewContact: () => void;
   onNewGroup: () => void;
   onPayAnyone: () => void;
-  onSyncContacts: () => void;
 }
 
-function FABMenu({ visible, onClose, onNewContact, onNewGroup, onPayAnyone, onSyncContacts }: FABMenuProps) {
+function FABMenu({ visible, onClose, onNewContact, onNewGroup, onPayAnyone }: FABMenuProps) {
   const { theme } = useTheme();
 
   const menuItems = [
     { icon: "user-plus" as const, label: "New Contact", onPress: onNewContact },
     { icon: "users" as const, label: "New Group", onPress: onNewGroup },
     { icon: "send" as const, label: "Pay Anyone", onPress: onPayAnyone },
-    { icon: "refresh-cw" as const, label: "Contacts on SwipeMe", onPress: onSyncContacts },
   ];
 
   return (
@@ -612,71 +1107,50 @@ function NewContactModal({ visible, onClose, onStartChat }: NewContactModalProps
 interface NewGroupModalProps {
   visible: boolean;
   onClose: () => void;
-  contacts: Contact[];
   onCreateGroup: (name: string, selectedContacts: Contact[]) => void;
 }
 
-function NewGroupModal({ visible, onClose, contacts, onCreateGroup }: NewGroupModalProps) {
+function NewGroupModal({ visible, onClose, onCreateGroup }: NewGroupModalProps) {
   const { theme } = useTheme();
   const [groupName, setGroupName] = useState("");
-  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const resetForm = () => {
-    setGroupName("");
-    setSelectedContacts(new Set());
-    setSearchQuery("");
-  };
 
   const handleClose = () => {
-    resetForm();
+    setGroupName("");
     onClose();
   };
 
-  const toggleContact = (contactId: string) => {
-    const newSelected = new Set(selectedContacts);
-    if (newSelected.has(contactId)) {
-      newSelected.delete(contactId);
-    } else if (newSelected.size < 10) {
-      newSelected.add(contactId);
-    } else {
-      Alert.alert("Limit Reached", "You can only add up to 10 people in a group.");
-    }
-    setSelectedContacts(newSelected);
-  };
-
   const handleCreate = () => {
-    if (selectedContacts.size === 0) {
-      Alert.alert("Select Contacts", "Please select at least one contact to create a group.");
+    if (!groupName.trim()) {
+      Alert.alert("Error", "Please enter a group name");
       return;
     }
-    const selected = contacts.filter(c => selectedContacts.has(c.id));
-    onCreateGroup(groupName.trim() || `Group (${selected.length + 1})`, selected);
+    onCreateGroup(groupName.trim(), []);
     handleClose();
   };
 
-  const filteredContacts = contacts.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
       <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
         behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
       >
         <View style={[styles.newGroupModalContainer, { backgroundColor: theme.backgroundRoot }]}>
           <View style={styles.modalHeader}>
             <Pressable onPress={handleClose} style={styles.closeButton}>
-              <ThemedText style={{ color: theme.primary }}>Cancel</ThemedText>
+              <Feather name="x" size={24} color={theme.text} />
             </Pressable>
             <ThemedText type="h4">New Group</ThemedText>
             <Pressable 
-              onPress={handleCreate} 
+              onPress={handleCreate}
               style={styles.createButton}
-              disabled={selectedContacts.size === 0}
+              disabled={!groupName.trim()}
             >
-              <ThemedText style={{ color: selectedContacts.size > 0 ? theme.primary : theme.textSecondary }}>
+              <ThemedText style={{ color: groupName.trim() ? theme.primary : theme.textSecondary, fontWeight: "600" }}>
                 Create
               </ThemedText>
             </Pressable>
@@ -685,83 +1159,21 @@ function NewGroupModal({ visible, onClose, contacts, onCreateGroup }: NewGroupMo
           <View style={[styles.groupNameContainer, { backgroundColor: theme.backgroundDefault }]}>
             <TextInput
               style={[styles.groupNameInput, { color: theme.text }]}
-              placeholder="Group Name (optional)"
+              placeholder="Group Name"
               placeholderTextColor={theme.textSecondary}
               value={groupName}
               onChangeText={setGroupName}
+              autoCapitalize="words"
             />
           </View>
 
           <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-            Select Contacts ({selectedContacts.size}/10)
+            Group members can be added after creation
           </ThemedText>
-
-          <View style={[styles.searchContainer, { marginHorizontal: Spacing.lg }]}>
-            <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
-              <Feather name="search" size={18} color={theme.textSecondary} />
-              <TextInput
-                style={[styles.searchInput, { color: theme.text }]}
-                placeholder="Search contacts..."
-                placeholderTextColor={theme.textSecondary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-          </View>
-
-          {filteredContacts.length === 0 ? (
-            <View style={styles.emptyGroupContacts}>
-              <Feather name="users" size={48} color={theme.textSecondary} />
-              <ThemedText style={[styles.emptyTitle, { color: theme.textSecondary }]}>
-                No contacts available
-              </ThemedText>
-              <ThemedText style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Your contacts on SwipeMe will appear here
-              </ThemedText>
-            </View>
-          ) : (
-            <FlatList
-              data={filteredContacts}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: Spacing.xl }}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => toggleContact(item.id)}
-                  style={({ pressed }) => [
-                    styles.groupContactItem,
-                    { backgroundColor: pressed ? theme.backgroundDefault : "transparent" },
-                  ]}
-                >
-                  <Avatar avatarId={item.avatarId} size={44} />
-                  <View style={styles.groupContactContent}>
-                    <ThemedText style={styles.groupContactName}>{item.name}</ThemedText>
-                  </View>
-                  <View style={[
-                    styles.checkbox,
-                    { 
-                      borderColor: selectedContacts.has(item.id) ? theme.primary : theme.border,
-                      backgroundColor: selectedContacts.has(item.id) ? theme.primary : "transparent",
-                    }
-                  ]}>
-                    {selectedContacts.has(item.id) ? (
-                      <Feather name="check" size={14} color="#FFFFFF" />
-                    ) : null}
-                  </View>
-                </Pressable>
-              )}
-            />
-          )}
         </View>
       </KeyboardAvoidingView>
     </Modal>
   );
-}
-
-interface DeviceContact {
-  id: string;
-  name: string;
-  phoneNumbers: string[];
-  emails: string[];
 }
 
 export default function DiscoverScreen() {
@@ -770,144 +1182,15 @@ export default function DiscoverScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showNewContact, setShowNewContact] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<Contacts.PermissionStatus | null>(null);
-
-  const requestPermission = async () => {
-    if (Platform.OS === "web") {
-      Alert.alert("Not Available", "Run in Expo Go to use this feature");
-      return;
-    }
-    
-    const { status } = await Contacts.requestPermissionsAsync();
-    setPermissionStatus(status);
-    
-    if (status === Contacts.PermissionStatus.GRANTED) {
-      await loadContacts(true);
-    }
-  };
-
-  const fetchDeviceContacts = async (): Promise<DeviceContact[]> => {
-    if (Platform.OS === "web") {
-      return [];
-    }
-    
-    try {
-      const { data } = await Contacts.getContactsAsync({
-        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails, Contacts.Fields.Name],
-      });
-      
-      return data.map(contact => ({
-        id: contact.id,
-        name: contact.name || "Unknown",
-        phoneNumbers: contact.phoneNumbers?.map(p => p.number?.replace(/[\s\-\(\)]/g, "") || "") || [],
-        emails: contact.emails?.map(e => e.email || "") || [],
-      })).filter(c => c.phoneNumbers.length > 0 || c.emails.length > 0);
-    } catch (error) {
-      console.error("Failed to fetch device contacts:", error);
-      return [];
-    }
-  };
-
-  const matchContactsWithUsers = async (deviceContactsList: DeviceContact[]): Promise<Contact[]> => {
-    if (deviceContactsList.length === 0) {
-      return [];
-    }
-    
-    try {
-      const emails = deviceContactsList.flatMap(c => c.emails).filter(Boolean);
-      const phones = deviceContactsList.flatMap(c => c.phoneNumbers).filter(Boolean);
-      
-      const response = await apiRequest("POST", "/api/contacts/match", {
-        emails,
-        phones,
-      });
-      
-      if (!response.ok) {
-        console.error("Failed to match contacts");
-        return [];
-      }
-      
-      const matchedUsers = await response.json();
-      
-      return matchedUsers.map((user: any) => {
-        const deviceContact = deviceContactsList.find(dc => 
-          dc.emails.includes(user.email) || 
-          dc.phoneNumbers.some(p => user.phone && p.includes(user.phone))
-        );
-        
-        return {
-          id: user.id.toString(),
-          name: deviceContact?.name || user.displayName || user.email.split("@")[0],
-          avatarId: user.id.toString(),
-          walletAddress: user.walletAddress || "",
-          phone: deviceContact?.phoneNumbers[0] || user.phone,
-        };
-      });
-    } catch (error) {
-      console.error("Failed to match contacts with users:", error);
-      return [];
-    }
-  };
-
-  const loadContacts = useCallback(async (hasPermission: boolean) => {
-    if (Platform.OS === "web" || !hasPermission) {
-      setContacts([]);
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const deviceContactsList = await fetchDeviceContacts();
-      const matchedContacts = await matchContactsWithUsers(deviceContactsList);
-      setContacts(matchedContacts);
-    } catch (error) {
-      console.error("Failed to load contacts:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      const initialize = async () => {
-        if (Platform.OS === "web") {
-          setPermissionStatus(Contacts.PermissionStatus.GRANTED);
-          return;
-        }
-        
-        const { status } = await Contacts.getPermissionsAsync();
-        setPermissionStatus(status);
-        
-        if (status === Contacts.PermissionStatus.GRANTED) {
-          await loadContacts(true);
-        }
-      };
-      
-      initialize();
-    }, [loadContacts])
-  );
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadContacts(permissionStatus === Contacts.PermissionStatus.GRANTED);
-    setRefreshing(false);
-  };
-
-  const handleContactPress = async (contact: Contact) => {
-    const chat = await createChat(contact);
-    navigation.navigate("ChatsTab", {
-      screen: "Chat",
-      params: { chatId: chat.id, name: contact.name },
-    } as any);
-  };
+  const [showScanner, setShowScanner] = useState(false);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [showConverter, setShowConverter] = useState(false);
+  const [showDiary, setShowDiary] = useState(false);
 
   const handleNewContact = () => {
     setShowNewContact(true);
@@ -936,175 +1219,65 @@ export default function DiscoverScreen() {
     navigation.navigate("WalletTab" as any);
   };
 
-  const handleSyncContacts = async () => {
-    if (permissionStatus !== Contacts.PermissionStatus.GRANTED) {
-      await requestPermission();
-    } else {
-      await loadContacts(true);
-      if (contacts.length === 0) {
-        Alert.alert("No Matches", "None of your contacts are on SwipeMe yet. Invite them to join!");
-      } else {
-        Alert.alert("Contacts Updated", `Found ${contacts.length} contact(s) on SwipeMe!`);
-      }
-    }
-  };
-
   const handleMiniAppPress = (app: MiniApp) => {
-    if (app.id === "calculator") {
-      setShowCalculator(true);
-    } else {
-      Alert.alert(
-        app.name,
-        `${app.name} mini-app coming soon! This will be a ${app.category} application.`,
-        [{ text: "OK" }]
-      );
+    switch (app.id) {
+      case "calculator":
+        setShowCalculator(true);
+        break;
+      case "scanner":
+        setShowScanner(true);
+        break;
+      case "predictions":
+        setShowPredictions(true);
+        break;
+      case "browser":
+        setShowBrowser(true);
+        break;
+      case "converter":
+        setShowConverter(true);
+        break;
+      case "diary":
+        setShowDiary(true);
+        break;
+      case "swap":
+      case "bridge":
+      case "stake":
+        Alert.alert(
+          "Coming Soon",
+          `${app.name} will be available soon!`,
+          [{ text: "OK" }]
+        );
+        break;
+      default:
+        Alert.alert(
+          app.name,
+          `${app.name} mini-app coming soon!`,
+          [{ text: "OK" }]
+        );
     }
   };
-
-  const filteredContacts = contacts.filter(contact =>
-    contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (contact.phone && contact.phone.includes(searchQuery))
-  );
-
-  if (permissionStatus === null) {
-    return <ThemedView style={styles.container} />;
-  }
-
-  if (permissionStatus === Contacts.PermissionStatus.UNDETERMINED) {
-    return (
-      <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
-        <PermissionRequest onRequestPermission={requestPermission} />
-        <FABMenu
-          visible={showMenu}
-          onClose={() => setShowMenu(false)}
-          onNewContact={handleNewContact}
-          onNewGroup={handleNewGroup}
-          onPayAnyone={handlePayAnyone}
-          onSyncContacts={handleSyncContacts}
-        />
-        <NewContactModal
-          visible={showNewContact}
-          onClose={() => setShowNewContact(false)}
-          onStartChat={handleStartChatWithUser}
-        />
-        <NewGroupModal
-          visible={showNewGroup}
-          onClose={() => setShowNewGroup(false)}
-          contacts={contacts}
-          onCreateGroup={handleCreateGroup}
-        />
-        <Pressable
-          onPress={() => setShowMenu(true)}
-          style={[styles.fab, { bottom: tabBarHeight + Spacing.lg }]}
-        >
-          <Feather name="plus" size={28} color="#FFFFFF" />
-        </Pressable>
-      </ThemedView>
-    );
-  }
-
-  if (permissionStatus === Contacts.PermissionStatus.DENIED) {
-    return (
-      <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
-        <PermissionDenied />
-        <FABMenu
-          visible={showMenu}
-          onClose={() => setShowMenu(false)}
-          onNewContact={handleNewContact}
-          onNewGroup={handleNewGroup}
-          onPayAnyone={handlePayAnyone}
-          onSyncContacts={handleSyncContacts}
-        />
-        <NewContactModal
-          visible={showNewContact}
-          onClose={() => setShowNewContact(false)}
-          onStartChat={handleStartChatWithUser}
-        />
-        <NewGroupModal
-          visible={showNewGroup}
-          onClose={() => setShowNewGroup(false)}
-          contacts={contacts}
-          onCreateGroup={handleCreateGroup}
-        />
-        <Pressable
-          onPress={() => setShowMenu(true)}
-          style={[styles.fab, { bottom: tabBarHeight + Spacing.lg }]}
-        >
-          <Feather name="plus" size={28} color="#FFFFFF" />
-        </Pressable>
-      </ThemedView>
-    );
-  }
 
   return (
     <ThemedView style={styles.container}>
-      <FlatList
-        data={filteredContacts}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ContactItem contact={item} onPress={() => handleContactPress(item)} />
-        )}
+      <ScrollView
         contentContainerStyle={[
-          styles.listContent,
+          styles.scrollContent,
           {
             paddingTop: headerHeight + Spacing.md,
             paddingBottom: tabBarHeight + Spacing.xl + 70,
           },
-          filteredContacts.length === 0 && styles.emptyListContent,
         ]}
-        ListHeaderComponent={
-          <View>
-            <MiniAppsSection onAppPress={handleMiniAppPress} />
-            
-            <ThemedText style={[styles.contactsSectionTitle, { color: theme.textSecondary }]}>
-              Contacts on SwipeMe
-            </ThemedText>
-            
-            <View style={styles.searchContainer}>
-              <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
-                <Feather name="search" size={18} color={theme.textSecondary} />
-                <TextInput
-                  style={[styles.searchInput, { color: theme.text }]}
-                  placeholder="Search contacts..."
-                  placeholderTextColor={theme.textSecondary}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery ? (
-                  <Pressable onPress={() => setSearchQuery("")}>
-                    <Feather name="x-circle" size={18} color={theme.textSecondary} />
-                  </Pressable>
-                ) : null}
-              </View>
-              
-              <Pressable 
-                style={[styles.qrButton, { backgroundColor: theme.primary }]}
-              >
-                <Feather name="maximize" size={20} color="#FFFFFF" />
-              </Pressable>
-            </View>
-          </View>
-        }
-        ListEmptyComponent={loading ? <LoadingState /> : <EmptyState searchQuery={searchQuery} isWeb={Platform.OS === "web"} />}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.primary}
-          />
-        }
-        ItemSeparatorComponent={() => (
-          <View style={[styles.separator, { backgroundColor: theme.border }]} />
-        )}
-      />
-      
+        showsVerticalScrollIndicator={false}
+      >
+        <MiniAppsSection onAppPress={handleMiniAppPress} />
+      </ScrollView>
+
       <FABMenu
         visible={showMenu}
         onClose={() => setShowMenu(false)}
         onNewContact={handleNewContact}
         onNewGroup={handleNewGroup}
         onPayAnyone={handlePayAnyone}
-        onSyncContacts={handleSyncContacts}
       />
 
       <NewContactModal
@@ -1116,7 +1289,6 @@ export default function DiscoverScreen() {
       <NewGroupModal
         visible={showNewGroup}
         onClose={() => setShowNewGroup(false)}
-        contacts={contacts}
         onCreateGroup={handleCreateGroup}
       />
 
@@ -1124,7 +1296,32 @@ export default function DiscoverScreen() {
         visible={showCalculator}
         onClose={() => setShowCalculator(false)}
       />
-      
+
+      <QRScannerMiniApp
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+      />
+
+      <PolymarketMiniApp
+        visible={showPredictions}
+        onClose={() => setShowPredictions(false)}
+      />
+
+      <BrowserMiniApp
+        visible={showBrowser}
+        onClose={() => setShowBrowser(false)}
+      />
+
+      <ConverterMiniApp
+        visible={showConverter}
+        onClose={() => setShowConverter(false)}
+      />
+
+      <DiaryMiniApp
+        visible={showDiary}
+        onClose={() => setShowDiary(false)}
+      />
+
       <Pressable
         onPress={() => setShowMenu(true)}
         style={[styles.fab, { bottom: tabBarHeight + Spacing.lg }]}
@@ -1139,121 +1336,43 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  listContent: {
+  scrollContent: {
     paddingHorizontal: Spacing.md,
   },
-  emptyListContent: {
-    flexGrow: 1,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    gap: Spacing.sm,
+  miniAppsSection: {
     marginBottom: Spacing.lg,
   },
-  searchBar: {
-    flex: 1,
+  miniAppsSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    height: 44,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.md,
-    gap: Spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
-  qrButton: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.sm,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  contactItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-  },
-  contactContent: {
-    flex: 1,
-    marginLeft: Spacing.md,
-  },
-  contactName: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-  contactPhone: {
-    fontSize: 14,
-  },
-  separator: {
-    height: 1,
-    marginLeft: 68,
-  },
-  permissionContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: Spacing.xl,
-  },
-  permissionIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: Spacing.lg,
-  },
-  permissionTitle: {
-    marginBottom: Spacing.sm,
-    textAlign: "center",
-  },
-  permissionSubtitle: {
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: Spacing.xl,
-  },
-  permissionButton: {
-    width: "100%",
-    marginBottom: Spacing.lg,
-  },
-  permissionNote: {
-    fontSize: 12,
-    textAlign: "center",
-    lineHeight: 18,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: Spacing["2xl"],
-  },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
     marginBottom: Spacing.md,
   },
-  emptyTitle: {
-    marginBottom: Spacing.xs,
+  miniAppsSectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
   },
-  emptySubtitle: {
-    textAlign: "center",
+  miniAppsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.md,
   },
-  loadingContainer: {
-    flex: 1,
+  miniAppItem: {
+    width: "22%",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  miniAppIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: Spacing["2xl"],
+    marginBottom: Spacing.xs,
   },
-  loadingText: {
-    marginTop: Spacing.md,
-    fontSize: 14,
+  miniAppName: {
+    fontSize: 12,
+    textAlign: "center",
   },
   fab: {
     position: "absolute",
@@ -1398,91 +1517,10 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    fontWeight: "400",
     paddingHorizontal: Spacing.lg,
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
-  },
-  emptyGroupContacts: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: Spacing.xl,
-  },
-  groupContactItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-  },
-  groupContactContent: {
-    flex: 1,
-    marginLeft: Spacing.md,
-  },
-  groupContactName: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  miniAppsSection: {
-    marginBottom: Spacing.lg,
-  },
-  miniAppsSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.md,
-  },
-  miniAppsSectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  seeAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  miniAppsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.md,
-  },
-  miniAppItem: {
-    width: "22%",
-    alignItems: "center",
-    marginBottom: Spacing.sm,
-  },
-  miniAppIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: BorderRadius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: Spacing.xs,
-  },
-  miniAppName: {
-    fontSize: 12,
-    textAlign: "center",
-  },
-  contactsSectionTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: Spacing.md,
   },
   calculatorContainer: {
     flex: 1,
@@ -1531,5 +1569,290 @@ const styles = StyleSheet.create({
   calcButtonText: {
     fontSize: 28,
     fontWeight: "500",
+  },
+  miniAppContainer: {
+    flex: 1,
+  },
+  miniAppHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Spacing.lg,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  permissionContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  permissionIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  permissionTitle: {
+    marginBottom: Spacing.sm,
+    textAlign: "center",
+  },
+  permissionSubtitle: {
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: Spacing.xl,
+  },
+  permissionButton: {
+    width: "100%",
+    marginBottom: Spacing.lg,
+  },
+  webFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.xl,
+  },
+  webFallbackText: {
+    marginTop: Spacing.md,
+    textAlign: "center",
+    fontSize: 16,
+  },
+  cameraContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  camera: {
+    flex: 1,
+  },
+  scanOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    borderRadius: BorderRadius.md,
+  },
+  scanHint: {
+    position: "absolute",
+    bottom: Spacing.xl,
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    color: "#FFFFFF",
+    fontSize: 16,
+  },
+  webViewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Spacing.md,
+    paddingTop: Spacing.lg,
+  },
+  webViewNavButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  webViewTitle: {
+    flex: 1,
+    textAlign: "center",
+  },
+  navButton: {
+    padding: Spacing.xs,
+  },
+  navButtonDisabled: {
+    opacity: 0.5,
+  },
+  webView: {
+    flex: 1,
+  },
+  browserHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Spacing.md,
+    paddingTop: Spacing.lg,
+  },
+  urlBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    paddingLeft: Spacing.md,
+    height: 44,
+  },
+  urlInput: {
+    flex: 1,
+    fontSize: 14,
+    height: "100%",
+  },
+  goButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.xs,
+  },
+  converterContent: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  converterCard: {
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  converterLabel: {
+    fontSize: 14,
+    marginBottom: Spacing.sm,
+  },
+  converterInput: {
+    fontSize: 32,
+    fontWeight: "600",
+    marginBottom: Spacing.md,
+  },
+  converterResult: {
+    fontSize: 32,
+    fontWeight: "600",
+    marginBottom: Spacing.md,
+  },
+  currencyPicker: {
+    flexDirection: "row",
+  },
+  currencyChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    marginRight: Spacing.sm,
+  },
+  currencyChipText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  swapButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginVertical: Spacing.sm,
+  },
+  rateInfo: {
+    textAlign: "center",
+    marginTop: Spacing.md,
+    fontSize: 14,
+  },
+  authContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.xl,
+  },
+  authIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  authTitle: {
+    marginBottom: Spacing.sm,
+    textAlign: "center",
+  },
+  authSubtitle: {
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: Spacing.xl,
+  },
+  authText: {
+    marginTop: Spacing.md,
+  },
+  authButton: {
+    width: "100%",
+  },
+  diaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Spacing.lg,
+  },
+  diaryHeaderButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  newEntryContainer: {
+    padding: Spacing.lg,
+    paddingTop: 0,
+  },
+  newEntryInput: {
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    minHeight: 120,
+    fontSize: 16,
+    textAlignVertical: "top",
+  },
+  newEntryButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  newEntryBtn: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  entriesList: {
+    padding: Spacing.lg,
+    paddingTop: 0,
+  },
+  emptyDiary: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing["2xl"],
+  },
+  emptyDiaryText: {
+    marginTop: Spacing.md,
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  diaryEntry: {
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  entryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.sm,
+  },
+  entryDate: {
+    fontSize: 12,
+  },
+  entryContent: {
+    fontSize: 16,
+    lineHeight: 24,
   },
 });

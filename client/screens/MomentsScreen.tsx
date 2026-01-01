@@ -79,6 +79,8 @@ export default function MomentsScreen() {
     enabled: !!selectedPostId,
   });
 
+  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+
   const createPostMutation = useMutation({
     mutationFn: async (data: { content: string }) => {
       return apiRequest("POST", "/api/moments", data);
@@ -88,6 +90,9 @@ export default function MomentsScreen() {
       setIsComposeOpen(false);
       setComposeText("");
     },
+    onError: (error: Error) => {
+      Alert.alert("Post Failed", error.message || "Could not create post. Please try again.");
+    },
   });
 
   const likeMutation = useMutation({
@@ -96,6 +101,9 @@ export default function MomentsScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/moments"] });
+    },
+    onError: (error: Error) => {
+      Alert.alert("Error", error.message || "Could not like post.");
     },
   });
 
@@ -107,6 +115,9 @@ export default function MomentsScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/moments", selectedPostId, "comments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/moments"] });
       setCommentText("");
+    },
+    onError: (error: Error) => {
+      Alert.alert("Error", error.message || "Could not add comment.");
     },
   });
 
@@ -274,9 +285,7 @@ export default function MomentsScreen() {
         </View>
       </Card>
     );
-  }, [theme, formatTime, handleLike]);
-
-  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  }, [theme, formatTime, handleLike, styles]);
 
   if (isLoading) {
     return (
