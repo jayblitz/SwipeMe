@@ -15,6 +15,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
@@ -61,7 +62,8 @@ export default function GroupInfoScreen({ navigation, route }: GroupInfoScreenPr
 
   const removeMemberMutation = useMutation({
     mutationFn: async (memberId: string) => {
-      return fetch(`/api/groups/${groupId}/members/${memberId}`, {
+      const url = new URL(`/api/groups/${groupId}/members/${memberId}`, getApiUrl());
+      return fetch(url.toString(), {
         method: "DELETE",
         credentials: "include",
       });
@@ -76,7 +78,8 @@ export default function GroupInfoScreen({ navigation, route }: GroupInfoScreenPr
 
   const leaveGroupMutation = useMutation({
     mutationFn: async () => {
-      return fetch(`/api/groups/${groupId}/leave`, {
+      const url = new URL(`/api/groups/${groupId}/leave`, getApiUrl());
+      return fetch(url.toString(), {
         method: "POST",
         credentials: "include",
       });
@@ -93,7 +96,8 @@ export default function GroupInfoScreen({ navigation, route }: GroupInfoScreenPr
 
   const deleteGroupMutation = useMutation({
     mutationFn: async () => {
-      return fetch(`/api/groups/${groupId}`, {
+      const url = new URL(`/api/groups/${groupId}`, getApiUrl());
+      return fetch(url.toString(), {
         method: "DELETE",
         credentials: "include",
       });
@@ -178,7 +182,8 @@ export default function GroupInfoScreen({ navigation, route }: GroupInfoScreenPr
           text: "Transfer",
           onPress: async () => {
             try {
-              await fetch(`/api/groups/${groupId}/transfer-admin`, {
+              const url = new URL(`/api/groups/${groupId}/transfer-admin`, getApiUrl());
+              await fetch(url.toString(), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",

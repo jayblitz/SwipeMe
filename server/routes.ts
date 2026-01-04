@@ -1367,6 +1367,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/notify/group-message", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { groupId, message } = req.body;
+      const senderId = req.session.userId;
+      
+      if (!groupId || !message) {
+        return res.status(400).json({ error: "Group ID and message are required" });
+      }
+      
+      const group = await storage.getGroupById(groupId);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      
+      const members = await storage.getGroupMembers(groupId);
+      const isMember = members.some(m => m.userId === senderId);
+      if (!isMember) {
+        return res.status(403).json({ error: "You are not a member of this group" });
+      }
+      
+      const sender = await storage.getUserById(senderId!);
+      const senderUsername = sender?.username || sender?.displayName || sender?.email?.split("@")[0] || "Someone";
+      
+      const truncatedMessage = message.length > 100 ? message.slice(0, 97) + "..." : message;
+      
+      const recipientIds = members
+        .filter(m => m.userId !== senderId)
+        .map(m => m.userId);
+      
+      realtimeService.broadcastGroupMessage({
+        groupId,
+        messageId: `msg-${Date.now()}`,
+        senderId: senderId!,
+        senderName: senderUsername,
+        memberIds: recipientIds,
+        content: truncatedMessage,
+        timestamp: new Date().toISOString(),
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Group notification error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/contacts/invite", requireAuth, async (req: Request, res: Response) => {
     try {
       const { email } = req.body;

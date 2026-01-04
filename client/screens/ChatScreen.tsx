@@ -1121,10 +1121,11 @@ export default function ChatScreen() {
   const { wallet } = useWallet();
   const route = useRoute<RouteProp<ChatsStackParamList, "Chat">>();
   const navigation = useNavigation<NativeStackNavigationProp<ChatsStackParamList>>();
-  const { chatId, name, peerAddress, avatarId, contactId } = route.params;
+  const { chatId, name, peerAddress, avatarId, contactId, isGroup } = route.params;
   const { client, isSupported } = useXMTP();
   const [xmtpDm, setXmtpDm] = useState<XMTPConversation | null>(null);
-  const useXMTPMode = Platform.OS !== "web" && isSupported && client && peerAddress;
+  const useXMTPMode = Platform.OS !== "web" && isSupported && client && peerAddress && !isGroup;
+  const [groupMemberCount, setGroupMemberCount] = useState<number>(0);
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
@@ -1169,9 +1170,13 @@ export default function ChatScreen() {
   }, [contactProfile?.lastSeenAt]);
 
   const handleOpenContactDetails = useCallback(() => {
-    const participantId = contactId || chat?.participants?.[0]?.id;
-    navigation.navigate("ContactDetails", { chatId, name, peerAddress, avatarId, contactId: participantId });
-  }, [navigation, chatId, name, peerAddress, avatarId, contactId, chat?.participants]);
+    if (isGroup) {
+      navigation.navigate("GroupInfo", { groupId: chatId, name });
+    } else {
+      const participantId = contactId || chat?.participants?.[0]?.id;
+      navigation.navigate("ContactDetails", { chatId, name, peerAddress, avatarId, contactId: participantId });
+    }
+  }, [navigation, chatId, name, peerAddress, avatarId, contactId, chat?.participants, isGroup]);
 
   useLayoutEffect(() => {
     const onlineStatus = getOnlineStatus();
@@ -1179,8 +1184,14 @@ export default function ChatScreen() {
       headerTitle: () => (
         <Pressable onPress={handleOpenContactDetails} style={{ flexDirection: "row", alignItems: "center" }}>
           <View style={{ position: "relative", marginRight: 10 }}>
-            <Avatar avatarId={avatarId || "coral"} imageUri={contactProfile?.profileImage} size={36} />
-            {onlineStatus === "Online" ? (
+            {isGroup ? (
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" }}>
+                <Feather name="users" size={18} color="#FFFFFF" />
+              </View>
+            ) : (
+              <Avatar avatarId={avatarId || "coral"} imageUri={contactProfile?.profileImage} size={36} />
+            )}
+            {!isGroup && onlineStatus === "Online" ? (
               <View style={{ 
                 position: "absolute", 
                 bottom: 0, 
@@ -1199,7 +1210,11 @@ export default function ChatScreen() {
               <ThemedText style={{ fontSize: 17, fontWeight: "600" }}>{name}</ThemedText>
               <Feather name="chevron-right" size={18} color={theme.textSecondary} style={{ marginLeft: 2 }} />
             </View>
-            {contactProfile?.username ? (
+            {isGroup ? (
+              <ThemedText style={{ fontSize: 12, color: theme.textSecondary }}>
+                {groupMemberCount > 0 ? `${groupMemberCount} member${groupMemberCount !== 1 ? "s" : ""}` : "Tap for info"}
+              </ThemedText>
+            ) : contactProfile?.username ? (
               <ThemedText style={{ fontSize: 12, color: onlineStatus === "Online" ? "#22C55E" : theme.textSecondary }}>
                 {onlineStatus === "Online" ? "Online" : (onlineStatus ? `Active ${onlineStatus}` : `@${contactProfile.username}`)}
               </ThemedText>
@@ -1222,7 +1237,7 @@ export default function ChatScreen() {
         </View>
       ),
     });
-  }, [navigation, theme, name, chatId, avatarId, handleOpenContactDetails, contactProfile, getOnlineStatus]);
+  }, [navigation, theme, name, chatId, avatarId, handleOpenContactDetails, contactProfile, getOnlineStatus, isGroup, groupMemberCount]);
 
   const loadData = useCallback(async () => {
     // Load chat background (reset to null if none set)
@@ -1285,6 +1300,29 @@ export default function ChatScreen() {
   );
 
   useEffect(() => {
+    if (isGroup) {
+      const fetchGroupInfo = async () => {
+        try {
+          const baseUrl = getApiUrl();
+          const response = await fetch(new URL(`/api/groups/${chatId}`, baseUrl), {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setGroupMemberCount(data.members?.length || 0);
+          }
+        } catch (error) {
+          console.error("Failed to fetch group info:", error);
+        }
+      };
+      
+      fetchGroupInfo();
+      return;
+    }
+
     const fetchContactProfile = async () => {
       const participantId = contactId || chat?.participants?.[0]?.id;
       if (!participantId) return;
@@ -1314,7 +1352,7 @@ export default function ChatScreen() {
     
     const interval = setInterval(fetchContactProfile, 60000);
     return () => clearInterval(interval);
-  }, [contactId, chat?.participants]);
+  }, [contactId, chat?.participants, isGroup, chatId]);
 
   useEffect(() => {
     if (!useXMTPMode || !xmtpDm) return;
@@ -1455,7 +1493,14 @@ export default function ChatScreen() {
       const newMessage = await sendMessage(chatId, messageText);
       setMessages(prev => [newMessage, ...prev]);
       
-      if (chat?.participants?.[0]?.id) {
+      if (isGroup) {
+        fetch(new URL("/api/notify/group-message", getApiUrl()), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ groupId: chatId, message: messageText }),
+        }).catch(err => console.error("Group notification send failed:", err));
+      } else if (chat?.participants?.[0]?.id) {
         const recipientId = chat.participants[0].id;
         fetch(new URL("/api/notify/message", getApiUrl()), {
           method: "POST",
