@@ -359,7 +359,15 @@ export const storage = {
   },
 
   // Moments (Social Feed) methods
-  async createPost(authorId: string, content?: string, mediaUrls?: string[], mediaType?: string, visibility?: string): Promise<Post> {
+  async createPost(
+    authorId: string, 
+    content?: string, 
+    mediaUrls?: string[], 
+    mediaType?: string, 
+    visibility?: string,
+    thumbnailUrl?: string,
+    durationSeconds?: number
+  ): Promise<Post> {
     const [post] = await db.insert(posts)
       .values({
         authorId,
@@ -367,6 +375,8 @@ export const storage = {
         mediaUrls: mediaUrls || null,
         mediaType: mediaType || "text",
         visibility: visibility || "public",
+        thumbnailUrl: thumbnailUrl || null,
+        durationSeconds: durationSeconds || null,
       })
       .returning();
     return post;

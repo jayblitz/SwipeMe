@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, jsonb, index, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -311,15 +311,35 @@ export const posts = pgTable("posts", {
   content: text("content"),
   mediaUrls: jsonb("media_urls").$type<string[]>(),
   mediaType: text("media_type").default("text"), // text, photo, video
+  thumbnailUrl: text("thumbnail_url"), // Video thumbnail for preview
+  durationSeconds: integer("duration_seconds"), // Video duration in seconds
   visibility: text("visibility").notNull().default("public"), // public, friends, private
   likesCount: text("likes_count").default("0"),
   commentsCount: text("comments_count").default("0"),
   tipsTotal: text("tips_total").default("0"),
+  viewsCount: text("views_count").default("0"), // Total views for engagement
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("posts_author_idx").on(table.authorId),
   index("posts_created_idx").on(table.createdAt),
+]);
+
+// Post engagement tracking for feed algorithm
+export const postEngagements = pgTable("post_engagements", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  eventType: text("event_type").notNull(), // view_started, view_completed, like, share, tip, comment
+  watchTimeSeconds: integer("watch_time_seconds"), // For video watch time
+  completionPercentage: integer("completion_percentage"), // 0-100 for video completion
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("post_engagements_post_idx").on(table.postId),
+  index("post_engagements_user_idx").on(table.userId),
+  index("post_engagements_event_idx").on(table.eventType),
 ]);
 
 export const postLikes = pgTable("post_likes", {
@@ -426,6 +446,7 @@ export type Post = typeof posts.$inferSelect;
 export type PostLike = typeof postLikes.$inferSelect;
 export type PostComment = typeof postComments.$inferSelect;
 export type PostTip = typeof postTips.$inferSelect;
+export type PostEngagement = typeof postEngagements.$inferSelect;
 export type RevenueLedger = typeof revenueLedger.$inferSelect;
 export type CreatorBalance = typeof creatorBalances.$inferSelect;
 export type CreatorWithdrawal = typeof creatorWithdrawals.$inferSelect;

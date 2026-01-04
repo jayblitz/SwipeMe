@@ -691,13 +691,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/moments", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
-      const { content, mediaUrls, mediaType, visibility } = req.body;
+      const { content, mediaUrls, mediaType, visibility, thumbnailUrl, durationSeconds } = req.body;
       
       if (!content && (!mediaUrls || mediaUrls.length === 0)) {
         return res.status(400).json({ error: "Content or media is required" });
       }
       
-      const post = await storage.createPost(userId, content, mediaUrls, mediaType, visibility);
+      const post = await storage.createPost(
+        userId, 
+        content, 
+        mediaUrls, 
+        mediaType, 
+        visibility,
+        thumbnailUrl,
+        durationSeconds ? parseInt(durationSeconds) : undefined
+      );
       res.json(post);
     } catch (error) {
       console.error("Create moment error:", error);

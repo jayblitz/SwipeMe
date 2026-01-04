@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { Video, ResizeMode } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
 import * as Haptics from "expo-haptics";
@@ -41,6 +42,7 @@ interface Post {
   authorId: string;
   content: string | null;
   mediaUrls: string[] | null;
+  mediaType: "text" | "photo" | "video";
   visibility: string;
   likesCount: string;
   commentsCount: string;
@@ -80,6 +82,9 @@ export default function MomentsScreen() {
   
   const viewStartTimeRef = useRef<number>(0);
   const likeAnimations = useRef<Map<string, Animated.Value>>(new Map());
+  const lastTapRef = useRef<Map<string, number>>(new Map());
+  const heartAnimationRef = useRef<Map<string, Animated.Value>>(new Map());
+  const videoRefs = useRef<Map<string, Video>>(new Map());
 
   const [feedMode, _setFeedMode] = useState<"recommended" | "chronological">("recommended");
   
@@ -116,6 +121,12 @@ export default function MomentsScreen() {
           durationMs: viewDuration,
           wasSkipped: viewDuration < 2000
         });
+        
+        const previousPost = posts[currentIndex];
+        if (previousPost.mediaType === "video") {
+          const previousVideo = videoRefs.current.get(previousPost.id);
+          previousVideo?.pauseAsync();
+        }
       }
       
       setCurrentIndex(newIndex);
@@ -123,6 +134,12 @@ export default function MomentsScreen() {
       
       if (posts[newIndex]) {
         trackEngagement(posts[newIndex].id, "view_started");
+        
+        const newPost = posts[newIndex];
+        if (newPost.mediaType === "video") {
+          const newVideo = videoRefs.current.get(newPost.id);
+          newVideo?.playAsync();
+        }
       }
     }
   }, [currentIndex, posts, trackEngagement]);
@@ -235,9 +252,33 @@ export default function MomentsScreen() {
     trackEngagement(postId, isLiked ? "unlike" : "like");
   }, [likeMutation, trackEngagement]);
 
-  const handleDoubleTap = useCallback((postId: string, isLiked: boolean) => {
-    if (!isLiked) {
-      handleLike(postId, false);
+  const handleTap = useCallback((postId: string, isLiked: boolean) => {
+    const now = Date.now();
+    const lastTap = lastTapRef.current.get(postId) || 0;
+    const DOUBLE_TAP_DELAY = 300;
+
+    if (now - lastTap < DOUBLE_TAP_DELAY) {
+      lastTapRef.current.delete(postId);
+      
+      let heartAnim = heartAnimationRef.current.get(postId);
+      if (!heartAnim) {
+        heartAnim = new Animated.Value(0);
+        heartAnimationRef.current.set(postId, heartAnim);
+      }
+      
+      Animated.sequence([
+        Animated.timing(heartAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.delay(500),
+        Animated.timing(heartAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start();
+      
+      if (!isLiked) {
+        handleLike(postId, false);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } else {
+      lastTapRef.current.set(postId, now);
     }
   }, [handleLike]);
 
@@ -267,29 +308,74 @@ export default function MomentsScreen() {
     const authorName = item.author.displayName || item.author.username || "Anonymous";
     const authorUsername = item.author.username ? `@${item.author.username}` : "";
     const hasMedia = item.mediaUrls && item.mediaUrls.length > 0;
+    const isVideo = item.mediaType === "video";
     const likeAnimation = likeAnimations.current.get(item.id) || new Animated.Value(1);
 
-    return (
-      <Pressable 
-        style={styles.postContainer}
-        onPress={() => {
-          handleDoubleTap(item.id, item.isLiked);
-        }}
-      >
-        {hasMedia ? (
+    const renderMediaContent = () => {
+      if (hasMedia && isVideo) {
+        return (
+          <Video
+            ref={(ref) => {
+              if (ref) {
+                videoRefs.current.set(item.id, ref);
+              } else {
+                videoRefs.current.delete(item.id);
+              }
+            }}
+            source={{ uri: item.mediaUrls![0] }}
+            style={styles.fullScreenMedia}
+            resizeMode={ResizeMode.COVER}
+            isLooping={true}
+            shouldPlay={currentIndex === index}
+            isMuted={false}
+          />
+        );
+      } else if (hasMedia) {
+        return (
           <Image
             source={{ uri: item.mediaUrls![0] }}
             style={styles.fullScreenMedia}
             contentFit="cover"
           />
-        ) : (
+        );
+      } else {
+        return (
           <LinearGradient
             colors={isDark ? ["#1a1a2e", "#16213e", "#0f3460"] : ["#667eea", "#764ba2", "#f64f59"]}
             style={styles.gradientBackground}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           />
-        )}
+        );
+      }
+    };
+
+    return (
+      <Pressable 
+        style={styles.postContainer}
+        onPress={() => {
+          handleTap(item.id, item.isLiked);
+        }}
+      >
+        {renderMediaContent()}
+        
+        <Animated.View 
+          style={[
+            styles.doubleTapHeart,
+            {
+              opacity: heartAnimationRef.current.get(item.id) || 0,
+              transform: [{ 
+                scale: (heartAnimationRef.current.get(item.id) || new Animated.Value(0)).interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.5, 1.2],
+                })
+              }],
+            }
+          ]}
+          pointerEvents="none"
+        >
+          <Feather name="heart" size={100} color="#FF2D55" />
+        </Animated.View>
         
         <LinearGradient
           colors={["transparent", "rgba(0,0,0,0.8)"]}
@@ -398,7 +484,7 @@ export default function MomentsScreen() {
         </View>
       </Pressable>
     );
-  }, [theme, formatTime, formatNumber, handleLike, handleDoubleTap, posts.length, styles, isDark, trackEngagement]);
+  }, [theme, formatTime, formatNumber, handleLike, handleTap, posts.length, styles, isDark, trackEngagement, currentIndex]);
 
   if (isLoading) {
     return (
@@ -680,6 +766,14 @@ function createStyles(theme: ReturnType<typeof useTheme>["theme"], _isDark: bool
     },
     fullScreenMedia: {
       ...StyleSheet.absoluteFillObject,
+    },
+    doubleTapHeart: {
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      marginTop: -50,
+      marginLeft: -50,
+      zIndex: 100,
     },
     gradientBackground: {
       ...StyleSheet.absoluteFillObject,

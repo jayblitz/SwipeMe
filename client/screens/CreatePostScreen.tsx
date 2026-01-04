@@ -21,7 +21,13 @@ import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "@/hooks/useTheme";
 import { apiRequest } from "@/lib/query-client";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import KeyboardAwareScrollViewCompat from "@/components/KeyboardAwareScrollViewCompat";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+
+interface MediaAsset {
+  uri: string;
+  type: "image" | "video";
+  duration?: number;
+}
 
 export default function CreatePostScreen() {
   const { theme } = useTheme();
@@ -30,14 +36,14 @@ export default function CreatePostScreen() {
   const queryClient = useQueryClient();
 
   const [content, setContent] = useState("");
-  const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<MediaAsset[]>([]);
   const [mediaType, setMediaType] = useState<"text" | "photo" | "video">("text");
 
   const [mediaLibraryPermission, requestMediaLibraryPermission] = MediaLibrary.usePermissions();
   const [cameraPermission, requestCameraPermission] = ImagePicker.useCameraPermissions();
 
   const createPostMutation = useMutation({
-    mutationFn: async (data: { content?: string; mediaUrls?: string[]; mediaType?: string }) => {
+    mutationFn: async (data: { content?: string; mediaUrls?: string[]; mediaType?: string; durationSeconds?: number }) => {
       return apiRequest("POST", "/api/moments", data);
     },
     onSuccess: () => {
@@ -83,7 +89,11 @@ export default function CreatePostScreen() {
     });
 
     if (!result.canceled && result.assets.length > 0) {
-      const newMedia = result.assets.map(a => a.uri);
+      const newMedia: MediaAsset[] = result.assets.map(a => ({
+        uri: a.uri,
+        type: a.type === "video" ? "video" : "image",
+        duration: a.duration ? Math.round(a.duration) : undefined,
+      }));
       setSelectedMedia(prev => [...prev, ...newMedia].slice(0, 10));
       const firstAsset = result.assets[0];
       if (firstAsset.type === "video") {
@@ -115,7 +125,11 @@ export default function CreatePostScreen() {
     });
 
     if (!result.canceled && result.assets.length > 0) {
-      const newMedia = result.assets.map(a => a.uri);
+      const newMedia: MediaAsset[] = result.assets.map(a => ({
+        uri: a.uri,
+        type: "image",
+        duration: undefined,
+      }));
       setSelectedMedia(prev => [...prev, ...newMedia].slice(0, 10));
       setMediaType("photo");
     }
@@ -134,12 +148,19 @@ export default function CreatePostScreen() {
       return;
     }
 
+    const videoAssets = selectedMedia.filter(m => m.type === "video");
+    const imageAssets = selectedMedia.filter(m => m.type === "image");
+    
+    const actualMediaType = videoAssets.length > 0 ? "video" : (imageAssets.length > 0 ? "photo" : "text");
+    const firstVideo = videoAssets[0];
+    
     createPostMutation.mutate({
       content: content.trim() || undefined,
-      mediaUrls: selectedMedia.length > 0 ? selectedMedia : undefined,
-      mediaType: selectedMedia.length > 0 ? mediaType : "text",
+      mediaUrls: selectedMedia.length > 0 ? selectedMedia.map(m => m.uri) : undefined,
+      mediaType: selectedMedia.length > 0 ? actualMediaType : "text",
+      durationSeconds: actualMediaType === "video" && firstVideo?.duration ? firstVideo.duration : undefined,
     });
-  }, [content, selectedMedia, mediaType, createPostMutation]);
+  }, [content, selectedMedia, createPostMutation]);
 
   const canPost = content.trim().length > 0 || selectedMedia.length > 0;
 
@@ -161,9 +182,19 @@ export default function CreatePostScreen() {
 
       {selectedMedia.length > 0 ? (
         <View style={styles.mediaGrid}>
-          {selectedMedia.map((uri, index) => (
+          {selectedMedia.map((asset, index) => (
             <View key={index} style={styles.mediaPreviewContainer}>
-              <Image source={{ uri }} style={styles.mediaPreview} contentFit="cover" />
+              <Image source={{ uri: asset.uri }} style={styles.mediaPreview} contentFit="cover" />
+              {asset.type === "video" ? (
+                <View style={styles.videoIndicator}>
+                  <Feather name="play-circle" size={28} color="#fff" />
+                  {asset.duration ? (
+                    <Text style={styles.videoDuration}>
+                      {Math.floor(asset.duration / 60)}:{String(Math.floor(asset.duration % 60)).padStart(2, "0")}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
               <Pressable
                 style={[styles.removeMediaButton, { backgroundColor: theme.error }]}
                 onPress={() => handleRemoveMedia(index)}
@@ -248,6 +279,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
+  },
+  videoIndicator: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  videoDuration: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "500",
   },
   mediaActions: {
     flexDirection: "row",

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { posts, postLikes, postTips, follows } from "@shared/schema";
+import { posts, postLikes, postTips, follows, postEngagements } from "@shared/schema";
 import { eq, desc, sql, and, gte, inArray } from "drizzle-orm";
 
 interface ScoredPost {
@@ -10,6 +10,7 @@ interface ScoredPost {
     engagement: number;
     creatorAffinity: number;
     contentMatch: number;
+    watchTimeQuality: number;
   };
 }
 
@@ -21,15 +22,18 @@ interface PostCandidate {
   likesCount: string | null;
   commentsCount: string | null;
   tipsTotal: string | null;
+  viewsCount: string | null;
+  durationSeconds: number | null;
   createdAt: Date | null;
   source: "fresh" | "trending" | "followed" | "similar";
 }
 
 const WEIGHTS = {
-  recency: 0.25,
-  engagement: 0.30,
-  creatorAffinity: 0.25,
-  contentMatch: 0.20,
+  recency: 0.20,
+  engagement: 0.25,
+  creatorAffinity: 0.20,
+  contentMatch: 0.15,
+  watchTimeQuality: 0.20,
 };
 
 const DECAY_HALF_LIFE_HOURS = 24;
@@ -82,6 +86,8 @@ export class RecommenderService {
       likesCount: posts.likesCount,
       commentsCount: posts.commentsCount,
       tipsTotal: posts.tipsTotal,
+      viewsCount: posts.viewsCount,
+      durationSeconds: posts.durationSeconds,
       createdAt: posts.createdAt,
     })
       .from(posts)
@@ -103,6 +109,8 @@ export class RecommenderService {
       likesCount: posts.likesCount,
       commentsCount: posts.commentsCount,
       tipsTotal: posts.tipsTotal,
+      viewsCount: posts.viewsCount,
+      durationSeconds: posts.durationSeconds,
       createdAt: posts.createdAt,
     })
       .from(posts)
@@ -110,7 +118,7 @@ export class RecommenderService {
         eq(posts.visibility, "public"),
         gte(posts.createdAt, oneDayAgo)
       ))
-      .orderBy(desc(sql`CAST(${posts.likesCount} AS INTEGER) + CAST(${posts.commentsCount} AS INTEGER) * 2`))
+      .orderBy(desc(sql`COALESCE(NULLIF(${posts.likesCount}, '')::integer, 0) + COALESCE(NULLIF(${posts.commentsCount}, '')::integer, 0) * 2 + COALESCE(NULLIF(${posts.viewsCount}, '')::integer, 0) * 0.1`))
       .limit(Math.ceil(limit));
 
     return result;
@@ -133,6 +141,8 @@ export class RecommenderService {
       likesCount: posts.likesCount,
       commentsCount: posts.commentsCount,
       tipsTotal: posts.tipsTotal,
+      viewsCount: posts.viewsCount,
+      durationSeconds: posts.durationSeconds,
       createdAt: posts.createdAt,
     })
       .from(posts)
@@ -171,6 +181,8 @@ export class RecommenderService {
       likesCount: posts.likesCount,
       commentsCount: posts.commentsCount,
       tipsTotal: posts.tipsTotal,
+      viewsCount: posts.viewsCount,
+      durationSeconds: posts.durationSeconds,
       createdAt: posts.createdAt,
     })
       .from(posts)
@@ -231,18 +243,23 @@ export class RecommenderService {
   private async scoreAndRank(candidates: PostCandidate[], context: UserContext): Promise<ScoredPost[]> {
     const now = Date.now();
     const scored: ScoredPost[] = [];
+    
+    const postIds = candidates.map(c => c.id);
+    const engagementStats = await this.getEngagementStats(postIds);
 
     for (const candidate of candidates) {
       const recencyScore = this.calculateRecencyScore(candidate.createdAt, now);
       const engagementScore = this.calculateEngagementScore(candidate);
       const creatorAffinityScore = this.calculateCreatorAffinityScore(candidate.authorId, context);
       const contentMatchScore = this.calculateContentMatchScore(candidate, context);
+      const watchTimeQualityScore = this.calculateWatchTimeQualityScore(candidate, engagementStats.get(candidate.id));
 
       const totalScore = 
         recencyScore * WEIGHTS.recency +
         engagementScore * WEIGHTS.engagement +
         creatorAffinityScore * WEIGHTS.creatorAffinity +
-        contentMatchScore * WEIGHTS.contentMatch;
+        contentMatchScore * WEIGHTS.contentMatch +
+        watchTimeQualityScore * WEIGHTS.watchTimeQuality;
 
       scored.push({
         postId: candidate.id,
@@ -252,12 +269,61 @@ export class RecommenderService {
           engagement: engagementScore,
           creatorAffinity: creatorAffinityScore,
           contentMatch: contentMatchScore,
+          watchTimeQuality: watchTimeQualityScore,
         },
       });
     }
 
     scored.sort((a, b) => b.score - a.score);
     return scored;
+  }
+  
+  private async getEngagementStats(postIds: string[]): Promise<Map<string, EngagementStat>> {
+    if (postIds.length === 0) return new Map();
+    
+    const stats = await db.select({
+      postId: postEngagements.postId,
+      avgCompletion: sql<number>`COALESCE(AVG(${postEngagements.completionPercentage}), 0)`,
+      avgWatchTime: sql<number>`COALESCE(AVG(${postEngagements.watchTimeSeconds}), 0)`,
+      viewCount: sql<number>`COUNT(${postEngagements.id})::integer`,
+    })
+      .from(postEngagements)
+      .where(inArray(postEngagements.postId, postIds))
+      .groupBy(postEngagements.postId);
+    
+    const result = new Map<string, EngagementStat>();
+    for (const stat of stats) {
+      result.set(stat.postId, {
+        avgCompletionPercentage: Number(stat.avgCompletion) || 0,
+        avgWatchTimeSeconds: Number(stat.avgWatchTime) || 0,
+        viewCount: Number(stat.viewCount) || 0,
+      });
+    }
+    return result;
+  }
+  
+  private calculateWatchTimeQualityScore(candidate: PostCandidate, stats?: EngagementStat): number {
+    if (!stats) {
+      return 0.5;
+    }
+    
+    let score = 0.5;
+    
+    if (candidate.mediaType === "video" && candidate.durationSeconds) {
+      const completionRate = stats.avgCompletionPercentage / 100;
+      score += completionRate * 0.3;
+      
+      const expectedWatchTime = candidate.durationSeconds * 0.5;
+      const watchTimeRatio = Math.min(1, stats.avgWatchTimeSeconds / expectedWatchTime);
+      score += watchTimeRatio * 0.2;
+    } else {
+      const views = parseInt(candidate.viewsCount || "0");
+      if (views > 0 && stats.viewCount > 0) {
+        score += Math.min(0.3, stats.viewCount / views * 0.3);
+      }
+    }
+    
+    return Math.min(1, score);
   }
 
   private calculateRecencyScore(createdAt: Date | null, now: number): number {
@@ -306,6 +372,12 @@ interface UserContext {
   likedPostIds: Set<string>;
   followedCreatorIds: Set<string>;
   creatorAffinities: Map<string, number>;
+}
+
+interface EngagementStat {
+  avgCompletionPercentage: number;
+  avgWatchTimeSeconds: number;
+  viewCount: number;
 }
 
 export const recommenderService = new RecommenderService();
