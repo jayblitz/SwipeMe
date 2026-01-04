@@ -313,11 +313,13 @@ export const posts = pgTable("posts", {
   mediaType: text("media_type").default("text"), // text, photo, video
   thumbnailUrl: text("thumbnail_url"), // Video thumbnail for preview
   durationSeconds: integer("duration_seconds"), // Video duration in seconds
+  hashtags: jsonb("hashtags").$type<string[]>(), // Extracted hashtags from content
   visibility: text("visibility").notNull().default("public"), // public, friends, private
   likesCount: text("likes_count").default("0"),
   commentsCount: text("comments_count").default("0"),
   tipsTotal: text("tips_total").default("0"),
   viewsCount: text("views_count").default("0"), // Total views for engagement
+  sharesCount: text("shares_count").default("0"), // Track shares for virality
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

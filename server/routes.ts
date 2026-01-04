@@ -926,6 +926,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/moments/:postId/share", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { postId } = req.params;
+      
+      const post = await storage.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      
+      await storage.incrementPostShares(postId);
+      
+      const domain = process.env.EXPO_PUBLIC_DOMAIN || "swipeme.app";
+      const shareUrl = `https://${domain}/moments/${postId}`;
+      
+      res.json({ 
+        success: true,
+        shareUrl,
+        shareMessage: `Check out this moment on SwipeMe: ${shareUrl}`
+      });
+    } catch (error) {
+      console.error("Share moment error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/moments/trending", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const trendingHashtags = await storage.getTrendingHashtags(limit);
+      res.json(trendingHashtags);
+    } catch (error) {
+      console.error("Get trending hashtags error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/moments/hashtag/:hashtag", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { hashtag } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const posts = await storage.getPostsByHashtag(hashtag, userId, limit, offset);
+      res.json(posts);
+    } catch (error) {
+      console.error("Get posts by hashtag error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Follow/Unfollow routes
   app.post("/api/users/:userId/follow", requireAuth, async (req: Request, res: Response) => {
     try {

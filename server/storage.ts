@@ -1,4 +1,4 @@
-import { eq, and, gt, desc, inArray, lt, or, ilike, ne, count } from "drizzle-orm";
+import { eq, and, gt, gte, desc, inArray, lt, or, ilike, ne, count, sql } from "drizzle-orm";
 import { db } from "./db";
 import { 
   users, 
@@ -359,6 +359,14 @@ export const storage = {
   },
 
   // Moments (Social Feed) methods
+  parseHashtags(content: string | null | undefined): string[] {
+    if (!content) return [];
+    const hashtagRegex = /#(\w+)/g;
+    const matches = content.match(hashtagRegex);
+    if (!matches) return [];
+    return [...new Set(matches.map(tag => tag.slice(1).toLowerCase()))];
+  },
+
   async createPost(
     authorId: string, 
     content?: string, 
@@ -368,6 +376,8 @@ export const storage = {
     thumbnailUrl?: string,
     durationSeconds?: number
   ): Promise<Post> {
+    const hashtags = this.parseHashtags(content);
+    
     const [post] = await db.insert(posts)
       .values({
         authorId,
@@ -377,6 +387,7 @@ export const storage = {
         visibility: visibility || "public",
         thumbnailUrl: thumbnailUrl || null,
         durationSeconds: durationSeconds || null,
+        hashtags: hashtags.length > 0 ? hashtags : null,
       })
       .returning();
     return post;
@@ -509,6 +520,81 @@ export const storage = {
       await db.update(posts).set({ tipsTotal: newTotal.toString() }).where(eq(posts.id, postId));
     }
     return tip;
+  },
+
+  async incrementPostShares(postId: string): Promise<void> {
+    const post = await this.getPostById(postId);
+    if (post) {
+      const currentShares = parseInt((post as any).sharesCount || "0");
+      await db.update(posts).set({ 
+        sharesCount: (currentShares + 1).toString() 
+      } as any).where(eq(posts.id, postId));
+    }
+  },
+
+  async getTrendingHashtags(limit: number = 10): Promise<{ hashtag: string; count: number; postCount: number }[]> {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    const result = await db.select({
+      hashtags: posts.hashtags,
+    })
+      .from(posts)
+      .where(and(
+        eq(posts.visibility, "public"),
+        gte(posts.createdAt, oneDayAgo),
+        sql`${posts.hashtags} IS NOT NULL`
+      ));
+    
+    const hashtagCounts = new Map<string, number>();
+    
+    for (const row of result) {
+      const tags = row.hashtags as string[] | null;
+      if (tags) {
+        for (const tag of tags) {
+          hashtagCounts.set(tag, (hashtagCounts.get(tag) || 0) + 1);
+        }
+      }
+    }
+    
+    const sorted = [...hashtagCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([hashtag, count]) => ({
+        hashtag,
+        count,
+        postCount: count,
+      }));
+    
+    return sorted;
+  },
+
+  async getPostsByHashtag(hashtag: string, userId: string, limit: number = 50, offset: number = 0): Promise<(Post & { author: User; isLiked: boolean })[]> {
+    const normalizedTag = hashtag.toLowerCase().replace(/^#/, "");
+    
+    const allPosts = await db.select()
+      .from(posts)
+      .where(and(
+        eq(posts.visibility, "public"),
+        sql`${posts.hashtags} @> ${JSON.stringify([normalizedTag])}`
+      ))
+      .orderBy(desc(posts.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const postsWithAuthors = await Promise.all(
+      allPosts.map(async (post) => {
+        const author = await this.getUserById(post.authorId);
+        const [like] = await db.select()
+          .from(postLikes)
+          .where(and(eq(postLikes.postId, post.id), eq(postLikes.userId, userId)));
+        return {
+          ...post,
+          author: author!,
+          isLiked: !!like,
+        };
+      })
+    );
+    return postsWithAuthors;
   },
 
   async followUser(followerId: string, followingId: string): Promise<Follow | null> {
