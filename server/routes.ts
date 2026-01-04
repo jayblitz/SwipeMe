@@ -928,7 +928,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/moments/:postId/share", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = req.session.userId!;
       const { postId } = req.params;
       
       const post = await storage.getPostById(postId);

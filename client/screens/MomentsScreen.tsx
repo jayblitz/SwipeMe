@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Alert,
   Animated,
+  ScrollView,
   type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,6 +23,7 @@ import { Video, ResizeMode } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
 import * as Haptics from "expo-haptics";
+import { Share } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,6 +45,7 @@ interface Post {
   content: string | null;
   mediaUrls: string[] | null;
   mediaType: "text" | "photo" | "video";
+  hashtags: string[] | null;
   visibility: string;
   likesCount: string;
   commentsCount: string;
@@ -50,6 +53,12 @@ interface Post {
   createdAt: string;
   author: PostAuthor;
   isLiked: boolean;
+}
+
+interface TrendingHashtag {
+  hashtag: string;
+  count: number;
+  postCount: number;
 }
 
 interface Comment {
@@ -88,8 +97,18 @@ export default function MomentsScreen() {
 
   const [feedMode, _setFeedMode] = useState<"recommended" | "chronological">("recommended");
   
+  const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null);
+  const [showTrending, setShowTrending] = useState(true);
+
   const { data: posts = [], isLoading } = useQuery<Post[]>({
-    queryKey: ["/api/moments", { mode: feedMode }],
+    queryKey: selectedHashtag 
+      ? ["/api/moments/hashtag", selectedHashtag] 
+      : ["/api/moments", { mode: feedMode }],
+    enabled: !!user,
+  });
+
+  const { data: trendingHashtags = [] } = useQuery<TrendingHashtag[]>({
+    queryKey: ["/api/moments/trending"],
     enabled: !!user,
   });
 
@@ -251,6 +270,38 @@ export default function MomentsScreen() {
     likeMutation.mutate(postId);
     trackEngagement(postId, isLiked ? "unlike" : "like");
   }, [likeMutation, trackEngagement]);
+
+  const handleShare = useCallback(async (postId: string) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      trackEngagement(postId, "share");
+      
+      const response = await apiRequest("POST", `/api/moments/${postId}/share`);
+      const result = await response.json();
+      
+      if (result.success) {
+        await Share.share({
+          message: result.shareMessage,
+          url: result.shareUrl,
+        });
+      }
+    } catch (error) {
+      if ((error as any)?.message !== "User dismissed the Share screen") {
+        console.error("Share error:", error);
+      }
+    }
+  }, [trackEngagement]);
+
+  const handleHashtagPress = useCallback((hashtag: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedHashtag(hashtag);
+    setShowTrending(false);
+  }, []);
+
+  const clearHashtagFilter = useCallback(() => {
+    setSelectedHashtag(null);
+    setShowTrending(true);
+  }, []);
 
   const handleTap = useCallback((postId: string, isLiked: boolean) => {
     const now = Date.now();
@@ -463,10 +514,7 @@ export default function MomentsScreen() {
 
           <Pressable
             style={styles.sideActionButton}
-            onPress={() => {
-              trackEngagement(item.id, "share");
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
+            onPress={() => handleShare(item.id)}
           >
             <Feather name="share" size={28} color="#FFF" />
             <Text style={styles.sideActionCount}>Share</Text>
@@ -484,7 +532,7 @@ export default function MomentsScreen() {
         </View>
       </Pressable>
     );
-  }, [theme, formatTime, formatNumber, handleLike, handleTap, posts.length, styles, isDark, trackEngagement, currentIndex]);
+  }, [theme, formatTime, formatNumber, handleLike, handleTap, handleShare, posts.length, styles, isDark, trackEngagement, currentIndex]);
 
   if (isLoading) {
     return (
@@ -540,7 +588,16 @@ export default function MomentsScreen() {
       />
 
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
-        <Text style={styles.topBarTitle}>Moments</Text>
+        <View style={styles.topBarRow}>
+          {selectedHashtag ? (
+            <Pressable style={styles.hashtagBackButton} onPress={clearHashtagFilter}>
+              <Feather name="arrow-left" size={20} color="#FFF" />
+            </Pressable>
+          ) : null}
+          <Text style={styles.topBarTitle}>
+            {selectedHashtag ? `#${selectedHashtag}` : "Moments"}
+          </Text>
+        </View>
         <Pressable
           style={styles.createButton}
           onPress={() => setIsComposeOpen(true)}
@@ -548,6 +605,28 @@ export default function MomentsScreen() {
           <Feather name="plus" size={24} color="#FFF" />
         </Pressable>
       </View>
+
+      {showTrending && trendingHashtags.length > 0 ? (
+        <View style={[styles.trendingContainer, { top: insets.top + 60 }]}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.trendingScroll}
+          >
+            <Feather name="trending-up" size={16} color="rgba(255,255,255,0.8)" style={{ marginRight: Spacing.sm }} />
+            {trendingHashtags.map((item) => (
+              <Pressable
+                key={item.hashtag}
+                style={styles.trendingTag}
+                onPress={() => handleHashtagPress(item.hashtag)}
+              >
+                <Text style={styles.trendingTagText}>#{item.hashtag}</Text>
+                <Text style={styles.trendingTagCount}>{item.postCount}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <Modal
         visible={isComposeOpen}
@@ -900,10 +979,54 @@ function createStyles(theme: ReturnType<typeof useTheme>["theme"], _isDark: bool
       paddingHorizontal: Spacing.lg,
       paddingBottom: Spacing.sm,
     },
+    topBarRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.sm,
+    },
+    hashtagBackButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: "rgba(255,255,255,0.2)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
     topBarTitle: {
       color: "#FFF",
       fontSize: 20,
       fontWeight: "700",
+    },
+    trendingContainer: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      zIndex: 10,
+    },
+    trendingScroll: {
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.xs,
+      alignItems: "center",
+    },
+    trendingTag: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "rgba(255,255,255,0.15)",
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.xs,
+      borderRadius: BorderRadius.full,
+      marginRight: Spacing.sm,
+      gap: Spacing.xs,
+    },
+    trendingTagText: {
+      color: "#FFF",
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    trendingTagCount: {
+      color: "rgba(255,255,255,0.7)",
+      fontSize: 11,
+      fontWeight: "500",
     },
     createButton: {
       width: 40,
