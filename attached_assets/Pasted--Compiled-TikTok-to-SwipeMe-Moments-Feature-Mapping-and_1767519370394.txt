@@ -1,0 +1,176 @@
+### Compiled TikTok-to-SwipeMe Moments Feature Mapping and Implementation Plan
+
+I've compiled our detailed discussions (TikTok feature expansions, feasibility, code snippets, server optimizations for speed/reliability) with Perplexity's insights (matrix, advantages, positioning, MVP/phases, skips, and code offers). The focus is on high/medium priority features buildable now with minimal/no cost—using your repo's deps (expo-av, FlatList, Socket.io if added) and free tools (no heavy ML/infra). This creates a "creator capitalism" hub: Addictive like TikTok but with instant stablecoin tips, transforming Moments into SwipeMe's growth engine. Excluded Duet (hard/complex sync) and E-commerce/Shop (not necessary per your request; defer for later phases). Positioning from Perplexity integrated: "Own your content. Own your money. Welcome to creator capitalism"—woven into UX/code for inspirational appeal.
+
+The plan is intuitive (start with core feed/engagements), transformative (tips shake creator economies—no delays/cuts), and scalable (server tweaks ensure speed for 10k+ users). Build MVP now (high priorities: ~40-50 hours, 2-4 weeks); medium in Phase 1-2. Replit AI Prompt: "Implement TikTok-like video feed in MomentsScreen.tsx with recording, likes, comments, tipping, and infinite scroll using expo-av, FlatList, and Socket.io."
+
+#### Compiled Feasibility Matrix
+Integrated Perplexity's matrix with our expansions—effort (Easy/Medium), fit (✅ Perfect / ⚠️ Adaptable), priority (🔴 High: Build Now / 🟡 Medium: Phase 1-2), and notes tied to repo (e.g., extend MomentsScreen.tsx, /api/moments).
+
+| TikTok Feature | Effort | SwipeMe Fit | Priority | Implementation Notes |
+|---------------|--------|-------------|----------|----------------------|
+| Vertical Swipe + Autoplay | Easy | ✅ Perfect | 🔴 High | FlatList with snapToInterval=height in MomentsScreen.tsx; expo-av for autoplay/pause on viewableItemsChanged—build now for core scroll feel. |
+| Likes/Hearts with Animation | Easy | ✅ Perfect | 🔴 High | TouchableOpacity overlay; CSS keyframes for pop animation; real-time via Socket.io emit 'likeUpdate'—integrate with existing likes in schema.ts. |
+| Comments | Medium | ✅ Use XMTP (E2E) | 🔴 High | FlatList below video; post to /api/moments/:id/comment (jsonb array); XMTP for encrypted threads—hybrid for privacy, build now. |
+| Tipping/Gifts | Medium | ✅ Core Strength (Stablecoins) | 🔴 High | "Tip" button calls /api/transfer (Viem/Tempo); green (#10B981) animations for incoming—leverage wallet features, instant withdrawals, build now. |
+| Share to WhatsApp/Signal | Easy | ✅ Perfect | 🔴 High | expo-sharing ShareSheet with video link; deep link to SwipeMe chats—build now for virality. |
+| Follow/Notifications | Medium | ✅ Easy | 🟡 Medium | Follow button (API /api/follow); Expo Notifications for new posts/tips (push token in users table)—add after MVP for retention. |
+| Personalized FYP | Medium | ✅ Two-Stage Recommender | 🟡 Medium | Rule-based sorting in /api/moments/feed (likes/views + prefs); future simple ML with free TensorFlow.js—phase 2 for engagement boost. |
+| Creator Analytics | Medium | ✅ Postgres Aggregation | 🟡 Medium | Dashboard in ProfileTab.tsx; query views/likes/tips from DB (add analytics table)—phase 2 for creator insights. |
+| Trending/Hashtags | Medium | ✅ Index + Trending Algo | 🟡 Medium | Hashtags in metadata; trending carousel (FlatList); index column for fast searches—phase 2 for discoverability. |
+| Challenges | Hard | ✅ Gamification + Monetization | 🟢 Later | Hashtag-based with bounties—defer to phase 3. |
+| Duets (Side-by-Side) | Hard | ⚠️ Complex Sync | Skip | Skipped per request—low ROI. |
+| Stitches (Remixes) | Hard | ⚠️ Requires Video Trimming Lib | 🟢 Later | expo-av trim; defer. |
+| Filters/AR Effects | Very Hard | ❌ Skip (ML Kit Cost) | Skip | Complex/expensive—skipped. |
+| Trending Sounds | Hard | ⚠️ Licensing Required | Phase 4 | FreeSound API; defer for legal. |
+| Live Streaming | Very Hard | ⚠️ Requires RTMP Server | Phase 4 | WebRTC; high infra—defer. |
+
+#### Compiled SwipeMe Advantages Over TikTok
+From Perplexity's table, enhanced with our ideas (e.g., on-chain tips, super app integration).
+
+| Dimension | TikTok | SwipeMe |
+|-----------|--------|---------|
+| Creator Payout | 50% cut, 2-week delay | 95% instantly via Tempo stablecoins—no delays, direct wallet. |
+| Tipping Friction | 5+ steps to buy coins | 1 tap with pre-loaded wallet; biometric confirm. |
+| Privacy | Monitored, algorithmic surveillance | XMTP E2E encryption; no tracking—user-owned data. |
+| Global Reach | Blocked in 50+ countries | Decentralized on Tempo—works everywhere, censorship-resistant. |
+| On-Chain Earnings | None (centralized) | 100% verifiable on-chain; tips as NFTs for exclusivity. |
+| Super App Integration | Standalone videos | Tied to chats/payments—tip in group discussions or live reacts. |
+
+Positioning: "Own your content. Own your money. Welcome to creator capitalism."—Add to onboarding UI and site hero.
+
+#### What to Build Now: High/Medium Priority Features (MVP + Phase 1-2)
+Per Perplexity's MVP (vertical swipe, likes, comments, tipping, share) + our medium (follow/notifs, FYP, analytics, trending/hashtags)—all buildable now with ~40-50 hours effort. These capture 80% of TikTok's addictiveness while leveraging your payments edge. Defer low/hard (challenges, stitches, etc.) to phase 3+.
+
+- **MVP (High Priority – Build Now, 2-4 Weeks)**: Core feed + key engagements for launch-ready.
+- **Phase 1-2 (Medium – 4-6 Weeks Post-MVP)**: Personalization + insights for growth.
+
+Key Skips (Aligned with Perplexity/You): No Duet/shop—flashy but not core to tipping; skip filters/AR/live/sounds (complex/costly/legal).
+
+#### Implementation Code for Priorities
+Perplexity's offered code (schema, APIs, RN screen, Socket.io, XMTP) adapted to your repo—extend existing MomentsScreen.tsx, /api/moments.
+
+1. **Database Schema (shared/schema.ts – Update Moments Table)**:
+   ```ts
+   import { pgTable, serial, text, integer, jsonb, timestamp, varchar } from 'drizzle-orm/pg-core';
+
+   export const moments = pgTable('moments', {
+     id: serial('id').primaryKey(),
+     userId: integer('user_id').references(() => users.id),
+     videoUrl: varchar('video_url', { length: 255 }),
+     caption: text('caption'),
+     likes: integer('likes').default(0),
+     comments: jsonb('comments').default([]), // [{userId, text, timestamp}]
+     hashtags: varchar('hashtags', { length: 255 }).array(),
+     views: integer('views').default(0),
+     createdAt: timestamp('created_at').defaultNow(),
+   });
+   ```
+   Run `npm run db:push`.
+
+2. **Backend API Endpoints (server/routes/moments.ts – Extend or Create)**:
+   ```js
+   const express = require('express');
+   const multer = require('multer'); // npm i multer
+   const router = express.Router();
+   const upload = multer({ dest: 'uploads/' }); // S3 for prod
+
+   router.post('/upload', upload.single('video'), async (req, res) => {
+     const videoUrl = req.file.path; // Compress with sharp (npm i sharp)
+     await db.insert(moments).values({ userId: req.user.id, videoUrl, caption: req.body.caption, hashtags: req.body.hashtags.split(',') });
+     res.send('Uploaded');
+   });
+
+   router.get('/feed', async (req, res) => {
+     const { page = 1, limit = 10 } = req.query;
+     // Basic FYP: Sort by engagement
+     const feed = await db.select().from(moments).orderBy(sql`(likes * 0.6 + views * 0.4) DESC`).limit(limit).offset((page-1)*limit);
+     res.json(feed);
+   });
+
+   router.post('/:id/like', async (req, res) => {
+     await db.update(moments).set({ likes: sql`likes + 1` }).where(eq(moments.id, req.params.id));
+     // Socket.io emit: io.emit('likeUpdate', { id: req.params.id, likes: newLikes });
+     res.send('Liked');
+   });
+
+   router.post('/:id/comment', async (req, res) => {
+     await db.update(moments).set({ comments: sql`comments || jsonb_build_array(jsonb_build_object('userId', ${req.user.id}, 'text', ${req.body.text}, 'timestamp', now()))` }).where(eq(moments.id, req.params.id));
+     res.send('Commented');
+   });
+
+   module.exports = router;
+   // In index.ts: app.use('/api/moments', momentsRouter);
+   ```
+
+3. **React Native MomentsScreen.tsx (Full Vertical Swipe UI)**:
+   ```tsx
+   import { FlatList, Dimensions, View, Text, TouchableOpacity } from 'react-native';
+   import { Video } from 'expo-av';
+   import { useState, useEffect, useRef } from 'react';
+
+   const { height } = Dimensions.get('window');
+
+   const MomentsScreen = () => {
+     const [feed, setFeed] = useState([]);
+     const [page, setPage] = useState(1);
+     const videoRefs = useRef({});
+
+     useEffect(() => { fetchFeed(); }, []);
+
+     async function fetchFeed() {
+       const data = await api.get(`/api/moments/feed?page=${page}`);
+       setFeed(prev => [...prev, ...data]);
+       setPage(page + 1);
+     }
+
+     const onViewableItemsChanged = ({ viewableItems }) => {
+       viewableItems.forEach(item => videoRefs.current[item.id]?.playAsync());
+       // Pause non-viewable
+     };
+
+     return (
+       <FlatList
+         data={feed}
+         renderItem={({ item }) => (
+           <View style={{ height, width: '100%' }}>
+             <Video ref={ref => videoRefs.current[item.id] = ref} source={{ uri: item.videoUrl }} style={{ flex: 1 }} resizeMode="cover" isLooping shouldPlay={false} />
+             <View style={{ position: 'absolute', bottom: 50, left: 20, color: '#fff' }}>
+               <Text>{item.caption}</Text>
+               <TouchableOpacity onPress={() => api.post(`/api/moments/${item.id}/like`)}>
+                 <Text>Likes: {item.likes}</Text>
+               </TouchableOpacity>
+               {/* Comments: TextInput + post button */}
+             </View>
+           </View>
+         )}
+         keyExtractor={item => item.id.toString()}
+         pagingEnabled snapToInterval={height} decelerationRate="fast" showsVerticalScrollIndicator={false}
+         onEndReached={fetchFeed} onEndReachedThreshold={0.5}
+         onViewableItemsChanged={onViewableItemsChanged} viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+       />
+     );
+   };
+   export default MomentsScreen;
+   ```
+
+4. **Socket.io Integration for Real-Time Updates**:
+   - Server (index.ts): As before—io.on('connection', ...); emit on like/comment for live counters.
+   - Client (SocketProvider.tsx wrapping app):
+     ```tsx
+     import { io } from 'socket.io-client';
+     const socket = io('YOUR_SERVER_URL');
+
+     useEffect(() => {
+       socket.on('likeUpdate', (data) => { // Update feed state for id
+         setFeed(prev => prev.map(p => p.id === data.id ? { ...p, likes: data.likes } : p));
+       });
+       // Similar for comments
+     }, []);
+     ```
+
+5. **XMTP Integration for Encrypted Comments**:
+   - Comments as mini-chats: On post, create XMTP convo linked to momentId (store convoId in comments jsonb).
+   - Client: Send comment via XMTP.send, post metadata to server for public display (hybrid: E2E content, public previews).
+
+This is the best compilation: Perplexity's prioritized phases/matrix with our code-ready, repo-tied implementations. Build high priorities now (feed/likes/comments/tipping/share)—test on testnet. It's transformative: Creators own earnings instantly, shaking creator economies. Next: Full code PR or specific feature deep-dive?
