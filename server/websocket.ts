@@ -4,6 +4,10 @@ import type { IncomingMessage } from "http";
 import { parse as parseUrl } from "url";
 import { parse as parseCookie } from "cookie";
 import jwt from "jsonwebtoken";
+import { sendMessageNotification, sendPaymentNotification } from "./pushNotifications";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq, inArray } from "drizzle-orm";
 
 interface Connection {
   ws: WebSocket;
@@ -247,10 +251,11 @@ class RealtimeService {
     }
   }
 
-  broadcastNewMessage(data: {
+  async broadcastNewMessage(data: {
     conversationId: string;
     messageId: string;
     senderId: string;
+    senderName?: string;
     recipientIds: string[];
     content?: string;
     timestamp: string;
@@ -263,16 +268,71 @@ class RealtimeService {
       timestamp: data.timestamp,
     };
 
+    const offlineUserIds: string[] = [];
+
     for (const recipientId of data.recipientIds) {
       const wasSent = this.sendToUser(recipientId, payload);
       if (!wasSent) {
-        console.log(`User ${recipientId} offline, push notification needed`);
+        offlineUserIds.push(recipientId);
       }
+    }
+
+    if (offlineUserIds.length > 0) {
+      await this.sendPushToOfflineUsers(offlineUserIds, {
+        type: "message",
+        senderName: data.senderName || "New message",
+        content: data.content || "You have a new message",
+        chatId: data.conversationId,
+      });
     }
   }
 
-  broadcastPayment(data: {
+  private async sendPushToOfflineUsers(
+    userIds: string[],
+    data: {
+      type: "message" | "payment";
+      senderName: string;
+      content?: string;
+      chatId?: string;
+      amount?: string;
+      currency?: string;
+      txHash?: string;
+    }
+  ) {
+    try {
+      const offlineUsers = await db
+        .select({ id: users.id, pushToken: users.pushToken })
+        .from(users)
+        .where(inArray(users.id, userIds));
+
+      for (const user of offlineUsers) {
+        if (!user.pushToken) continue;
+
+        if (data.type === "message") {
+          await sendMessageNotification(
+            user.pushToken,
+            data.senderName,
+            data.content || "New message",
+            data.chatId || ""
+          );
+        } else if (data.type === "payment") {
+          await sendPaymentNotification(
+            user.pushToken,
+            data.senderName,
+            data.amount || "0",
+            data.currency || "pathUSD",
+            data.txHash
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Failed to send push notifications:", error);
+    }
+  }
+
+  async broadcastPayment(data: {
     senderId: string;
+    senderName?: string;
     recipientId: string;
     amount: string;
     currency: string;
@@ -288,7 +348,17 @@ class RealtimeService {
       timestamp: data.timestamp,
     };
 
-    this.sendToUser(data.recipientId, payload);
+    const wasSent = this.sendToUser(data.recipientId, payload);
+    
+    if (!wasSent) {
+      await this.sendPushToOfflineUsers([data.recipientId], {
+        type: "payment",
+        senderName: data.senderName || "SwipeMe",
+        amount: data.amount,
+        currency: data.currency,
+        txHash: data.transactionHash,
+      });
+    }
   }
 
   broadcastTyping(data: {

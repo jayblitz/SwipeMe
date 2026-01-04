@@ -1350,8 +1350,9 @@ export default function ChatScreen() {
             return [newMessage, ...prev].sort((a, b) => b.timestamp - a.timestamp);
           });
           
-          if (realtimeClient.isConnected() && msg.senderInboxId) {
-            realtimeClient.sendDelivered(messageId, chatId, msg.senderInboxId);
+          const participantUserId = contactId || chat?.participants?.[0]?.id;
+          if (realtimeClient.isConnected() && participantUserId) {
+            realtimeClient.sendDelivered(messageId, chatId, participantUserId);
           }
         });
         
@@ -1404,16 +1405,16 @@ export default function ChatScreen() {
         msg => msg.senderId !== "me" && msg.status !== "read"
       );
       
-      if (unreadMessages.length > 0 && realtimeClient.isConnected()) {
+      const participantUserId = contactId || chat?.participants?.[0]?.id;
+      if (unreadMessages.length > 0 && realtimeClient.isConnected() && participantUserId) {
         const messageIds = unreadMessages.map(msg => msg.id);
-        const senderId = unreadMessages[0]?.senderId || "";
-        realtimeClient.sendRead(messageIds, chatId, senderId);
+        realtimeClient.sendRead(messageIds, chatId, participantUserId);
         
         setMessages(prev => prev.map(msg => 
           messageIds.includes(msg.id) ? { ...msg, status: "read" } : msg
         ));
       }
-    }, [messages, chatId])
+    }, [messages, chatId, contactId, chat?.participants])
   );
 
   const handleSend = async () => {
