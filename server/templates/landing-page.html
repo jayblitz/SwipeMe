@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self';">
-  <title>SwipeMe - The Future of Social Finance</title>
-  <meta name="description" content="Just SwipeMe - instant money, straight from your chat. Decentralized super app for messaging and payments on Tempo.">
+  <title>SwipeMe - The Super App for Instant Payments</title>
+  <meta name="description" content="SwipeMe is a WeChat-inspired super app with end-to-end encrypted messaging, blockchain P2P payments, social Moments feed, creator monetization, and mini-apps marketplace.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/favicon.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/favicon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icon.png">
@@ -16,45 +16,44 @@
   <style>
     :root {
       --primary: #0066FF;
-      --primary-light: #00BFFF;
+      --primary-dark: #0052CC;
+      --primary-light: #E6F0FF;
       --cyan: #00C8FF;
-      --dark: #000000;
-      --dark-surface: #0a0a0f;
-      --dark-card: rgba(0, 102, 255, 0.08);
-      --glow-blue: rgba(0, 102, 255, 0.6);
-      --glow-cyan: rgba(0, 191, 255, 0.5);
-      --white: #ffffff;
-      --gray-light: rgba(255, 255, 255, 0.9);
-      --gray-muted: rgba(255, 255, 255, 0.6);
+      --secondary: #00D4AA;
+      --purple: #8B5CF6;
+      --pink: #EC4899;
+      --orange: #F59E0B;
+      --red: #EF4444;
+      --dark: #0F172A;
+      --gray-900: #1E293B;
+      --gray-800: #334155;
+      --gray-700: #475569;
+      --gray-600: #64748B;
+      --gray-500: #94A3B8;
+      --gray-400: #CBD5E1;
+      --gray-300: #E2E8F0;
+      --gray-200: #F1F5F9;
+      --gray-100: #F8FAFC;
+      --white: #FFFFFF;
+      --success: #10B981;
+      --gradient-primary: linear-gradient(135deg, #0066FF 0%, #00C8FF 100%);
+      --gradient-purple: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+      --gradient-orange: linear-gradient(135deg, #F59E0B 0%, #EF4444 100%);
+      --gradient-green: linear-gradient(135deg, #10B981 0%, #00D4AA 100%);
+      --gradient-dark: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--dark);
-      color: var(--white);
+      background: var(--white);
+      color: var(--dark);
       line-height: 1.6;
       overflow-x: hidden;
-      position: relative;
     }
 
-    .cursive {
-      font-family: 'Playfair Display', serif;
-      font-style: italic;
-    }
-
-    /* Animated Background Canvas */
-    #background-canvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      pointer-events: none;
-    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
     /* Navigation */
     .nav {
@@ -62,17 +61,17 @@
       top: 0;
       left: 0;
       right: 0;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       z-index: 1000;
-      border-bottom: 1px solid rgba(0, 102, 255, 0.2);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
       transition: all 0.3s ease;
     }
 
     .nav.scrolled {
-      background: rgba(0, 0, 0, 0.9);
-      box-shadow: 0 4px 30px rgba(0, 102, 255, 0.15);
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
     }
 
     .nav-container {
@@ -89,7 +88,7 @@
       align-items: center;
       gap: 12px;
       text-decoration: none;
-      color: var(--white);
+      color: var(--dark);
       transition: transform 0.3s ease;
     }
 
@@ -100,7 +99,7 @@
       height: 42px;
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 0 20px rgba(0, 102, 255, 0.5);
+      box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
     }
 
     .nav-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
@@ -109,7 +108,7 @@
     .nav-links { display: flex; align-items: center; gap: 36px; }
 
     .nav-link {
-      color: var(--gray-muted);
+      color: var(--gray-600);
       text-decoration: none;
       font-weight: 500;
       font-size: 15px;
@@ -117,23 +116,35 @@
       position: relative;
     }
 
-    .nav-link:hover { color: var(--primary-light); text-shadow: 0 0 10px var(--glow-cyan); }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: var(--gradient-primary);
+      transition: width 0.3s ease;
+    }
+
+    .nav-link:hover { color: var(--primary); }
+    .nav-link:hover::after { width: 100%; }
 
     .nav-cta {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      background: var(--gradient-primary);
       color: var(--white);
       padding: 12px 24px;
-      border-radius: 50px;
+      border-radius: 12px;
       font-weight: 600;
       font-size: 14px;
       text-decoration: none;
       transition: all 0.3s ease;
-      box-shadow: 0 0 20px var(--glow-blue);
+      box-shadow: 0 4px 15px rgba(0, 102, 255, 0.3);
     }
 
     .nav-cta:hover {
       transform: translateY(-2px);
-      box-shadow: 0 0 30px var(--glow-blue), 0 0 60px var(--glow-cyan);
+      box-shadow: 0 8px 25px rgba(0, 102, 255, 0.4);
     }
 
     .nav-mobile-toggle {
@@ -144,251 +155,198 @@
       padding: 8px;
     }
 
-    .nav-mobile-toggle svg { width: 28px; height: 28px; stroke: var(--white); }
+    .nav-mobile-toggle svg { width: 28px; height: 28px; stroke: var(--dark); }
 
     /* Hero Section */
     .hero {
-      min-height: 100vh;
-      display: flex;
+      padding: 160px 0 100px;
+      background: linear-gradient(180deg, var(--gray-100) 0%, var(--white) 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 80%;
+      height: 150%;
+      background: radial-gradient(ellipse, rgba(0, 102, 255, 0.08) 0%, transparent 70%);
+      animation: pulse 8s ease-in-out infinite;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -30%;
+      left: -20%;
+      width: 60%;
+      height: 100%;
+      background: radial-gradient(ellipse, rgba(0, 200, 255, 0.06) 0%, transparent 70%);
+      animation: pulse 10s ease-in-out infinite reverse;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    .hero-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
       align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 120px 24px 80px;
       position: relative;
       z-index: 1;
     }
 
-    .hero-content {
-      max-width: 800px;
-      animation: fadeIn 1.5s ease-out;
+    .hero-text { max-width: 560px; }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--primary-light);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 24px;
+      animation: slideUp 0.6s ease-out;
     }
 
-    .hero-logo {
-      width: 80px;
-      height: 80px;
-      border-radius: 20px;
-      margin: 0 auto 32px;
-      box-shadow: 0 0 40px var(--glow-blue), 0 0 80px var(--glow-cyan);
-      animation: glow 3s ease-in-out infinite alternate;
+    .hero-badge-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: blink 2s infinite;
     }
 
-    @keyframes glow {
-      from { box-shadow: 0 0 40px var(--glow-blue), 0 0 80px var(--glow-cyan); }
-      to { box-shadow: 0 0 60px var(--glow-blue), 0 0 120px var(--glow-cyan); }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
 
     .hero h1 {
-      font-size: 72px;
-      font-weight: 700;
+      font-size: 64px;
+      font-weight: 900;
+      line-height: 1.05;
       margin-bottom: 24px;
-      background: linear-gradient(135deg, var(--white) 0%, var(--primary-light) 50%, var(--primary) 100%);
+      color: var(--dark);
+      letter-spacing: -2px;
+      animation: slideUp 0.6s ease-out 0.1s backwards;
+    }
+
+    .hero h1 .highlight {
+      background: var(--gradient-primary);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      letter-spacing: -2px;
-      animation: fadeIn 1.5s ease-out 0.2s backwards;
     }
 
-    .hero .tagline {
-      font-size: 28px;
-      margin-bottom: 16px;
-      color: var(--primary-light);
-      text-shadow: 0 0 30px var(--glow-cyan);
-      animation: fadeIn 1.5s ease-out 0.4s backwards;
-    }
-
-    .hero .subtitle {
-      font-size: 18px;
-      color: var(--gray-muted);
-      margin-bottom: 48px;
+    .hero-tagline {
+      font-size: 20px;
+      color: var(--gray-600);
       line-height: 1.7;
-      animation: fadeIn 1.5s ease-out 0.6s backwards;
+      margin-bottom: 36px;
+      animation: slideUp 0.6s ease-out 0.2s backwards;
     }
 
     .hero-buttons {
       display: flex;
-      gap: 20px;
-      justify-content: center;
+      gap: 16px;
       flex-wrap: wrap;
-      animation: fadeIn 1.5s ease-out 0.8s backwards;
+      animation: slideUp 0.6s ease-out 0.3s backwards;
     }
 
-    .glow-button {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-      border: none;
-      padding: 18px 40px;
-      border-radius: 50px;
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .btn-primary {
+      background: var(--gradient-primary);
       color: var(--white);
+      padding: 16px 32px;
+      border-radius: 14px;
       font-weight: 600;
       font-size: 16px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 0 20px var(--glow-blue);
       text-decoration: none;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 30px rgba(0, 102, 255, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(0, 102, 255, 0.4);
+    }
+
+    .btn-primary svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+    .btn-secondary {
+      background: var(--white);
+      color: var(--dark);
+      padding: 16px 32px;
+      border-radius: 14px;
+      font-weight: 600;
+      font-size: 16px;
+      text-decoration: none;
+      border: 2px solid var(--gray-300);
+      transition: all 0.3s ease;
       display: inline-flex;
       align-items: center;
       gap: 10px;
     }
 
-    .glow-button:hover {
+    .btn-secondary:hover {
+      border-color: var(--primary);
+      color: var(--primary);
       transform: translateY(-3px);
-      box-shadow: 0 0 40px var(--glow-blue), 0 0 80px var(--glow-cyan);
     }
 
-    .glow-button.secondary {
-      background: transparent;
-      border: 2px solid var(--primary);
-      box-shadow: 0 0 15px rgba(0, 102, 255, 0.3);
-    }
+    .btn-secondary svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
 
-    .glow-button.secondary:hover {
-      background: rgba(0, 102, 255, 0.1);
-      box-shadow: 0 0 25px var(--glow-blue);
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Features Section */
-    .features {
-      padding: 120px 24px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .features h2 {
-      text-align: center;
-      font-size: 48px;
-      margin-bottom: 16px;
-      background: linear-gradient(135deg, var(--white) 0%, var(--primary-light) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .features .section-subtitle {
-      text-align: center;
-      color: var(--gray-muted);
-      font-size: 18px;
-      margin-bottom: 64px;
-    }
-
-    .feature-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 32px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .feature-card {
-      background: var(--dark-card);
-      border: 1px solid rgba(0, 191, 255, 0.2);
-      border-radius: 24px;
-      padding: 40px 32px;
-      transition: all 0.4s ease;
-      animation: fadeIn 1s ease-out backwards;
-    }
-
-    .feature-card:nth-child(1) { animation-delay: 0.1s; }
-    .feature-card:nth-child(2) { animation-delay: 0.2s; }
-    .feature-card:nth-child(3) { animation-delay: 0.3s; }
-    .feature-card:nth-child(4) { animation-delay: 0.4s; }
-
-    .feature-card:hover {
-      transform: translateY(-8px) scale(1.02);
-      border-color: var(--primary-light);
-      box-shadow: 0 0 40px rgba(0, 191, 255, 0.2), 0 20px 60px rgba(0, 0, 0, 0.3);
-    }
-
-    .feature-icon {
-      width: 64px;
-      height: 64px;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 24px;
-      box-shadow: 0 0 30px var(--glow-blue);
-    }
-
-    .feature-icon svg {
-      width: 32px;
-      height: 32px;
-      stroke: var(--white);
-      fill: none;
-      stroke-width: 2;
-    }
-
-    .feature-card h3 {
-      font-size: 22px;
-      margin-bottom: 12px;
-      color: var(--white);
-    }
-
-    .feature-card p {
-      color: var(--gray-muted);
-      font-size: 15px;
-      line-height: 1.7;
-    }
-
-    /* Preview Section */
-    .preview {
-      padding: 120px 24px;
-      position: relative;
-      z-index: 1;
-      background: linear-gradient(180deg, transparent 0%, rgba(0, 102, 255, 0.05) 50%, transparent 100%);
-    }
-
-    .preview h2 {
-      text-align: center;
-      font-size: 48px;
-      margin-bottom: 64px;
-      background: linear-gradient(135deg, var(--white) 0%, var(--primary-light) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .preview-container {
+    /* Hero Phone Mockup - TikTok Style Moments */
+    .hero-visual {
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 48px;
-      flex-wrap: wrap;
-      max-width: 1000px;
-      margin: 0 auto;
+      position: relative;
+      animation: float 6s ease-in-out infinite;
     }
 
-    .phone-mockup {
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-20px); }
+    }
+
+    .hero-phone {
       width: 280px;
       background: linear-gradient(145deg, #1a1a1a 0%, #000 100%);
       border-radius: 44px;
       padding: 10px;
-      box-shadow: 0 0 60px rgba(0, 102, 255, 0.3), 0 30px 80px rgba(0, 0, 0, 0.5);
-      animation: float 6s ease-in-out infinite;
+      box-shadow: 0 50px 100px rgba(0, 0, 0, 0.25), 0 20px 60px rgba(0, 0, 0, 0.2);
+      position: relative;
+      z-index: 2;
     }
 
-    .phone-mockup:nth-child(2) { animation-delay: -2s; }
-    .phone-mockup:nth-child(3) { animation-delay: -4s; }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-15px); }
-    }
-
-    .phone-screen {
-      background: linear-gradient(180deg, #0a0a0f 0%, #1a1a2e 100%);
+    .hero-phone-screen {
+      background: #000;
       border-radius: 36px;
-      aspect-ratio: 9/19.5;
       overflow: hidden;
+      aspect-ratio: 9/19.5;
       position: relative;
     }
 
-    .phone-notch {
+    .hero-phone-notch {
       position: absolute;
       top: 12px;
       left: 50%;
@@ -397,308 +355,1513 @@
       height: 24px;
       background: #000;
       border-radius: 16px;
+      z-index: 20;
+    }
+
+    /* TikTok-Style Moments Feed - More Authentic */
+    .tiktok-feed {
+      height: 100%;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .tiktok-feed::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        radial-gradient(ellipse at 30% 20%, rgba(139, 92, 246, 0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 60%, rgba(236, 72, 153, 0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(16, 185, 129, 0.2) 0%, transparent 40%),
+        linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+      animation: bgShift 8s ease-in-out infinite;
+    }
+
+    @keyframes bgShift {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+
+    .tiktok-nav {
+      position: absolute;
+      top: 40px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
       z-index: 10;
     }
 
-    .screen-content {
-      height: 100%;
+    .tiktok-nav-item {
+      color: rgba(255,255,255,0.6);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .tiktok-nav-item.active {
+      color: white;
+      position: relative;
+    }
+
+    .tiktok-nav-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 2px;
+      background: white;
+      border-radius: 2px;
+    }
+
+    .tiktok-video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 60px 20px 20px;
-      text-align: center;
+      justify-content: flex-end;
+      padding: 0 12px 16px;
     }
 
-    .screen-content .screen-icon {
-      width: 48px;
-      height: 48px;
-      margin-bottom: 16px;
-      opacity: 0.9;
-    }
-
-    .screen-content h4 {
-      font-size: 16px;
-      color: var(--white);
-      margin-bottom: 8px;
-    }
-
-    .screen-content p {
-      font-size: 12px;
-      color: var(--gray-muted);
-    }
-
-    /* Security Section */
-    .security {
-      padding: 120px 24px;
-      text-align: center;
-      position: relative;
+    .tiktok-video::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 50%;
+      background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%);
       z-index: 1;
     }
 
-    .security h2 {
-      font-size: 48px;
-      margin-bottom: 24px;
-      background: linear-gradient(135deg, var(--white) 0%, var(--primary-light) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .security p {
-      font-size: 20px;
-      color: var(--gray-muted);
-      max-width: 600px;
-      margin: 0 auto 48px;
-      line-height: 1.7;
-    }
-
-    .security-badges {
+    .tiktok-content {
+      position: relative;
+      z-index: 2;
       display: flex;
-      justify-content: center;
-      gap: 32px;
-      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 8px;
     }
 
-    .security-badge {
+    .tiktok-info {
+      flex: 1;
+      padding-bottom: 8px;
+    }
+
+    .tiktok-user {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 16px 28px;
-      background: var(--dark-card);
-      border: 1px solid rgba(0, 191, 255, 0.2);
-      border-radius: 100px;
-      transition: all 0.3s ease;
+      gap: 8px;
+      margin-bottom: 8px;
     }
 
-    .security-badge:hover {
-      border-color: var(--primary-light);
-      box-shadow: 0 0 20px rgba(0, 191, 255, 0.2);
+    .tiktok-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 12px;
+      border: 2px solid white;
+      position: relative;
     }
 
-    .security-badge svg {
-      width: 24px;
-      height: 24px;
-      stroke: var(--primary-light);
+    .tiktok-avatar::after {
+      content: '+';
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 14px;
+      background: #FE2C55;
+      border-radius: 50%;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    .tiktok-username {
+      color: white;
+      font-weight: 700;
+      font-size: 14px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .tiktok-caption {
+      color: white;
+      font-size: 12px;
+      line-height: 1.4;
+      margin-bottom: 10px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .tiktok-music {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: white;
+      font-size: 11px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .tiktok-music-disc {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #333 0%, #000 100%);
+      border: 3px solid #444;
+      animation: spin 3s linear infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tiktok-music-disc::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: white;
+      border-radius: 50%;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .tiktok-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+      padding-bottom: 8px;
+    }
+
+    .tiktok-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .tiktok-action-btn {
+      width: 40px;
+      height: 40px;
+      background: transparent;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .tiktok-action-btn svg {
+      width: 26px;
+      height: 26px;
+      stroke: white;
+      fill: none;
+      stroke-width: 1.5;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+    }
+
+    .tiktok-action-btn.liked svg {
+      fill: #FE2C55;
+      stroke: #FE2C55;
+    }
+
+    .tiktok-action-count {
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .tiktok-tip-btn {
+      background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      padding: 8px 14px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      animation: tipPulse 2s ease-in-out infinite;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    }
+
+    @keyframes tipPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
+      50% { transform: scale(1.05); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6); }
+    }
+
+    .tiktok-tip-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke: white;
       fill: none;
       stroke-width: 2;
     }
 
-    .security-badge span {
+    .tiktok-tip-text {
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .tiktok-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: rgba(255,255,255,0.2);
+    }
+
+    .tiktok-progress-bar {
+      height: 100%;
+      width: 65%;
+      background: white;
+      border-radius: 0 2px 2px 0;
+    }
+
+    /* Floating Elements */
+    .hero-float-1, .hero-float-2, .hero-float-3 {
+      position: absolute;
+      background: var(--white);
+      border-radius: 16px;
+      padding: 14px 18px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+      animation: floatBubble 4s ease-in-out infinite;
+      z-index: 3;
+    }
+
+    .hero-float-1 { top: 15%; left: -80px; animation-delay: 0s; }
+    .hero-float-2 { bottom: 35%; right: -90px; animation-delay: 1.5s; }
+    .hero-float-3 { bottom: 8%; left: -50px; animation-delay: 3s; }
+
+    @keyframes floatBubble {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    .float-icon {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
       font-weight: 600;
-      color: var(--gray-light);
+      color: var(--dark);
     }
 
-    /* CTA / Waitlist Section */
-    .cta {
-      padding: 120px 24px;
+    .float-icon svg { width: 22px; height: 22px; }
+
+    /* Stats Bar */
+    .stats-bar {
+      background: var(--white);
+      border-top: 1px solid var(--gray-200);
+      border-bottom: 1px solid var(--gray-200);
+      padding: 50px 0;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 40px;
       text-align: center;
-      position: relative;
-      z-index: 1;
-      background: radial-gradient(ellipse at center, rgba(0, 102, 255, 0.1) 0%, transparent 70%);
     }
 
-    .cta h2 {
-      font-size: 56px;
-      margin-bottom: 24px;
-      background: linear-gradient(135deg, var(--white) 0%, var(--primary-light) 100%);
+    .stat-item {
+      opacity: 0;
+      animation: fadeInUp 0.6s ease-out forwards;
+    }
+
+    .stat-item:nth-child(1) { animation-delay: 0.1s; }
+    .stat-item:nth-child(2) { animation-delay: 0.2s; }
+    .stat-item:nth-child(3) { animation-delay: 0.3s; }
+    .stat-item:nth-child(4) { animation-delay: 0.4s; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .stat-value {
+      font-size: 42px;
+      font-weight: 800;
+      background: var(--gradient-primary);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      margin-bottom: 8px;
     }
 
-    .cta p {
-      font-size: 18px;
-      color: var(--gray-muted);
-      margin-bottom: 48px;
+    .stat-label { font-size: 15px; color: var(--gray-600); font-weight: 500; }
+
+    /* Features Section */
+    .features {
+      padding: 120px 0;
+      background: linear-gradient(180deg, var(--white) 0%, var(--gray-100) 100%);
     }
 
-    .waitlist-form {
-      max-width: 500px;
-      margin: 0 auto;
-      display: flex;
-      gap: 0;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(0, 191, 255, 0.3);
-      border-radius: 50px;
-      padding: 6px;
-      transition: all 0.3s ease;
-    }
-
-    .waitlist-form:focus-within {
-      border-color: var(--primary-light);
-      box-shadow: 0 0 30px rgba(0, 191, 255, 0.2);
-    }
-
-    .waitlist-form input {
-      flex: 1;
-      padding: 16px 24px;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--white);
-      font-size: 16px;
-    }
-
-    .waitlist-form input::placeholder {
-      color: var(--gray-muted);
-    }
-
-    .waitlist-form button {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-      border: none;
-      padding: 16px 32px;
-      border-radius: 50px;
-      color: var(--white);
-      font-weight: 600;
-      font-size: 15px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      white-space: nowrap;
-    }
-
-    .waitlist-form button:hover {
-      box-shadow: 0 0 30px var(--glow-blue);
-      transform: scale(1.02);
-    }
-
-    .waitlist-form button:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-    }
-
-    .form-message {
-      margin-top: 16px;
-      font-size: 14px;
-    }
-
-    .form-message.success { color: #10B981; }
-    .form-message.error { color: #EF4444; }
-
-    /* Footer */
-    .footer {
-      padding: 48px 24px;
+    .section-header {
       text-align: center;
-      border-top: 1px solid rgba(0, 102, 255, 0.2);
+      max-width: 700px;
+      margin: 0 auto 80px;
+    }
+
+    .section-label {
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 16px;
+      background: var(--primary-light);
+      padding: 8px 16px;
+      border-radius: 100px;
+    }
+
+    .section-title {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      color: var(--dark);
+      letter-spacing: -1px;
+      line-height: 1.1;
+    }
+
+    .section-subtitle {
+      font-size: 18px;
+      color: var(--gray-600);
+      line-height: 1.7;
+    }
+
+    /* Feature Cards - Bento Grid */
+    .feature-bento {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-template-rows: auto auto;
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--white);
+      border-radius: 28px;
+      padding: 36px;
+      border: 1px solid var(--gray-200);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      transform: scaleX(0);
+      transition: transform 0.4s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.12);
+      border-color: transparent;
+    }
+
+    .feature-card:hover::before { transform: scaleX(1); }
+
+    .feature-card.messaging { grid-column: span 7; }
+    .feature-card.messaging::before { background: var(--gradient-primary); }
+
+    .feature-card.payments { grid-column: span 5; }
+    .feature-card.payments::before { background: var(--gradient-green); }
+
+    .feature-card.moments { grid-column: span 5; }
+    .feature-card.moments::before { background: var(--gradient-purple); }
+
+    .feature-card.wallet { grid-column: span 7; }
+    .feature-card.wallet::before { background: var(--gradient-orange); }
+
+    .feature-icon-large {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+      position: relative;
+    }
+
+    .feature-icon-large::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 24px;
+      background: inherit;
+      opacity: 0.2;
+      z-index: -1;
+    }
+
+    .feature-icon-large svg { width: 36px; height: 36px; stroke: white; stroke-width: 2; fill: none; }
+
+    .feature-icon-large.blue { background: var(--gradient-primary); }
+    .feature-icon-large.green { background: var(--gradient-green); }
+    .feature-icon-large.purple { background: var(--gradient-purple); }
+    .feature-icon-large.orange { background: var(--gradient-orange); }
+
+    .feature-card h3 {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: var(--dark);
+    }
+
+    .feature-card p {
+      font-size: 16px;
+      color: var(--gray-600);
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+
+    .feature-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .feature-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--gray-100);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gray-700);
+      transition: all 0.3s ease;
+    }
+
+    .feature-pill:hover {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    .feature-pill svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+    /* App Preview Section */
+    .preview {
+      padding: 120px 0;
+      background: var(--dark);
+      color: var(--white);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .preview::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    .preview .section-label { background: rgba(255, 255, 255, 0.1); color: var(--cyan); }
+    .preview .section-title { color: var(--white); }
+    .preview .section-subtitle { color: var(--gray-400); }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 40px;
+      margin-top: 60px;
       position: relative;
       z-index: 1;
     }
+
+    .preview-item {
+      text-align: center;
+      transition: transform 0.4s ease;
+    }
+
+    .preview-item:hover { transform: translateY(-10px); }
+
+    .preview-phone {
+      width: 100%;
+      max-width: 260px;
+      margin: 0 auto 28px;
+      background: linear-gradient(145deg, #1a1a1a 0%, #0a0a0a 100%);
+      border-radius: 36px;
+      padding: 10px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+      transition: all 0.4s ease;
+    }
+
+    .preview-item:hover .preview-phone {
+      box-shadow: 0 40px 100px rgba(0, 102, 255, 0.3);
+    }
+
+    .preview-screen {
+      background: var(--white);
+      border-radius: 28px;
+      overflow: hidden;
+      aspect-ratio: 9/17;
+      position: relative;
+    }
+
+    .preview-label {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 10px;
+    }
+
+    .preview-desc {
+      font-size: 15px;
+      color: var(--gray-400);
+      max-width: 220px;
+      margin: 0 auto;
+    }
+
+    /* Phone Screen Contents */
+    .screen-wallet {
+      padding: 40px 16px 16px;
+      background: linear-gradient(180deg, #0066FF 0%, #00C8FF 100%);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .wallet-header { color: white; text-align: center; padding-bottom: 20px; }
+    .wallet-label { font-size: 12px; opacity: 0.8; margin-bottom: 4px; }
+    .wallet-balance { font-size: 32px; font-weight: 700; }
+    .wallet-address { font-size: 10px; opacity: 0.7; font-family: monospace; margin-top: 8px; }
+
+    .wallet-actions { display: flex; gap: 12px; margin: 20px 0; }
+
+    .wallet-action {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 12px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      backdrop-filter: blur(10px);
+    }
+
+    .wallet-tokens {
+      background: white;
+      border-radius: 20px 20px 0 0;
+      padding: 16px;
+      flex: 1;
+      margin-top: auto;
+    }
+
+    .token-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .token-item:last-child { border-bottom: none; }
+
+    .token-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .token-info { flex: 1; }
+    .token-name { font-size: 13px; font-weight: 600; color: var(--dark); }
+    .token-symbol { font-size: 11px; color: var(--gray-500); }
+    .token-amount { font-size: 14px; font-weight: 600; color: var(--dark); text-align: right; }
+
+    /* Chat Screen */
+    .screen-chat {
+      padding: 40px 12px 12px;
+      background: var(--gray-100);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .chat-header-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--gradient-purple);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .chat-header-name { font-size: 14px; font-weight: 600; color: var(--dark); }
+    .chat-header-status { font-size: 11px; color: var(--success); }
+
+    .chat-messages { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+    .chat-bubble {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .chat-bubble.received {
+      background: white;
+      color: var(--dark);
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+
+    .chat-bubble.sent {
+      background: var(--primary);
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-bubble.payment {
+      background: var(--gradient-green);
+      color: white;
+      align-self: center;
+      text-align: center;
+      padding: 14px 20px;
+      border-radius: 16px;
+    }
+
+    .payment-amount { font-size: 18px; font-weight: 700; }
+    .payment-note { font-size: 11px; opacity: 0.9; margin-top: 4px; }
+
+    /* TikTok Moments Screen - Preview */
+    .screen-moments {
+      height: 100%;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .screen-moments::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        radial-gradient(ellipse at 40% 30%, rgba(236, 72, 153, 0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 60% 70%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
+        linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+    }
+
+    .screen-moments-nav {
+      position: absolute;
+      top: 40px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .screen-moments-nav span {
+      color: rgba(255,255,255,0.5);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .screen-moments-nav span.active {
+      color: white;
+    }
+
+    .screen-moments-content {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 14px;
+      background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+      z-index: 5;
+    }
+
+    .moments-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .moments-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #F59E0B 0%, #EF4444 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      border: 2px solid white;
+      position: relative;
+    }
+
+    .moments-avatar::after {
+      content: '+';
+      position: absolute;
+      bottom: -3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 12px;
+      height: 12px;
+      background: #FE2C55;
+      border-radius: 50%;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    .moments-username { 
+      color: white; 
+      font-weight: 700; 
+      font-size: 13px; 
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .moments-caption {
+      color: white;
+      font-size: 11px;
+      line-height: 1.4;
+      margin-bottom: 8px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .moments-actions {
+      position: absolute;
+      right: 10px;
+      bottom: 70px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .moments-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .moments-action-btn {
+      width: 36px;
+      height: 36px;
+      background: transparent;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .moments-action-btn svg { 
+      width: 22px; 
+      height: 22px; 
+      stroke: white; 
+      fill: none; 
+      stroke-width: 1.5; 
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+    }
+    .moments-action-btn.liked svg { fill: #FE2C55; stroke: #FE2C55; }
+    .moments-action-count { 
+      color: white; 
+      font-size: 9px; 
+      font-weight: 600; 
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .moments-tip-btn {
+      background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      padding: 6px 10px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+
+    .moments-tip-btn svg { width: 12px; height: 12px; stroke: white; fill: none; stroke-width: 2; }
+    .moments-tip-text { color: white; font-size: 10px; font-weight: 700; }
+
+    /* Creator Earnings Section */
+    .earnings {
+      padding: 120px 0;
+      background: linear-gradient(135deg, #F8FAFC 0%, #E6F0FF 100%);
+    }
+
+    .earnings-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+
+    .earnings-text h2 {
+      font-size: 44px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      color: var(--dark);
+      letter-spacing: -1px;
+    }
+
+    .earnings-text p {
+      font-size: 18px;
+      color: var(--gray-600);
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+
+    .earnings-highlights {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .earnings-highlight {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 24px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+      transition: transform 0.3s ease;
+    }
+
+    .earnings-highlight:hover { transform: translateX(8px); }
+
+    .earnings-highlight-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .earnings-highlight-icon svg { width: 26px; height: 26px; stroke: white; stroke-width: 2; fill: none; }
+
+    .earnings-highlight-text h4 { font-size: 17px; font-weight: 600; color: var(--dark); margin-bottom: 4px; }
+    .earnings-highlight-text p { font-size: 14px; color: var(--gray-600); margin: 0; }
+
+    .earnings-visual { display: flex; justify-content: center; }
+
+    .earnings-phone {
+      width: 280px;
+      background: var(--dark);
+      border-radius: 36px;
+      padding: 10px;
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.2);
+    }
+
+    .earnings-screen {
+      background: white;
+      border-radius: 28px;
+      overflow: hidden;
+      padding: 40px 16px 16px;
+    }
+
+    .earnings-header { text-align: center; margin-bottom: 20px; }
+    .earnings-title { font-size: 14px; color: var(--gray-500); margin-bottom: 8px; }
+    .earnings-total { font-size: 36px; font-weight: 700; color: var(--dark); }
+    .earnings-available { font-size: 12px; color: var(--success); margin-top: 4px; }
+
+    .earnings-chart {
+      background: var(--gray-100);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .chart-bars { display: flex; align-items: flex-end; gap: 8px; height: 60px; }
+
+    .chart-bar {
+      flex: 1;
+      background: var(--gradient-primary);
+      border-radius: 4px 4px 0 0;
+      min-height: 10px;
+    }
+
+    .chart-bar:nth-child(1) { height: 30%; }
+    .chart-bar:nth-child(2) { height: 50%; }
+    .chart-bar:nth-child(3) { height: 70%; }
+    .chart-bar:nth-child(4) { height: 45%; }
+    .chart-bar:nth-child(5) { height: 90%; }
+    .chart-bar:nth-child(6) { height: 65%; }
+    .chart-bar:nth-child(7) { height: 100%; }
+
+    .withdraw-btn {
+      display: block;
+      width: 100%;
+      background: var(--gradient-primary);
+      color: white;
+      padding: 14px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    /* Mini Apps Section */
+    .miniapps {
+      padding: 120px 0;
+      background: white;
+    }
+
+    .miniapps-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+
+    .miniapps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .miniapp-item {
+      background: var(--gray-100);
+      border-radius: 24px;
+      padding: 28px;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .miniapp-item:hover {
+      background: white;
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1);
+      transform: translateY(-8px);
+    }
+
+    .miniapp-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 14px;
+    }
+
+    .miniapp-icon svg { width: 32px; height: 32px; stroke: white; fill: none; stroke-width: 2; }
+
+    .miniapp-name { font-size: 14px; font-weight: 600; color: var(--dark); }
+
+    .miniapps-text h2 {
+      font-size: 44px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      color: var(--dark);
+      letter-spacing: -1px;
+    }
+
+    .miniapps-text p {
+      font-size: 18px;
+      color: var(--gray-600);
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+
+    .miniapps-features { display: flex; flex-direction: column; gap: 18px; }
+
+    .miniapps-feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .miniapps-feature-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .miniapps-feature-icon svg { width: 18px; height: 18px; stroke: var(--primary); stroke-width: 2; fill: none; }
+    .miniapps-feature-text { font-size: 16px; color: var(--gray-700); line-height: 1.6; }
+
+    /* Security Section */
+    .security {
+      padding: 120px 0;
+      background: var(--dark);
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .security::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(0, 102, 255, 0.1) 0%, transparent 70%);
+    }
+
+    .security .section-header { position: relative; z-index: 1; }
+    .security .section-label { background: rgba(0, 200, 255, 0.15); color: var(--cyan); }
+    .security .section-title { color: white; }
+    .security .section-subtitle { color: var(--gray-400); }
+
+    .security-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .security-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 36px;
+      transition: all 0.3s ease;
+    }
+
+    .security-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(0, 200, 255, 0.3);
+      transform: translateY(-5px);
+    }
+
+    .security-card-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(0, 200, 255, 0.2) 0%, rgba(0, 102, 255, 0.2) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .security-card-icon svg { width: 28px; height: 28px; stroke: var(--cyan); stroke-width: 2; fill: none; }
+
+    .security-card h3 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+    .security-card p { font-size: 15px; color: var(--gray-400); line-height: 1.7; }
+
+    /* FAQ Section */
+    .faq {
+      padding: 120px 0;
+      background: var(--gray-100);
+    }
+
+    .faq-list {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .faq-item {
+      background: white;
+      border-radius: 16px;
+      margin-bottom: 16px;
+      overflow: hidden;
+      border: 1px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .faq-item:hover { border-color: var(--primary-light); }
+
+    .faq-question {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 24px 28px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      user-select: none;
+    }
+
+    .faq-question:hover { background: var(--gray-100); }
+
+    .faq-number {
+      width: 36px;
+      height: 36px;
+      background: var(--gradient-primary);
+      color: white;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .faq-question-text {
+      flex: 1;
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--dark);
+    }
+
+    .faq-toggle {
+      width: 32px;
+      height: 32px;
+      background: var(--gray-100);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .faq-toggle svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--gray-600);
+      stroke-width: 2;
+      fill: none;
+      transition: transform 0.3s ease;
+    }
+
+    .faq-item.open .faq-toggle { background: var(--primary-light); }
+    .faq-item.open .faq-toggle svg { stroke: var(--primary); transform: rotate(180deg); }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease, padding 0.4s ease;
+    }
+
+    .faq-item.open .faq-answer { max-height: 500px; }
+
+    .faq-answer-content {
+      padding: 0 28px 24px;
+      padding-left: 80px;
+      font-size: 15px;
+      color: var(--gray-600);
+      line-height: 1.8;
+    }
+
+    /* CTA Section */
+    .cta {
+      padding: 120px 0;
+      background: linear-gradient(135deg, #0066FF 0%, #00C8FF 100%);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+    }
+
+    .cta-content { position: relative; z-index: 1; max-width: 600px; margin: 0 auto; }
+
+    .cta h2 {
+      font-size: 48px;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 20px;
+      letter-spacing: -1px;
+    }
+
+    .cta p {
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 40px;
+    }
+
+    .cta-form {
+      display: flex;
+      gap: 12px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .cta-input {
+      flex: 1;
+      padding: 18px 24px;
+      border-radius: 14px;
+      border: none;
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .cta-input::placeholder { color: var(--gray-500); }
+
+    .cta-submit {
+      background: var(--dark);
+      color: white;
+      padding: 18px 32px;
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      white-space: nowrap;
+    }
+
+    .cta-submit:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+    }
+
+    .cta-submit:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .cta-message {
+      margin-top: 20px;
+      font-size: 15px;
+      color: white;
+      font-weight: 500;
+    }
+
+    .cta-message.error { color: #ffcccc; }
+    .cta-message.success { color: #90EE90; font-weight: 600; }
+
+    /* Footer */
+    .footer {
+      padding: 60px 0 40px;
+      background: var(--dark);
+      color: white;
+    }
+
+    .footer-content {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 60px;
+      margin-bottom: 50px;
+    }
+
+    .footer-brand { max-width: 300px; }
 
     .footer-logo {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 12px;
-      margin-bottom: 24px;
+      text-decoration: none;
+      color: white;
+      margin-bottom: 20px;
     }
 
-    .footer-logo img {
+    .footer-logo-icon {
       width: 40px;
       height: 40px;
-      border-radius: 10px;
+      border-radius: 12px;
+      overflow: hidden;
     }
 
-    .footer-logo span {
-      font-weight: 700;
-      font-size: 20px;
-    }
+    .footer-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
+    .footer-logo-text { font-weight: 700; font-size: 20px; }
 
-    .footer-links {
-      display: flex;
-      justify-content: center;
-      gap: 32px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-
-    .footer-links a {
-      color: var(--gray-muted);
-      text-decoration: none;
+    .footer-brand p {
       font-size: 14px;
+      color: var(--gray-500);
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+
+    .footer-social { display: flex; gap: 12px; }
+
+    .footer-social-link {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      color: var(--gray-400);
       transition: all 0.3s ease;
     }
 
-    .footer-links a:hover {
-      color: var(--primary-light);
-      text-shadow: 0 0 10px var(--glow-cyan);
+    .footer-social-link:hover {
+      background: var(--primary);
+      color: white;
     }
 
-    .footer-copyright {
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 13px;
+    .footer-social-link svg { width: 18px; height: 18px; fill: currentColor; }
+
+    .footer-column h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
-    /* Mobile Responsive */
+    .footer-column a {
+      display: block;
+      font-size: 14px;
+      color: var(--gray-500);
+      text-decoration: none;
+      margin-bottom: 12px;
+      transition: color 0.3s ease;
+    }
+
+    .footer-column a:hover { color: white; }
+
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 30px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .footer-copy { font-size: 14px; color: var(--gray-500); }
+
+    .footer-links { display: flex; gap: 24px; }
+
+    .footer-links a {
+      font-size: 14px;
+      color: var(--gray-500);
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    .footer-links a:hover { color: white; }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .hero-content { grid-template-columns: 1fr; text-align: center; gap: 60px; }
+      .hero-text { max-width: 100%; margin: 0 auto; }
+      .hero-buttons { justify-content: center; }
+      .hero-float-1, .hero-float-2, .hero-float-3 { display: none; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .feature-bento { grid-template-columns: 1fr; }
+      .feature-card.messaging, .feature-card.payments, .feature-card.moments, .feature-card.wallet { grid-column: span 1; }
+      .preview-grid { grid-template-columns: 1fr; gap: 60px; }
+      .earnings-content, .miniapps-content { grid-template-columns: 1fr; gap: 60px; }
+      .security-grid { grid-template-columns: 1fr; }
+      .footer-content { grid-template-columns: 1fr 1fr; }
+    }
+
     @media (max-width: 768px) {
       .nav-links { display: none; }
       .nav-mobile-toggle { display: block; }
-
-      .hero { padding: 100px 20px 60px; }
-      .hero h1 { font-size: 42px; letter-spacing: -1px; }
-      .hero .tagline { font-size: 20px; }
-      .hero .subtitle { font-size: 16px; }
-
-      .features h2, .preview h2, .security h2, .cta h2 {
-        font-size: 32px;
-      }
-
-      .phone-mockup { width: 220px; }
-
-      .waitlist-form {
+      .nav-links.mobile-open {
+        display: flex;
         flex-direction: column;
-        border-radius: 20px;
-        padding: 8px;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        padding: 24px;
+        gap: 16px;
+        border-bottom: 1px solid var(--gray-200);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
       }
-
-      .waitlist-form input {
-        text-align: center;
-        padding: 16px;
-      }
-
-      .waitlist-form button {
-        width: 100%;
-        border-radius: 16px;
-      }
+      .hero { padding: 130px 0 80px; }
+      .hero h1 { font-size: 40px; }
+      .hero-tagline { font-size: 17px; }
+      .section-title { font-size: 32px; }
+      .stats-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
+      .stat-value { font-size: 28px; }
+      .footer-content { grid-template-columns: 1fr; gap: 40px; }
+      .footer-bottom { flex-direction: column; gap: 20px; text-align: center; }
+      .cta h2 { font-size: 32px; }
+      .cta-form { flex-direction: column; }
+      .miniapps-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
-    /* Mobile Nav Menu */
-    .mobile-menu {
-      display: none;
-      position: fixed;
-      top: 74px;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.95);
-      backdrop-filter: blur(20px);
-      padding: 24px;
-      border-bottom: 1px solid rgba(0, 102, 255, 0.2);
-      z-index: 999;
+    /* Scroll Animations */
+    .animate-on-scroll {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: all 0.8s ease;
     }
 
-    .mobile-menu.active { display: block; }
-
-    .mobile-menu a {
-      display: block;
-      padding: 16px;
-      color: var(--white);
-      text-decoration: none;
-      font-weight: 500;
-      text-align: center;
-      transition: all 0.3s ease;
-    }
-
-    .mobile-menu a:hover {
-      color: var(--primary-light);
-      background: rgba(0, 102, 255, 0.1);
-      border-radius: 12px;
+    .animate-on-scroll.visible {
+      opacity: 1;
+      transform: translateY(0);
     }
   </style>
 </head>
 <body>
-  <canvas id="background-canvas"></canvas>
-
   <!-- Navigation -->
-  <nav class="nav">
+  <nav class="nav" id="nav">
     <div class="nav-container">
       <a href="#" class="nav-logo">
         <div class="nav-logo-icon">
@@ -706,121 +1869,477 @@
         </div>
         <span class="nav-logo-text">SwipeMe</span>
       </a>
-      <div class="nav-links">
+      <div class="nav-links" id="navLinks">
         <a href="#features" class="nav-link">Features</a>
-        <a href="#preview" class="nav-link">Preview</a>
-        <a href="#security" class="nav-link">Security</a>
-        <a href="#waitlist" class="nav-cta">Join Waitlist</a>
+        <a href="#preview" class="nav-link">App Preview</a>
+        <a href="#earnings" class="nav-link">Creators</a>
+        <a href="#faq" class="nav-link">FAQ</a>
+        <a href="#cta" class="nav-cta">Get Early Access</a>
       </div>
-      <button class="nav-mobile-toggle" id="mobile-toggle" aria-label="Toggle menu">
+      <button class="nav-mobile-toggle" onclick="toggleMobileNav()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 12h18M3 6h18M3 18h18"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
         </svg>
       </button>
     </div>
   </nav>
 
-  <!-- Mobile Menu -->
-  <div class="mobile-menu" id="mobile-menu">
-    <a href="#features">Features</a>
-    <a href="#preview">Preview</a>
-    <a href="#security">Security</a>
-    <a href="#waitlist">Join Waitlist</a>
-  </div>
-
   <!-- Hero Section -->
   <section class="hero">
-    <div class="hero-content">
-      <img src="/assets/images/icon.png" alt="SwipeMe" class="hero-logo">
-      <h1 class="cursive">SwipeMe</h1>
-      <p class="tagline cursive">Just SwipeMe - instant money, straight from your chat</p>
-      <p class="subtitle">The decentralized super app for messaging and payments. Chat, pay, earn - all in one secure flow on Tempo.</p>
-      <div class="hero-buttons">
-        <a href="#waitlist" class="glow-button">
-          Get Early Access
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M5 12h14M12 5l7 7-7 7"/>
-          </svg>
-        </a>
-        <a href="#features" class="glow-button secondary">Explore Features</a>
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-text">
+          <div class="hero-badge">
+            <span class="hero-badge-dot"></span>
+            Live on Tempo Testnet
+          </div>
+          <h1>The <span class="highlight">Super App</span> for Instant Payments</h1>
+          <p class="hero-tagline">SwipeMe combines encrypted messaging, blockchain payments, social moments, and mini-apps into one powerful platform. Send money as easily as sending a message.</p>
+          <div class="hero-buttons">
+            <a href="#cta" class="btn-primary">
+              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              Join Waitlist
+            </a>
+            <a href="#features" class="btn-secondary">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+              See Features
+            </a>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-float-1">
+            <div class="float-icon">
+              <svg viewBox="0 0 24 24" style="stroke: #10B981; fill: none; stroke-width: 2;"><polyline points="20 6 9 17 4 12"/></svg>
+              +$50 Received
+            </div>
+          </div>
+          <div class="hero-float-2">
+            <div class="float-icon">
+              <svg viewBox="0 0 24 24" style="stroke: #0066FF; fill: none; stroke-width: 2;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              E2E Encrypted
+            </div>
+          </div>
+          <div class="hero-float-3">
+            <div class="float-icon">
+              <svg viewBox="0 0 24 24" style="stroke: #EC4899; fill: #EC4899; stroke-width: 2;"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              2.4K Likes
+            </div>
+          </div>
+          <div class="hero-phone">
+            <div class="hero-phone-screen">
+              <div class="hero-phone-notch"></div>
+              <div class="tiktok-feed">
+                <div class="tiktok-nav">
+                  <span class="tiktok-nav-item">Following</span>
+                  <span class="tiktok-nav-item active">For You</span>
+                </div>
+                <div class="tiktok-video">
+                  <div class="tiktok-content">
+                    <div class="tiktok-info">
+                      <div class="tiktok-user">
+                        <div class="tiktok-avatar">S</div>
+                        <span class="tiktok-username">@swipeme_creator</span>
+                      </div>
+                      <p class="tiktok-caption">First $1K earned through tips on SwipeMe! The future of creator monetization is here</p>
+                      <div class="tiktok-music">
+                        <div class="tiktok-music-disc"></div>
+                        <span>Original Sound - swipeme</span>
+                      </div>
+                    </div>
+                    <div class="tiktok-actions">
+                      <div class="tiktok-action">
+                        <div class="tiktok-action-btn liked">
+                          <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        </div>
+                        <span class="tiktok-action-count">24.7K</span>
+                      </div>
+                      <div class="tiktok-action">
+                        <div class="tiktok-action-btn">
+                          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <span class="tiktok-action-count">1.2K</span>
+                      </div>
+                      <div class="tiktok-action">
+                        <div class="tiktok-action-btn">
+                          <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                        </div>
+                        <span class="tiktok-action-count">3.4K</span>
+                      </div>
+                      <div class="tiktok-tip-btn">
+                        <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        <span class="tiktok-tip-text">$5</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="tiktok-progress">
+                  <div class="tiktok-progress-bar"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Bar -->
+  <section class="stats-bar">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value">4</div>
+          <div class="stat-label">Stablecoins Supported</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">E2E</div>
+          <div class="stat-label">Encrypted Messages</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">Instant</div>
+          <div class="stat-label">Settlement Time</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">100%</div>
+          <div class="stat-label">Self-Custodial</div>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- Features Section -->
   <section class="features" id="features">
-    <h2>Unlock the Power</h2>
-    <p class="section-subtitle">Everything you need in one seamless experience</p>
-    <div class="feature-cards">
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </div>
-        <h3>Encrypted Messaging</h3>
-        <p>XMTP-powered end-to-end encrypted chats with groups, attachments, and disappearing messages.</p>
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <span class="section-label">Features</span>
+        <h2 class="section-title">Everything You Need in One App</h2>
+        <p class="section-subtitle">From messaging to payments to social content - SwipeMe brings together all the features you need into a seamless super app experience.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+
+      <div class="feature-bento">
+        <div class="feature-card messaging animate-on-scroll">
+          <div class="feature-icon-large blue">
+            <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          </div>
+          <h3>Encrypted Messaging</h3>
+          <p>End-to-end encrypted conversations powered by XMTP. Your messages are truly private - not even we can read them. Real-time streaming, voice messages, and disappearing messages built in.</p>
+          <div class="feature-pills">
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>XMTP Protocol</span>
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Real-time Sync</span>
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>Voice Messages</span>
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Disappearing</span>
+          </div>
         </div>
-        <h3>Instant Payments</h3>
-        <p>Sub-second transfers with multi-stablecoin support. pathUSD, AlphaUSD, BetaUSD, and ThetaUSD.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M2 12h20"/></svg>
+
+        <div class="feature-card payments animate-on-scroll">
+          <div class="feature-icon-large green">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <h3>Instant P2P Payments</h3>
+          <p>Send stablecoins directly from your chat. Money lands in their wallet instantly. Multi-asset support for pathUSD, AlphaUSD, BetaUSD, and ThetaUSD.</p>
+          <div class="feature-pills">
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>Sub-second</span>
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Multi-asset</span>
+          </div>
         </div>
-        <h3>Self-Custodial Wallets</h3>
-        <p>Biometric-secured, AES-256 encrypted keys. Your keys, your crypto - full control always.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
+
+        <div class="feature-card moments animate-on-scroll">
+          <div class="feature-icon-large purple">
+            <svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+          </div>
+          <h3>TikTok-Style Moments</h3>
+          <p>Share updates with your followers and get discovered through our recommendation algorithm. Get rewarded through tips from fans who love your content.</p>
+          <div class="feature-pills">
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>Tips</span>
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>Short Video</span>
+          </div>
         </div>
-        <h3>Creator Monetization</h3>
-        <p>TikTok-style Moments feed with tipping. Creators earn rewards directly from their audience.</p>
+
+        <div class="feature-card wallet animate-on-scroll">
+          <div class="feature-icon-large orange">
+            <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <h3>Self-Custodial Wallet</h3>
+          <p>Your keys, your crypto. Generate or import wallets with seed phrases or private keys. All secured with military-grade AES-256-GCM encryption and biometric authentication.</p>
+          <div class="feature-pills">
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>AES-256</span>
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>Biometric</span>
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>Self-Custody</span>
+            <span class="feature-pill"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Multi-Token</span>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- Preview Section -->
+  <!-- App Preview Section -->
   <section class="preview" id="preview">
-    <h2>See It in Action</h2>
-    <div class="preview-container">
-      <div class="phone-mockup">
-        <div class="phone-screen">
-          <div class="phone-notch"></div>
-          <div class="screen-content">
-            <svg class="screen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <h4>Secure Chats</h4>
-            <p>End-to-end encrypted messaging with XMTP protocol</p>
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <span class="section-label">App Preview</span>
+        <h2 class="section-title">See SwipeMe in Action</h2>
+        <p class="section-subtitle">A beautiful, intuitive interface designed for seamless messaging and payments on mobile.</p>
+      </div>
+
+      <div class="preview-grid">
+        <!-- Wallet Screen -->
+        <div class="preview-item animate-on-scroll">
+          <div class="preview-phone">
+            <div class="preview-screen">
+              <div class="screen-wallet">
+                <div class="wallet-header">
+                  <div class="wallet-label">Total Balance</div>
+                  <div class="wallet-balance">$2,847.50</div>
+                  <div class="wallet-address">0x7f4...8e2a</div>
+                </div>
+                <div class="wallet-actions">
+                  <div class="wallet-action">Send</div>
+                  <div class="wallet-action">Receive</div>
+                </div>
+                <div class="wallet-tokens">
+                  <div class="token-item">
+                    <div class="token-icon" style="background: linear-gradient(135deg, #0066FF 0%, #00C8FF 100%);">pUSD</div>
+                    <div class="token-info">
+                      <div class="token-name">pathUSD</div>
+                      <div class="token-symbol">pUSD</div>
+                    </div>
+                    <div class="token-amount">$1,250.00</div>
+                  </div>
+                  <div class="token-item">
+                    <div class="token-icon" style="background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);">aUSD</div>
+                    <div class="token-info">
+                      <div class="token-name">AlphaUSD</div>
+                      <div class="token-symbol">aUSD</div>
+                    </div>
+                    <div class="token-amount">$847.50</div>
+                  </div>
+                  <div class="token-item">
+                    <div class="token-icon" style="background: linear-gradient(135deg, #10B981 0%, #00D4AA 100%);">bUSD</div>
+                    <div class="token-info">
+                      <div class="token-name">BetaUSD</div>
+                      <div class="token-symbol">bUSD</div>
+                    </div>
+                    <div class="token-amount">$750.00</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <h4 class="preview-label">Multi-Asset Wallet</h4>
+          <p class="preview-desc">Manage all your stablecoins in one place</p>
+        </div>
+
+        <!-- Chat Screen -->
+        <div class="preview-item animate-on-scroll">
+          <div class="preview-phone">
+            <div class="preview-screen">
+              <div class="screen-chat">
+                <div class="chat-header">
+                  <div class="chat-header-avatar">SK</div>
+                  <div>
+                    <div class="chat-header-name">Sarah Kim</div>
+                    <div class="chat-header-status">Online</div>
+                  </div>
+                </div>
+                <div class="chat-messages">
+                  <div class="chat-bubble received">Hey, can you send me the 50 for dinner?</div>
+                  <div class="chat-bubble sent">Sure! Sending now</div>
+                  <div class="chat-bubble payment">
+                    <div class="payment-amount">$50.00 Sent</div>
+                    <div class="payment-note">For dinner - Confirmed</div>
+                  </div>
+                  <div class="chat-bubble received">Got it instantly! Thanks</div>
+                  <div class="chat-bubble sent">No problem! Love how fast this is</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <h4 class="preview-label">In-Chat Payments</h4>
+          <p class="preview-desc">Send money directly in your conversations</p>
+        </div>
+
+        <!-- Moments Screen (TikTok style) -->
+        <div class="preview-item animate-on-scroll">
+          <div class="preview-phone">
+            <div class="preview-screen">
+              <div class="screen-moments">
+                <div class="screen-moments-nav">
+                  <span>Following</span>
+                  <span class="active">For You</span>
+                </div>
+                <div class="moments-actions">
+                  <div class="moments-action">
+                    <div class="moments-action-btn liked">
+                      <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    </div>
+                    <span class="moments-action-count">8.2K</span>
+                  </div>
+                  <div class="moments-action">
+                    <div class="moments-action-btn">
+                      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                    <span class="moments-action-count">432</span>
+                  </div>
+                  <div class="moments-action">
+                    <div class="moments-action-btn">
+                      <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    </div>
+                    <span class="moments-action-count">1.1K</span>
+                  </div>
+                  <div class="moments-tip-btn">
+                    <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <span class="moments-tip-text">$5</span>
+                  </div>
+                </div>
+                <div class="screen-moments-content">
+                  <div class="moments-user">
+                    <div class="moments-avatar">M</div>
+                    <span class="moments-username">@mike_dev</span>
+                  </div>
+                  <p class="moments-caption">Shipped a new feature! The Moments feed is now live with tipping.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <h4 class="preview-label">Social Moments</h4>
+          <p class="preview-desc">Share updates and get rewarded through tips</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Creator Earnings Section -->
+  <section class="earnings" id="earnings">
+    <div class="container">
+      <div class="earnings-content">
+        <div class="earnings-text animate-on-scroll">
+          <span class="section-label">For Creators</span>
+          <h2>Get Rewarded Through Tips</h2>
+          <p>SwipeMe lets creators monetize their content through direct tips from fans. No middlemen, no delays - just instant payments straight to your wallet.</p>
+          <div class="earnings-highlights">
+            <div class="earnings-highlight">
+              <div class="earnings-highlight-icon" style="background: var(--gradient-green);">
+                <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div class="earnings-highlight-text">
+                <h4>Direct Fan Support</h4>
+                <p>Fans tip you directly for content they love</p>
+              </div>
+            </div>
+            <div class="earnings-highlight">
+              <div class="earnings-highlight-icon" style="background: var(--gradient-primary);">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+              <div class="earnings-highlight-text">
+                <h4>Weekly Withdrawals</h4>
+                <p>Cash out your earnings every Monday</p>
+              </div>
+            </div>
+            <div class="earnings-highlight">
+              <div class="earnings-highlight-icon" style="background: var(--gradient-purple);">
+                <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div class="earnings-highlight-text">
+                <h4>Real-Time Tracking</h4>
+                <p>Watch your earnings grow instantly</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="earnings-visual animate-on-scroll">
+          <div class="earnings-phone">
+            <div class="earnings-screen">
+              <div class="earnings-header">
+                <div class="earnings-title">Creator Earnings</div>
+                <div class="earnings-total">$1,847.50</div>
+                <div class="earnings-available">$425.00 available to withdraw</div>
+              </div>
+              <div class="earnings-chart">
+                <div class="chart-bars">
+                  <div class="chart-bar"></div>
+                  <div class="chart-bar"></div>
+                  <div class="chart-bar"></div>
+                  <div class="chart-bar"></div>
+                  <div class="chart-bar"></div>
+                  <div class="chart-bar"></div>
+                  <div class="chart-bar"></div>
+                </div>
+              </div>
+              <a href="#" class="withdraw-btn">Withdraw to Wallet</a>
+            </div>
           </div>
         </div>
       </div>
-      <div class="phone-mockup">
-        <div class="phone-screen">
-          <div class="phone-notch"></div>
-          <div class="screen-content">
-            <svg class="screen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="2" y="4" width="20" height="16" rx="2"/>
-              <path d="M6 8h.01M2 12h20"/>
-            </svg>
-            <h4>Crypto Wallet</h4>
-            <p>Multi-asset support with real-time balances</p>
+    </div>
+  </section>
+
+  <!-- Mini Apps Section -->
+  <section class="miniapps" id="miniapps">
+    <div class="container">
+      <div class="miniapps-content">
+        <div class="miniapps-grid animate-on-scroll">
+          <div class="miniapp-item">
+            <div class="miniapp-icon" style="background: var(--gradient-primary);">
+              <svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
+            </div>
+            <div class="miniapp-name">Calculator</div>
+          </div>
+          <div class="miniapp-item">
+            <div class="miniapp-icon" style="background: var(--gradient-green);">
+              <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </div>
+            <div class="miniapp-name">DeFi Swap</div>
+          </div>
+          <div class="miniapp-item">
+            <div class="miniapp-icon" style="background: var(--gradient-purple);">
+              <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="miniapp-name">Tasks</div>
+          </div>
+          <div class="miniapp-item">
+            <div class="miniapp-icon" style="background: var(--gradient-orange);">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="miniapp-name">Timer</div>
+          </div>
+          <div class="miniapp-item">
+            <div class="miniapp-icon" style="background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%);">
+              <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </div>
+            <div class="miniapp-name">Notes</div>
+          </div>
+          <div class="miniapp-item">
+            <div class="miniapp-icon" style="background: var(--gradient-dark);">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </div>
+            <div class="miniapp-name">More...</div>
           </div>
         </div>
-      </div>
-      <div class="phone-mockup">
-        <div class="phone-screen">
-          <div class="phone-notch"></div>
-          <div class="screen-content">
-            <svg class="screen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-            </svg>
-            <h4>In-Chat Payments</h4>
-            <p>Send money instantly without leaving the conversation</p>
+        <div class="miniapps-text animate-on-scroll">
+          <span class="section-label">Mini Apps</span>
+          <h2>A Marketplace of Powerful Tools</h2>
+          <p>Discover and use mini-apps directly within SwipeMe. From DeFi swaps to productivity tools - extend the platform with apps built by the community.</p>
+          <div class="miniapps-features">
+            <div class="miniapps-feature">
+              <div class="miniapps-feature-icon">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <span class="miniapps-feature-text">Seamlessly integrated payment support for all mini-apps</span>
+            </div>
+            <div class="miniapps-feature">
+              <div class="miniapps-feature-icon">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <span class="miniapps-feature-text">Open platform for developers to build and publish apps</span>
+            </div>
+            <div class="miniapps-feature">
+              <div class="miniapps-feature-icon">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <span class="miniapps-feature-text">No need to leave the app - everything works in one place</span>
+            </div>
           </div>
         </div>
       </div>
@@ -829,110 +2348,211 @@
 
   <!-- Security Section -->
   <section class="security" id="security">
-    <h2>Built Secure</h2>
-    <p>On-chain transparency on Tempo - immutable, verifiable, and private. Your data stays yours.</p>
-    <div class="security-badges">
-      <div class="security-badge">
-        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>End-to-End Encrypted</span>
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <span class="section-label">Security First</span>
+        <h2 class="section-title">Built for Privacy and Trust</h2>
+        <p class="section-subtitle">Every aspect of SwipeMe is designed with security and privacy at its core. Your data, your keys, your control.</p>
       </div>
-      <div class="security-badge">
-        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span>Self-Custodial</span>
-      </div>
-      <div class="security-badge">
-        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
-        <span>On-Chain Verified</span>
+
+      <div class="security-grid">
+        <div class="security-card animate-on-scroll">
+          <div class="security-card-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3>Self-Custodial</h3>
+          <p>You hold your private keys. We never have access to your wallet or funds. True ownership means true security.</p>
+        </div>
+        <div class="security-card animate-on-scroll">
+          <div class="security-card-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h3>End-to-End Encrypted</h3>
+          <p>All messages are encrypted using XMTP protocol. Not even SwipeMe can read your conversations.</p>
+        </div>
+        <div class="security-card animate-on-scroll">
+          <div class="security-card-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          </div>
+          <h3>AES-256 Encryption</h3>
+          <p>Military-grade encryption for all sensitive data. Your wallet keys are protected with the strongest encryption available.</p>
+        </div>
+        <div class="security-card animate-on-scroll">
+          <div class="security-card-icon">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <h3>On-Chain Verification</h3>
+          <p>Every transaction is recorded on the Tempo blockchain. Immutable, transparent, and verifiable by anyone.</p>
+        </div>
+        <div class="security-card animate-on-scroll">
+          <div class="security-card-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </div>
+          <h3>Biometric Auth</h3>
+          <p>Protect your wallet with Face ID or fingerprint. Quick, secure access that only you can authorize.</p>
+        </div>
+        <div class="security-card animate-on-scroll">
+          <div class="security-card-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          </div>
+          <h3>Rate Limited</h3>
+          <p>Protection against brute force attacks with intelligent rate limiting on all authentication endpoints.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- Waitlist CTA Section -->
-  <section class="cta" id="waitlist">
-    <h2 class="cursive">Get Early Access</h2>
-    <p>Be among the first to experience the future of social finance</p>
-    <form class="waitlist-form" id="waitlist-form">
-      <input type="email" id="waitlist-email" placeholder="Enter your email" required>
-      <button type="submit" id="waitlist-submit">Swipe In</button>
-    </form>
-    <p class="form-message" id="form-message"></p>
+  <!-- FAQ Section -->
+  <section class="faq" id="faq">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <span class="section-label">FAQ</span>
+        <h2 class="section-title">Frequently Asked Questions</h2>
+        <p class="section-subtitle">Everything you need to know about SwipeMe.</p>
+      </div>
+
+      <div class="faq-list">
+        <div class="faq-item animate-on-scroll">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            <span class="faq-number">1</span>
+            <span class="faq-question-text">What is SwipeMe?</span>
+            <span class="faq-toggle"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-content">SwipeMe is a super app that combines end-to-end encrypted messaging with blockchain-based P2P payments, a social Moments feed, creator monetization, and a mini-apps marketplace. It's like WeChat, but decentralized and built on blockchain technology.</div>
+          </div>
+        </div>
+        <div class="faq-item animate-on-scroll">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            <span class="faq-number">2</span>
+            <span class="faq-question-text">Is my money safe?</span>
+            <span class="faq-toggle"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-content">Yes. SwipeMe uses a self-custodial wallet, meaning you control your private keys. Your wallet is secured with AES-256-GCM encryption and protected by biometric authentication. We never have access to your funds.</div>
+          </div>
+        </div>
+        <div class="faq-item animate-on-scroll">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            <span class="faq-number">3</span>
+            <span class="faq-question-text">What stablecoins are supported?</span>
+            <span class="faq-toggle"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-content">SwipeMe supports multiple stablecoins on the Tempo testnet including pathUSD, AlphaUSD, BetaUSD, and ThetaUSD. You can send and receive any of these tokens within the app.</div>
+          </div>
+        </div>
+        <div class="faq-item animate-on-scroll">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            <span class="faq-number">4</span>
+            <span class="faq-question-text">Are my messages private?</span>
+            <span class="faq-toggle"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-content">Absolutely. All messages are encrypted using the XMTP protocol with end-to-end encryption. Only you and your recipient can read your messages - not even SwipeMe can access them.</div>
+          </div>
+        </div>
+        <div class="faq-item animate-on-scroll">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            <span class="faq-number">5</span>
+            <span class="faq-question-text">How do creators get rewarded?</span>
+            <span class="faq-toggle"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-content">Creators get rewarded through direct tips from fans on their Moments posts. Earnings accumulate in real-time and can be withdrawn weekly on Mondays UTC. It's a simple and transparent way to monetize your content.</div>
+          </div>
+        </div>
+        <div class="faq-item animate-on-scroll">
+          <div class="faq-question" onclick="toggleFaq(this)">
+            <span class="faq-number">6</span>
+            <span class="faq-question-text">Is SwipeMe available now?</span>
+            <span class="faq-toggle"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </div>
+          <div class="faq-answer">
+            <div class="faq-answer-content">SwipeMe is currently in early access on the Tempo testnet. Join our waitlist to be among the first to experience the app when we launch publicly.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta" id="cta">
+    <div class="container">
+      <div class="cta-content animate-on-scroll">
+        <h2>Ready to Experience the Future?</h2>
+        <p>Join thousands waiting for early access to SwipeMe. Be the first to know when we launch.</p>
+        <form class="cta-form" id="waitlistForm">
+          <input type="email" class="cta-input" id="waitlistEmail" placeholder="Enter your email address" required>
+          <button type="submit" class="cta-submit" id="waitlistSubmit">Join Waitlist</button>
+        </form>
+        <p class="cta-message" id="waitlistMessage"></p>
+      </div>
+    </div>
   </section>
 
   <!-- Footer -->
   <footer class="footer">
-    <div class="footer-logo">
-      <img src="/assets/images/icon.png" alt="SwipeMe">
-      <span>SwipeMe</span>
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <a href="#" class="footer-logo">
+            <div class="footer-logo-icon">
+              <img src="/assets/images/icon.png" alt="SwipeMe">
+            </div>
+            <span class="footer-logo-text">SwipeMe</span>
+          </a>
+          <p>The super app for encrypted messaging, instant payments, social moments, and mini-apps. Built on Tempo blockchain.</p>
+          <div class="footer-social">
+            <a href="https://x.com/swipemee_" target="_blank" rel="noopener noreferrer" class="footer-social-link" aria-label="Twitter">
+              <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+          </div>
+        </div>
+        <div class="footer-column">
+          <h4>Product</h4>
+          <a href="#features">Features</a>
+          <a href="#preview">App Preview</a>
+          <a href="#earnings">For Creators</a>
+          <a href="#miniapps">Mini Apps</a>
+        </div>
+        <div class="footer-column">
+          <h4>Resources</h4>
+          <a href="#security">Security</a>
+          <a href="#faq">FAQ</a>
+        </div>
+        <div class="footer-column">
+          <h4>Company</h4>
+          <a href="#cta">Join Waitlist</a>
+          <a href="https://x.com/swipemee_" target="_blank">Twitter</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">2026 SwipeMe. All rights reserved.</p>
+        <div class="footer-links">
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Service</a>
+        </div>
+      </div>
     </div>
-    <div class="footer-links">
-      <a href="https://x.com/swipemee_" target="_blank" rel="noopener">X (Twitter)</a>
-      <a href="https://github.com/jayblitz/SwipeMe" target="_blank" rel="noopener">GitHub</a>
-      <a href="#features">Features</a>
-      <a href="#security">Security</a>
-    </div>
-    <p class="footer-copyright">2026 SwipeMe. Instant money, straight from your chat.</p>
   </footer>
 
   <script>
-    // Glowing pixel background animation
-    const canvas = document.getElementById('background-canvas');
-    const ctx = canvas.getContext('2d');
-    
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+    // Mobile nav toggle
+    function toggleMobileNav() {
+      document.getElementById('navLinks').classList.toggle('mobile-open');
     }
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
 
-    const particles = [];
-    const particleCount = 80;
-
-    for (let i = 0; i < particleCount; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: Math.random() * 2 + 1,
-        speedX: (Math.random() - 0.5) * 0.3,
-        speedY: (Math.random() - 0.5) * 0.3,
-        opacity: Math.random() * 0.5 + 0.2
+    // Close mobile nav when clicking a link
+    document.querySelectorAll('.nav-link, .nav-cta').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('navLinks').classList.remove('mobile-open');
       });
-    }
+    });
 
-    function drawParticles() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      particles.forEach(p => {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(0, 153, 255, ${p.opacity})`;
-        ctx.fill();
-        
-        // Add glow effect
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = 'rgba(0, 191, 255, 0.5)';
-        
-        p.x += p.speedX;
-        p.y += p.speedY;
-        
-        // Wrap around edges
-        if (p.x < 0) p.x = canvas.width;
-        if (p.x > canvas.width) p.x = 0;
-        if (p.y < 0) p.y = canvas.height;
-        if (p.y > canvas.height) p.y = 0;
-        
-        // Pulse opacity
-        p.opacity += (Math.random() - 0.5) * 0.02;
-        p.opacity = Math.max(0.1, Math.min(0.7, p.opacity));
-      });
-      
-      requestAnimationFrame(drawParticles);
-    }
-    drawParticles();
-
-    // Navigation scroll effect
-    const nav = document.querySelector('.nav');
+    // Navbar scroll effect
     window.addEventListener('scroll', () => {
+      const nav = document.getElementById('nav');
       if (window.scrollY > 50) {
         nav.classList.add('scrolled');
       } else {
@@ -940,98 +2560,108 @@
       }
     });
 
-    // Mobile menu toggle
-    const mobileToggle = document.getElementById('mobile-toggle');
-    const mobileMenu = document.getElementById('mobile-menu');
-    
-    mobileToggle.addEventListener('click', () => {
-      mobileMenu.classList.toggle('active');
-    });
-
-    // Close mobile menu when clicking a link
-    mobileMenu.querySelectorAll('a').forEach(link => {
-      link.addEventListener('click', () => {
-        mobileMenu.classList.remove('active');
+    // FAQ accordion
+    function toggleFaq(element) {
+      const faqItem = element.closest('.faq-item');
+      if (!faqItem) return;
+      
+      const wasOpen = faqItem.classList.contains('open');
+      
+      // Close all FAQ items
+      document.querySelectorAll('.faq-item').forEach(item => {
+        item.classList.remove('open');
       });
-    });
+      
+      // Open clicked item if it wasn't open
+      if (!wasOpen) {
+        faqItem.classList.add('open');
+      }
+    }
 
-    // Waitlist form submission
+    // Also add event delegation for FAQ clicks as backup
     document.addEventListener('DOMContentLoaded', function() {
-      const form = document.getElementById('waitlist-form');
-      const emailInput = document.getElementById('waitlist-email');
-      const submitBtn = document.getElementById('waitlist-submit');
-      const messageEl = document.getElementById('form-message');
-
-      if (form) {
-        form.addEventListener('submit', async function(e) {
+      document.querySelectorAll('.faq-question').forEach(question => {
+        question.addEventListener('click', function(e) {
           e.preventDefault();
-          
-          const email = emailInput.value.trim();
-          if (!email) return;
-
-          submitBtn.disabled = true;
-          submitBtn.textContent = 'Joining...';
-          messageEl.textContent = '';
-          messageEl.className = 'form-message';
-
-          try {
-            const response = await fetch('/api/waitlist', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-              messageEl.textContent = 'Welcome to the waitlist! Check your email for confirmation.';
-              messageEl.className = 'form-message success';
-              emailInput.value = '';
-            } else {
-              messageEl.textContent = data.message || 'Something went wrong. Please try again.';
-              messageEl.className = 'form-message error';
-            }
-          } catch (error) {
-            messageEl.textContent = 'Network error. Please try again.';
-            messageEl.className = 'form-message error';
-          } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Swipe In';
-          }
+          toggleFaq(this);
         });
+      });
+      
+      // Attach waitlist form handler
+      const waitlistForm = document.getElementById('waitlistForm');
+      if (waitlistForm) {
+        waitlistForm.addEventListener('submit', submitWaitlist);
       }
     });
 
-    // Smooth scroll for anchor links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', function(e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Waitlist form submission
+    async function submitWaitlist(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      const emailInput = document.getElementById('waitlistEmail');
+      const submitBtn = document.getElementById('waitlistSubmit');
+      const message = document.getElementById('waitlistMessage');
+      
+      if (!emailInput || !submitBtn || !message) {
+        console.error('Waitlist form elements not found');
+        return false;
+      }
+      
+      const email = emailInput.value.trim();
+      if (!email) {
+        message.textContent = 'Please enter your email address.';
+        message.classList.add('error');
+        return false;
+      }
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Joining...';
+      message.textContent = '';
+      message.classList.remove('error');
+      message.classList.remove('success');
+      
+      try {
+        const response = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          message.textContent = data.message || "You've been added to the waitlist!";
+          message.classList.add('success');
+          emailInput.value = '';
+        } else {
+          message.textContent = data.error || 'Something went wrong. Please try again.';
+          message.classList.add('error');
         }
-      });
-    });
+      } catch (error) {
+        console.error('Waitlist error:', error);
+        message.textContent = 'Network error. Please try again.';
+        message.classList.add('error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Join Waitlist';
+      }
+      
+      return false;
+    }
 
-    // Intersection Observer for fade-in animations
-    const observerOptions = {
-      threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
-    };
-
+    // Scroll animations
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          entry.target.style.opacity = '1';
-          entry.target.style.transform = 'translateY(0)';
+          entry.target.classList.add('visible');
         }
       });
-    }, observerOptions);
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
 
-    document.querySelectorAll('.feature-card, .phone-mockup, .security-badge').forEach(el => {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(30px)';
-      el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+    document.querySelectorAll('.animate-on-scroll').forEach(el => {
       observer.observe(el);
     });
   </script>
