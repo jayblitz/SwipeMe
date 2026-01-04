@@ -1398,8 +1398,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sender = await storage.getUserById(senderId!);
       const senderUsername = sender?.username || sender?.displayName || sender?.email?.split("@")[0] || "Someone";
       
-      const truncatedMessage = message.length > 100 ? message.slice(0, 97) + "..." : message;
-      
       const recipientIds = members
         .filter(m => m.userId !== senderId)
         .map(m => m.userId);
@@ -1410,7 +1408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         senderId: senderId!,
         senderName: senderUsername,
         memberIds: recipientIds,
-        content: truncatedMessage,
+        content: message,
         timestamp: storedMessage.createdAt?.toISOString() || new Date().toISOString(),
       });
       

@@ -4,7 +4,7 @@
 SwipeMe is a WeChat-inspired super app that integrates end-to-end encrypted messaging with blockchain-based P2P payments. Its core purpose is to provide "instant money, straight from your chat" by combining secure communication with seamless crypto transactions. The project delivers a cross-platform mobile experience using Expo (React Native). Key capabilities include robust authentication (email verification, 2FA, passkeys), secure wallet management (creation, import, encryption), real-time multi-asset display and transfers on the Tempo testnet, and end-to-end encrypted messaging powered by XMTP. Future ambitions include real-time message streaming, advanced XMTP content types, gas-sponsored transactions, and fiat on-ramp integration.
 
 ## Project Status
-Transitioned from MVP stage to production build phase. Focus is on stability, polished UX, and EAS build compatibility.
+Production build phase. Version 1.0.2 (build 3). Focus is on stability, polished UX, and EAS build compatibility.
 
 **Completed Features:**
 - Moments social feed with text posts, likes, comments
@@ -13,6 +13,13 @@ Transitioned from MVP stage to production build phase. Focus is on stability, po
 - AI Assistant was removed due to security concerns
 - Revenue tracking system with fee analytics (5% tip fees, 1% P2P fees)
 - Creator earnings dashboard with withdrawal functionality
+- Signal-style group chats with server-side message persistence
+- Group admin controls (transfer admin, remove members, leave/delete)
+
+**Recent Security Fixes (v1.0.2):**
+- CSRF protection: Session cookies now use SameSite=Strict
+- Group messages persisted to database with real-time WebSocket broadcast
+- Version tracking with buildNumber (iOS) and versionCode (Android) for rollback capability
 
 ## User Preferences
 - iOS 26 liquid glass UI design aesthetic
