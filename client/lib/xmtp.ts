@@ -1,10 +1,11 @@
-import { Client, Dm, DecodedMessage, PublicIdentity, type Signer } from "@xmtp/react-native-sdk";
+import { Client, Dm, Group, DecodedMessage, PublicIdentity, type Signer } from "@xmtp/react-native-sdk";
 import { Platform } from "react-native";
 import { apiRequest } from "./query-client";
 import * as SecureStore from "expo-secure-store";
 
 export type XMTPClient = Client;
 export type XMTPConversation = Dm;
+export type XMTPGroup = Group;
 export type XMTPMessage = DecodedMessage;
 
 const XMTP_DB_KEY_STORAGE = "xmtp_db_encryption_key";
@@ -194,4 +195,213 @@ export async function streamAllMessages(
       // Ignore cancellation errors
     }
   };
+}
+
+export interface GroupInfo {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  memberAddresses: string[];
+  group: Group;
+  isAdmin: boolean;
+}
+
+export interface CreateGroupOptions {
+  name: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+export async function createGroup(
+  memberAddresses: string[],
+  options: CreateGroupOptions
+): Promise<GroupInfo> {
+  if (!xmtpClient) {
+    throw new Error("XMTP client not initialized");
+  }
+
+  const memberInboxIds: string[] = [];
+  for (const address of memberAddresses) {
+    const peerIdentity = new PublicIdentity(address as `0x${string}`, "ETHEREUM");
+    const inboxId = await xmtpClient.findInboxIdFromIdentity(peerIdentity);
+    if (inboxId) {
+      memberInboxIds.push(inboxId);
+    }
+  }
+
+  const group = await xmtpClient.conversations.newGroup(memberInboxIds, {
+    name: options.name,
+    description: options.description,
+    imageUrl: options.imageUrl,
+    permissionLevel: "admin_only",
+  });
+
+  return {
+    id: group.id,
+    name: options.name,
+    description: options.description,
+    imageUrl: options.imageUrl,
+    memberAddresses,
+    group,
+    isAdmin: true,
+  };
+}
+
+export async function getGroups(): Promise<GroupInfo[]> {
+  if (!xmtpClient) {
+    throw new Error("XMTP client not initialized");
+  }
+
+  const groups = await xmtpClient.conversations.listGroups();
+  const groupInfos: GroupInfo[] = [];
+
+  for (const group of groups) {
+    const members = await group.members();
+    const memberAddresses = members
+      .map(m => m.identities?.[0]?.identifier || "")
+      .filter(Boolean);
+    
+    const isAdmin = members.some(
+      m => m.inboxId === xmtpClient?.inboxId && m.permissionLevel === "admin"
+    );
+
+    const groupName = await group.name();
+    const groupDescription = await group.description();
+    const groupImageUrl = await group.imageUrl();
+
+    groupInfos.push({
+      id: group.id,
+      name: groupName || "Group Chat",
+      description: groupDescription,
+      imageUrl: groupImageUrl,
+      memberAddresses,
+      group,
+      isAdmin,
+    });
+  }
+
+  return groupInfos;
+}
+
+export async function getGroupById(groupId: string): Promise<GroupInfo | null> {
+  if (!xmtpClient) {
+    throw new Error("XMTP client not initialized");
+  }
+
+  const groups = await xmtpClient.conversations.listGroups();
+  const group = groups.find(g => g.id === groupId);
+  
+  if (!group) {
+    return null;
+  }
+
+  const members = await group.members();
+  const memberAddresses = members
+    .map(m => m.identities?.[0]?.identifier || "")
+    .filter(Boolean);
+
+  const isAdmin = members.some(
+    m => m.inboxId === xmtpClient?.inboxId && m.permissionLevel === "admin"
+  );
+
+  const groupName = await group.name();
+  const groupDescription = await group.description();
+  const groupImageUrl = await group.imageUrl();
+
+  return {
+    id: group.id,
+    name: groupName || "Group Chat",
+    description: groupDescription,
+    imageUrl: groupImageUrl,
+    memberAddresses,
+    group,
+    isAdmin,
+  };
+}
+
+export async function addGroupMembers(
+  group: Group,
+  memberAddresses: string[]
+): Promise<void> {
+  if (!xmtpClient) {
+    throw new Error("XMTP client not initialized");
+  }
+
+  const memberInboxIds: string[] = [];
+  for (const address of memberAddresses) {
+    const peerIdentity = new PublicIdentity(address as `0x${string}`, "ETHEREUM");
+    const inboxId = await xmtpClient.findInboxIdFromIdentity(peerIdentity);
+    if (inboxId) {
+      memberInboxIds.push(inboxId);
+    }
+  }
+
+  await group.addMembers(memberInboxIds);
+}
+
+export async function removeGroupMembers(
+  group: Group,
+  memberAddresses: string[]
+): Promise<void> {
+  if (!xmtpClient) {
+    throw new Error("XMTP client not initialized");
+  }
+
+  const memberInboxIds: string[] = [];
+  for (const address of memberAddresses) {
+    const peerIdentity = new PublicIdentity(address as `0x${string}`, "ETHEREUM");
+    const inboxId = await xmtpClient.findInboxIdFromIdentity(peerIdentity);
+    if (inboxId) {
+      memberInboxIds.push(inboxId);
+    }
+  }
+
+  await group.removeMembers(memberInboxIds);
+}
+
+export async function updateGroupName(group: Group, name: string): Promise<void> {
+  await group.updateName(name);
+}
+
+export async function updateGroupDescription(group: Group, description: string): Promise<void> {
+  await group.updateDescription(description);
+}
+
+export async function updateGroupImage(group: Group, imageUrl: string): Promise<void> {
+  await group.updateImageUrl(imageUrl);
+}
+
+export async function sendGroupMessage(group: Group, content: string): Promise<void> {
+  await group.send(content);
+}
+
+export async function getGroupMessages(group: Group): Promise<DecodedMessage[]> {
+  const messages = await group.messages();
+  return messages;
+}
+
+export async function streamGroupMessages(
+  group: Group,
+  onMessage: (message: DecodedMessage) => void | Promise<void>
+): Promise<() => void> {
+  const cancelStream = await group.streamMessages(async (message) => {
+    await Promise.resolve(onMessage(message));
+  });
+  return cancelStream;
+}
+
+export async function leaveGroup(group: Group): Promise<void> {
+  if (!xmtpClient) {
+    throw new Error("XMTP client not initialized");
+  }
+  
+  await group.removeMembers([xmtpClient.inboxId]);
+}
+
+export async function syncGroups(): Promise<void> {
+  if (!xmtpClient) {
+    throw new Error("XMTP client not initialized");
+  }
+  await xmtpClient.conversations.sync();
 }

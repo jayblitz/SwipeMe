@@ -64,8 +64,12 @@ export const chats = pgTable("chats", {
   id: varchar("id")
     .primaryKey()
     .default(sql`gen_random_uuid()`),
-  type: text("type").notNull().default("direct"),
+  type: text("type").notNull().default("direct"), // direct, group
   name: text("name"),
+  description: text("description"),
+  avatarUrl: text("avatar_url"),
+  xmtpGroupId: text("xmtp_group_id"), // XMTP MLS group ID for groups
+  adminId: varchar("admin_id").references(() => users.id), // Group admin (creator)
   disappearingMessagesTimer: text("disappearing_messages_timer"), // null = off, "24h" | "7d" | "30d"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -77,6 +81,7 @@ export const chatParticipants = pgTable("chat_participants", {
     .default(sql`gen_random_uuid()`),
   chatId: varchar("chat_id").notNull().references(() => chats.id),
   userId: varchar("user_id").notNull().references(() => users.id),
+  role: text("role").notNull().default("member"), // admin, member
   mutedUntil: timestamp("muted_until"),
   joinedAt: timestamp("joined_at").defaultNow(),
 }, (table) => [

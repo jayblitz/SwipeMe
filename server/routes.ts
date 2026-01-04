@@ -659,6 +659,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Group Chat endpoints
+  app.post("/api/groups", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { name, description, avatarUrl, memberIds, xmtpGroupId } = req.body;
+      
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json({ error: "Group name is required" });
+      }
+      
+      if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
+        return res.status(400).json({ error: "At least one member is required" });
+      }
+      
+      const group = await storage.createGroup(userId, {
+        name: name.trim(),
+        description: description?.trim(),
+        avatarUrl,
+        xmtpGroupId,
+        memberIds,
+      });
+      
+      res.json(group);
+    } catch (error) {
+      console.error("Create group error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/groups", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const groups = await storage.getUserGroups(userId);
+      res.json(groups);
+    } catch (error) {
+      console.error("Get groups error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/groups/:groupId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { groupId } = req.params;
+      
+      const group = await storage.getGroupWithMembers(groupId);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      
+      const isMember = group.members.some(m => m.userId === userId);
+      if (!isMember) {
+        return res.status(403).json({ error: "Not a member of this group" });
+      }
+      
+      res.json(group);
+    } catch (error) {
+      console.error("Get group error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/groups/:groupId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { groupId } = req.params;
+      const { name, description, avatarUrl } = req.body;
+      
+      const group = await storage.getGroupById(groupId);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      
+      if (group.adminId !== userId) {
+        return res.status(403).json({ error: "Only admin can update group" });
+      }
+      
+      const updated = await storage.updateGroup(groupId, {
+        name: name?.trim(),
+        description: description?.trim(),
+        avatarUrl,
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Update group error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/groups/:groupId/members", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { groupId } = req.params;
+      const { memberIds } = req.body;
+      
+      if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
+        return res.status(400).json({ error: "Member IDs are required" });
+      }
+      
+      const group = await storage.getGroupById(groupId);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      
+      if (group.adminId !== userId) {
+        return res.status(403).json({ error: "Only admin can add members" });
+      }
+      
+      await storage.addGroupMembers(groupId, memberIds);
+      
+      const updatedGroup = await storage.getGroupWithMembers(groupId);
+      res.json(updatedGroup);
+    } catch (error) {
+      console.error("Add group members error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/groups/:groupId/members/:memberId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { groupId, memberId } = req.params;
+      
+      const group = await storage.getGroupById(groupId);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      
+      if (group.adminId !== userId && userId !== memberId) {
+        return res.status(403).json({ error: "Only admin can remove members, or you can leave" });
+      }
+      
+      if (memberId === group.adminId) {
+        return res.status(400).json({ error: "Admin cannot be removed. Transfer admin first or delete the group." });
+      }
+      
+      await storage.removeGroupMember(groupId, memberId);
+      
+      const updatedGroup = await storage.getGroupWithMembers(groupId);
+      res.json(updatedGroup);
+    } catch (error) {
+      console.error("Remove group member error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/groups/:groupId/leave", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { groupId } = req.params;
+      
+      const group = await storage.getGroupById(groupId);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      
+      if (group.adminId === userId) {
+        return res.status(400).json({ error: "Admin cannot leave. Transfer admin first or delete the group." });
+      }
+      
+      await storage.removeGroupMember(groupId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Leave group error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/groups/:groupId/transfer-admin", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { groupId } = req.params;
+      const { newAdminId } = req.body;
+      
+      if (!newAdminId) {
+        return res.status(400).json({ error: "New admin ID is required" });
+      }
+      
+      const group = await storage.getGroupById(groupId);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      
+      if (group.adminId !== userId) {
+        return res.status(403).json({ error: "Only current admin can transfer admin role" });
+      }
+      
+      const members = await storage.getGroupMembers(groupId);
+      const isNewAdminMember = members.some(m => m.userId === newAdminId);
+      if (!isNewAdminMember) {
+        return res.status(400).json({ error: "New admin must be a member of the group" });
+      }
+      
+      await storage.transferGroupAdmin(groupId, userId, newAdminId);
+      
+      const updatedGroup = await storage.getGroupWithMembers(groupId);
+      res.json(updatedGroup);
+    } catch (error) {
+      console.error("Transfer admin error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/groups/:groupId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { groupId } = req.params;
+      
+      const group = await storage.getGroupById(groupId);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      
+      if (group.adminId !== userId) {
+        return res.status(403).json({ error: "Only admin can delete the group" });
+      }
+      
+      await storage.deleteGroup(groupId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete group error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Moments (Social Feed) endpoints
   app.get("/api/moments", requireAuth, async (req: Request, res: Response) => {
     try {

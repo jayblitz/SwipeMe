@@ -4,6 +4,7 @@ import {
   users, 
   verificationCodes, 
   wallets, 
+  chats,
   chatParticipants, 
   waitlistSignups,
   passkeys,
@@ -19,6 +20,7 @@ import {
   type Wallet,
   type WaitlistSignup,
   type Passkey,
+  type Chat,
   type ChatParticipant,
   type Follow,
   type Post,
@@ -877,5 +879,193 @@ export const storage = {
       .from(revenueLedger)
       .orderBy(desc(revenueLedger.createdAt))
       .limit(limit);
+  },
+
+  async createGroup(adminId: string, data: {
+    name: string;
+    description?: string;
+    avatarUrl?: string;
+    xmtpGroupId?: string;
+    memberIds: string[];
+  }): Promise<Chat & { members: Array<ChatParticipant & { user: User }> }> {
+    const [group] = await db.insert(chats)
+      .values({
+        type: "group",
+        name: data.name,
+        description: data.description,
+        avatarUrl: data.avatarUrl,
+        xmtpGroupId: data.xmtpGroupId,
+        adminId,
+      })
+      .returning();
+
+    await db.insert(chatParticipants)
+      .values({
+        chatId: group.id,
+        userId: adminId,
+        role: "admin",
+      });
+
+    for (const memberId of data.memberIds) {
+      if (memberId !== adminId) {
+        await db.insert(chatParticipants)
+          .values({
+            chatId: group.id,
+            userId: memberId,
+            role: "member",
+          });
+      }
+    }
+
+    return this.getGroupWithMembers(group.id) as Promise<Chat & { members: Array<ChatParticipant & { user: User }> }>;
+  },
+
+  async getGroupById(groupId: string): Promise<Chat | undefined> {
+    const [group] = await db.select()
+      .from(chats)
+      .where(and(
+        eq(chats.id, groupId),
+        eq(chats.type, "group")
+      ));
+    return group;
+  },
+
+  async getUserGroups(userId: string): Promise<Array<Chat & { members: Array<ChatParticipant & { user: User }> }>> {
+    const participations = await db.select()
+      .from(chatParticipants)
+      .where(eq(chatParticipants.userId, userId));
+
+    const groupIds = participations.map(p => p.chatId);
+    if (groupIds.length === 0) return [];
+
+    const groups = await db.select()
+      .from(chats)
+      .where(and(
+        inArray(chats.id, groupIds),
+        eq(chats.type, "group")
+      ))
+      .orderBy(desc(chats.updatedAt));
+
+    const result: Array<Chat & { members: Array<ChatParticipant & { user: User }> }> = [];
+    for (const group of groups) {
+      const withMembers = await this.getGroupWithMembers(group.id);
+      if (withMembers) {
+        result.push(withMembers);
+      }
+    }
+
+    return result;
+  },
+
+  async getGroupWithMembers(groupId: string): Promise<(Chat & { members: Array<ChatParticipant & { user: User }> }) | null> {
+    const [group] = await db.select()
+      .from(chats)
+      .where(and(
+        eq(chats.id, groupId),
+        eq(chats.type, "group")
+      ));
+
+    if (!group) return null;
+
+    const participants = await db.select()
+      .from(chatParticipants)
+      .where(eq(chatParticipants.chatId, groupId));
+
+    const members: Array<ChatParticipant & { user: User }> = [];
+    for (const participant of participants) {
+      const user = await this.getUserById(participant.userId);
+      if (user) {
+        members.push({ ...participant, user });
+      }
+    }
+
+    return { ...group, members };
+  },
+
+  async getGroupMembers(groupId: string): Promise<ChatParticipant[]> {
+    return db.select()
+      .from(chatParticipants)
+      .where(eq(chatParticipants.chatId, groupId));
+  },
+
+  async updateGroup(groupId: string, data: {
+    name?: string;
+    description?: string;
+    avatarUrl?: string;
+  }): Promise<Chat | undefined> {
+    const updateData: Partial<Chat> = { updatedAt: new Date() };
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl;
+
+    const [updated] = await db.update(chats)
+      .set(updateData)
+      .where(eq(chats.id, groupId))
+      .returning();
+    return updated;
+  },
+
+  async addGroupMembers(groupId: string, memberIds: string[]): Promise<void> {
+    for (const memberId of memberIds) {
+      const existing = await db.select()
+        .from(chatParticipants)
+        .where(and(
+          eq(chatParticipants.chatId, groupId),
+          eq(chatParticipants.userId, memberId)
+        ));
+
+      if (existing.length === 0) {
+        await db.insert(chatParticipants)
+          .values({
+            chatId: groupId,
+            userId: memberId,
+            role: "member",
+          });
+      }
+    }
+
+    await db.update(chats)
+      .set({ updatedAt: new Date() })
+      .where(eq(chats.id, groupId));
+  },
+
+  async removeGroupMember(groupId: string, memberId: string): Promise<void> {
+    await db.delete(chatParticipants)
+      .where(and(
+        eq(chatParticipants.chatId, groupId),
+        eq(chatParticipants.userId, memberId)
+      ));
+
+    await db.update(chats)
+      .set({ updatedAt: new Date() })
+      .where(eq(chats.id, groupId));
+  },
+
+  async transferGroupAdmin(groupId: string, oldAdminId: string, newAdminId: string): Promise<void> {
+    await db.update(chatParticipants)
+      .set({ role: "member" })
+      .where(and(
+        eq(chatParticipants.chatId, groupId),
+        eq(chatParticipants.userId, oldAdminId)
+      ));
+
+    await db.update(chatParticipants)
+      .set({ role: "admin" })
+      .where(and(
+        eq(chatParticipants.chatId, groupId),
+        eq(chatParticipants.userId, newAdminId)
+      ));
+
+    await db.update(chats)
+      .set({ adminId: newAdminId, updatedAt: new Date() })
+      .where(eq(chats.id, groupId));
+  },
+
+  async deleteGroup(groupId: string): Promise<void> {
+    await db.delete(chatParticipants)
+      .where(eq(chatParticipants.chatId, groupId));
+
+    await db.delete(chats)
+      .where(eq(chats.id, groupId));
   },
 };
