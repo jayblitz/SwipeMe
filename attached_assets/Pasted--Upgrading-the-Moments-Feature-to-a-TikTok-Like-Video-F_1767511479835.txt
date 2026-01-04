@@ -1,0 +1,111 @@
+### Upgrading the Moments Feature to a TikTok-Like Video Feed in SwipeMe
+
+Based on the SwipeMe GitHub repo (https://github.com/jayblitz/SwipeMe), the Moments feature (added in recent commits as a basic post-sharing system in MomentsScreen.tsx with API /api/moments) is a good start but lacks the addictive, vertical-scrolling video experience of TikTok. To transform it into a full TikTok-like feed—short videos, infinite scroll, likes/comments/tips, and swipe navigation—we'll leverage React Native's FlatList for paging, expo-av for video playback (already in your deps), and gestures for interactions. This makes Moments a core super app pillar: Creators upload shorts, users swipe through, tip with stablecoins, and engage live—shaking finance by turning content into instant income.
+
+Research from tutorials (e.g., NotJust.dev's DEVember, dev.to guides, and YouTube by Albert Cabrera Jr.) emphasizes: Use FlatList with snapToInterval=screen height for full-screen swipes, auto-play/pause based on visibility, infinite loading via onEndReached, and overlays for likes/comments. No heavy deps needed beyond expo-av; keep it performant for mobile. We'll tie tips to your payment system (Viem/Tempo) for transformative monetization—creators get real-time stablecoin tips, withdrawable instantly.
+
+#### Why This Upgrade?
+- **Transformative Impact**: From static posts to dynamic feeds—users "need" it for endless entertainment, creators for direct earnings (no platform cuts like TikTok's 50%). Shakes finance: Tips flow as stablecoins, building micro-economies in chats.
+- **Intuitive UX**: Vertical swipes feel natural; AI-recommended feeds (future phase) personalize like TikTok algorithms.
+- **Repo Fit**: Builds on existing (e.g., attachments in chats use expo-image-picker—extend for videos; DB schema has moments table—add videoUrl/likes/comments).
+
+#### Step-by-Step Implementation
+1. **Prep Dependencies** (5 min): Ensure expo-av and react-native-gesture-handler are installed (already in package.json—verify: `npm ls expo-av`). Add if needed: `npx expo install expo-av react-native-video` (fallback for complex playback).
+
+2. **Backend Enhancements: Video Storage and Feed API** (30 min)  
+   - Update shared/schema.ts: Add to moments table—`videoUrl: varchar('videoUrl', { length: 255 })`, `likes: integer('likes').default(0)`, `comments: jsonb('comments').default([])`.
+   - In server/routes/moments.ts (or create):
+     ```js
+     const multer = require('multer'); // For uploads (npm i multer)
+     const upload = multer({ dest: 'uploads/' }); // Or use S3 for production (free AWS tier)
+     app.post('/api/moments/upload', upload.single('video'), async (req, res) => {
+       const videoUrl = `/uploads/${req.file.filename}`; // Save path or S3 URL
+       await db.insert(moments).values({ userId: req.user.id, videoUrl, caption: req.body.caption });
+       res.send('Uploaded');
+     });
+     app.get('/api/moments/feed', async (req, res) => {
+       const { page = 1, limit = 10 } = req.query;
+       const feed = await db.select().from(moments).orderBy(desc(moments.createdAt)).limit(limit).offset((page-1)*limit);
+       res.json(feed);
+     });
+     app.post('/api/moments/:id/like', async (req, res) => {
+       await db.update(moments).set({ likes: sql`likes + 1` }).where(eq(moments.id, req.params.id));
+       res.send('Liked');
+     });
+     // Similar for /comment (append to jsonb array)
+     ```
+   - Run `npm run db:push` to apply schema changes.
+
+3. **Client-Side: TikTok Feed UI in MomentsScreen.tsx** (1-2 hours)  
+   - Replace list with video-optimized FlatList:
+     ```tsx
+     import { Video } from 'expo-av';
+     import { FlatList, Dimensions, View, Text, TouchableOpacity } from 'react-native';
+     import { useState, useEffect, useRef } from 'react';
+
+     const { height } = Dimensions.get('window');
+     const MomentsScreen = () => {
+       const [feed, setFeed] = useState([]);
+       const [page, setPage] = useState(1);
+       const videoRefs = useRef({});
+
+       useEffect(() => { fetchFeed(); }, []);
+
+       async function fetchFeed() {
+         const data = await api.get(`/api/moments/feed?page=${page}`);
+         setFeed(prev => [...prev, ...data]);
+         setPage(page + 1);
+       }
+
+       const onViewableItemsChanged = ({ viewableItems }) => {
+         viewableItems.forEach(item => videoRefs.current[item.id]?.playAsync()); // Play visible
+         // Pause others
+       };
+
+       return (
+         <FlatList
+           data={feed}
+           renderItem={({ item }) => (
+             <View style={{ height, width: '100%' }}>
+               <Video
+                 ref={ref => videoRefs.current[item.id] = ref}
+                 source={{ uri: item.videoUrl }}
+                 style={{ flex: 1 }}
+                 resizeMode="cover"
+                 isLooping
+                 shouldPlay={false} // Control via onViewable
+               />
+               <View style={{ position: 'absolute', bottom: 20, left: 20 }}>
+                 <Text>{item.caption}</Text>
+                 <TouchableOpacity onPress={() => api.post(`/api/moments/${item.id}/like`)}>
+                   <Text>Likes: {item.likes}</Text>
+                 </TouchableOpacity>
+                 {/* Add comment input */}
+               </View>
+             </View>
+           )}
+           keyExtractor={item => item.id.toString()}
+           pagingEnabled
+           snapToInterval={height}
+           decelerationRate="fast"
+           showsVerticalScrollIndicator={false}
+           onEndReached={fetchFeed}
+           onEndReachedThreshold={0.5}
+           onViewableItemsChanged={onViewableItemsChanged}
+           viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+         />
+       );
+     };
+     ```
+   - Upload: In new UploadScreen.tsx: Use expo-image-picker for videos (`type: 'video'`), post to /api/moments/upload.
+
+4. **Enhancements for TikTok Feel** (30 min)  
+   - Double-Tap Likes: Add GestureHandler in MessageBubble.tsx equivalent (PanGesture for taps).
+   - Infinite/Recommendations: In feed API, add AI sorting (future: Use free Hugging Face API for content tags).
+   - Offline: Cache videos with expo-file-system.
+
+5. **Testing and Polish**  
+   - Run in Expo Go: Upload video, swipe feed—play/pause auto, likes update.
+   - Edge: Handle no internet (show cached feed); optimize for battery (pause off-screen videos).
+
+This upgrade makes Moments addictive—creators earn tips (integrate payments: Add "Tip" button calling transfer API). Replit Prompt: "Implement TikTok-like video feed in MomentsScreen.tsx using expo-av and FlatList." It's transformative: SwipeMe becomes the super app for creators to monetize instantly, shaking finance one video at a time.
