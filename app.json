@@ -12,9 +12,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.swipeme.app"
+      "bundleIdentifier": "com.swipeme.app",
+      "buildNumber": "3"
     },
     "android": {
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#0066FF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -1369,7 +1369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/notify/group-message", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { groupId, message } = req.body;
+      const { groupId, message, type, metadata } = req.body;
       const senderId = req.session.userId;
       
       if (!groupId || !message) {
@@ -1387,6 +1387,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "You are not a member of this group" });
       }
       
+      const storedMessage = await storage.createGroupMessage({
+        chatId: groupId,
+        senderId: senderId!,
+        content: message,
+        type: type || "text",
+        metadata,
+      });
+      
       const sender = await storage.getUserById(senderId!);
       const senderUsername = sender?.username || sender?.displayName || sender?.email?.split("@")[0] || "Someone";
       
@@ -1398,17 +1406,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       realtimeService.broadcastGroupMessage({
         groupId,
-        messageId: `msg-${Date.now()}`,
+        messageId: storedMessage.id,
         senderId: senderId!,
         senderName: senderUsername,
         memberIds: recipientIds,
         content: truncatedMessage,
-        timestamp: new Date().toISOString(),
+        timestamp: storedMessage.createdAt?.toISOString() || new Date().toISOString(),
       });
       
-      res.json({ success: true });
+      res.json({ success: true, messageId: storedMessage.id });
     } catch (error) {
       console.error("Group notification error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/groups/:groupId/messages", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { groupId } = req.params;
+      const userId = req.session.userId;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      const group = await storage.getGroupById(groupId);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      
+      const members = await storage.getGroupMembers(groupId);
+      const isMember = members.some(m => m.userId === userId);
+      if (!isMember) {
+        return res.status(403).json({ error: "You are not a member of this group" });
+      }
+      
+      const messages = await storage.getGroupMessages(groupId, limit);
+      
+      const sanitizedMessages = messages.map(msg => ({
+        id: msg.id,
+        chatId: msg.chatId,
+        senderId: msg.senderId,
+        content: msg.content,
+        type: msg.type,
+        metadata: msg.metadata,
+        status: msg.status,
+        createdAt: msg.createdAt,
+        sender: msg.sender ? {
+          id: msg.sender.id,
+          username: msg.sender.username,
+          displayName: msg.sender.displayName,
+          profileImage: msg.sender.profileImage,
+        } : null,
+      }));
+      
+      res.json(sanitizedMessages);
+    } catch (error) {
+      console.error("Get group messages error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

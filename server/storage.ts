@@ -6,6 +6,7 @@ import {
   wallets, 
   chats,
   chatParticipants, 
+  messages,
   waitlistSignups,
   passkeys,
   follows,
@@ -22,6 +23,7 @@ import {
   type Passkey,
   type Chat,
   type ChatParticipant,
+  type Message,
   type Follow,
   type Post,
   type PostComment,
@@ -1067,5 +1069,54 @@ export const storage = {
 
     await db.delete(chats)
       .where(eq(chats.id, groupId));
+  },
+
+  async createGroupMessage(data: {
+    chatId: string;
+    senderId: string;
+    content: string;
+    type?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<Message> {
+    const [message] = await db.insert(messages)
+      .values({
+        chatId: data.chatId,
+        senderId: data.senderId,
+        content: data.content,
+        type: data.type || "text",
+        metadata: data.metadata,
+        status: "sent",
+      })
+      .returning();
+    return message;
+  },
+
+  async getGroupMessages(groupId: string, limit: number = 50): Promise<(Message & { sender: User | null })[]> {
+    const allMessages = await db.select()
+      .from(messages)
+      .where(eq(messages.chatId, groupId))
+      .orderBy(desc(messages.createdAt))
+      .limit(limit);
+    
+    const messagesWithSenders = await Promise.all(
+      allMessages.map(async (msg) => {
+        const sender = await this.getUserById(msg.senderId);
+        return { ...msg, sender: sender || null };
+      })
+    );
+    
+    return messagesWithSenders;
+  },
+
+  async updateMessageStatus(messageId: string, status: string, timestamp?: Date): Promise<void> {
+    const updateData: { status: string; deliveredAt?: Date; readAt?: Date } = { status };
+    if (status === "delivered") {
+      updateData.deliveredAt = timestamp || new Date();
+    } else if (status === "read") {
+      updateData.readAt = timestamp || new Date();
+    }
+    await db.update(messages)
+      .set(updateData)
+      .where(eq(messages.id, messageId));
   },
 };

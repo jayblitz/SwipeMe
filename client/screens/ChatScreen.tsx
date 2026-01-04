@@ -1273,6 +1273,37 @@ export default function ChatScreen() {
       } catch (error) {
         console.error("Failed to load XMTP messages:", error);
       }
+    } else if (isGroup) {
+      try {
+        const baseUrl = getApiUrl();
+        const response = await fetch(new URL(`/api/groups/${chatId}/messages?limit=50`, baseUrl), {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+        
+        if (response.ok) {
+          const serverMessages = await response.json();
+          const convertedMessages: Message[] = serverMessages.map((msg: { id: string; chatId: string; senderId: string; content: string; type: string; createdAt: string; status?: string; sender?: { id: string; username?: string; displayName?: string } }) => ({
+            id: msg.id,
+            chatId: msg.chatId,
+            senderId: msg.senderId === user?.id ? "me" : msg.senderId,
+            content: msg.content || "",
+            timestamp: new Date(msg.createdAt).getTime(),
+            type: msg.type as "text" | "payment" | "image" | "voice" | "location" | "contact" | "document",
+            status: msg.status || "sent",
+            senderName: msg.sender?.displayName || msg.sender?.username || "Unknown",
+          }));
+          setMessages(convertedMessages.sort((a, b) => b.timestamp - a.timestamp));
+        } else {
+          const localMessages = await getMessages(chatId);
+          setMessages(localMessages.sort((a, b) => b.timestamp - a.timestamp));
+        }
+      } catch (error) {
+        console.error("Failed to load group messages from server:", error);
+        const localMessages = await getMessages(chatId);
+        setMessages(localMessages.sort((a, b) => b.timestamp - a.timestamp));
+      }
     } else {
       const [loadedMessages, loadedChats] = await Promise.all([
         getMessages(chatId),
@@ -1291,7 +1322,7 @@ export default function ChatScreen() {
         console.error("Failed to fetch balances:", error);
       }
     }
-  }, [chatId, user?.id, useXMTPMode, peerAddress, client?.inboxId, wallet?.address]);
+  }, [chatId, user?.id, useXMTPMode, peerAddress, client?.inboxId, wallet?.address, isGroup]);
 
   useFocusEffect(
     useCallback(() => {

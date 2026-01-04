@@ -146,7 +146,7 @@ function setupSession(app: express.Application) {
         secure: isProduction,
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
-        sameSite: isProduction ? "none" : "lax",
+        sameSite: "strict",
       },
     })
   );
