@@ -7,7 +7,7 @@ import jwt from "jsonwebtoken";
 import { sendMessageNotification, sendPaymentNotification } from "./pushNotifications";
 import { db } from "./db";
 import { users } from "@shared/schema";
-import { eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 
 interface Connection {
   ws: WebSocket;
@@ -378,6 +378,89 @@ class RealtimeService {
       if (recipientId !== data.userId) {
         this.sendToUser(recipientId, payload);
       }
+    }
+  }
+
+  async broadcastGroupMessage(data: {
+    groupId: string;
+    messageId: string;
+    senderId: string;
+    senderName?: string;
+    memberIds: string[];
+    content?: string;
+    timestamp: string;
+  }) {
+    const payload: MessagePayload = {
+      type: "group_message",
+      conversationId: data.groupId,
+      messageId: data.messageId,
+      senderId: data.senderId,
+      timestamp: data.timestamp,
+    };
+
+    const offlineUserIds: string[] = [];
+
+    for (const memberId of data.memberIds) {
+      if (memberId !== data.senderId) {
+        const wasSent = this.sendToUser(memberId, payload);
+        if (!wasSent) {
+          offlineUserIds.push(memberId);
+        }
+      }
+    }
+
+    if (offlineUserIds.length > 0) {
+      await this.sendPushToOfflineUsers(offlineUserIds, {
+        type: "message",
+        senderName: data.senderName || "Group message",
+        content: data.content || "New message in group",
+        chatId: data.groupId,
+      });
+    }
+  }
+
+  broadcastGroupStatusUpdate(data: {
+    groupId: string;
+    messageId: string;
+    senderId: string;
+    status: "sent" | "delivered" | "read";
+    updatedBy: string;
+    memberIds: string[];
+    timestamp: string;
+  }) {
+    const payload: MessagePayload = {
+      type: "group_status_update",
+      conversationId: data.groupId,
+      messageId: data.messageId,
+      status: data.status,
+      updatedBy: data.updatedBy,
+      timestamp: data.timestamp,
+    };
+
+    this.sendToUser(data.senderId, payload);
+  }
+
+  broadcastGroupMemberChange(data: {
+    groupId: string;
+    action: "added" | "removed" | "left" | "admin_transferred";
+    memberId: string;
+    memberName?: string;
+    memberIds: string[];
+    newAdminId?: string;
+    timestamp: string;
+  }) {
+    const payload: MessagePayload = {
+      type: "group_member_change",
+      conversationId: data.groupId,
+      action: data.action,
+      memberId: data.memberId,
+      memberName: data.memberName,
+      newAdminId: data.newAdminId,
+      timestamp: data.timestamp,
+    };
+
+    for (const memberId of data.memberIds) {
+      this.sendToUser(memberId, payload);
     }
   }
 
