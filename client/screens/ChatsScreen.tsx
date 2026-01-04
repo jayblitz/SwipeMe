@@ -488,6 +488,7 @@ export default function ChatsScreen() {
         visible={showNewMessage}
         onClose={() => setShowNewMessage(false)}
         onStartChat={handleStartChat}
+        onNewGroup={() => navigation.navigate("CreateGroup")}
         deviceContacts={deviceContacts}
       />
     </ThemedView>

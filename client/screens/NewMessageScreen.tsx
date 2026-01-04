@@ -23,6 +23,7 @@ interface NewMessageScreenProps {
   visible: boolean;
   onClose: () => void;
   onStartChat: (user: { id: string; email: string; name?: string; walletAddress?: string }) => void;
+  onNewGroup?: () => void;
   deviceContacts: Contacts.Contact[];
 }
 
@@ -49,7 +50,7 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("");
 
 type ViewMode = "main" | "findByEmail" | "findByUsername";
 
-export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts }: NewMessageScreenProps) {
+export function NewMessageScreen({ visible, onClose, onStartChat, onNewGroup, deviceContacts }: NewMessageScreenProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState("");
@@ -219,11 +220,10 @@ export function NewMessageScreen({ visible, onClose, onStartChat, deviceContacts
   };
 
   const handleNewGroup = () => {
-    Alert.alert(
-      "Coming Soon",
-      "Group chats are coming to SwipeMe! You'll soon be able to create groups, share payments, and chat with multiple friends at once.",
-      [{ text: "OK", style: "default" }]
-    );
+    onClose();
+    if (onNewGroup) {
+      onNewGroup();
+    }
   };
 
   const handleFindByEmail = () => {

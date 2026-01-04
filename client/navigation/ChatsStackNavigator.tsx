@@ -4,13 +4,17 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ChatsScreen from "@/screens/ChatsScreen";
 import ChatScreen from "@/screens/ChatScreen";
 import ContactDetailsScreen from "@/screens/ContactDetailsScreen";
+import CreateGroupScreen from "@/screens/CreateGroupScreen";
+import GroupInfoScreen from "@/screens/GroupInfoScreen";
 import { ThemedText } from "@/components/ThemedText";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
 export type ChatsStackParamList = {
   ChatsList: undefined;
-  Chat: { chatId: string; name: string; peerAddress?: string; avatarId?: string; contactId?: string };
+  Chat: { chatId: string; name: string; peerAddress?: string; avatarId?: string; contactId?: string; isGroup?: boolean };
   ContactDetails: { chatId: string; name: string; peerAddress?: string; avatarId?: string; contactId?: string };
+  CreateGroup: undefined;
+  GroupInfo: { groupId: string; name: string };
 };
 
 const Stack = createNativeStackNavigator<ChatsStackParamList>();
@@ -58,6 +62,22 @@ export default function ChatsStackNavigator() {
       <Stack.Screen
         name="ContactDetails"
         component={ContactDetailsScreen}
+        options={({ route }) => ({
+          ...opaqueOptions,
+          headerTitle: route.params.name,
+        })}
+      />
+      <Stack.Screen
+        name="CreateGroup"
+        component={CreateGroupScreen}
+        options={{
+          ...opaqueOptions,
+          headerTitle: "New Group",
+        }}
+      />
+      <Stack.Screen
+        name="GroupInfo"
+        component={GroupInfoScreen}
         options={({ route }) => ({
           ...opaqueOptions,
           headerTitle: route.params.name,
