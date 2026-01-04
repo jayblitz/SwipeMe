@@ -1,0 +1,76 @@
+### How Signal Groups Work
+
+Signal's group messaging is designed with a strong emphasis on privacy and end-to-end encryption, ensuring that the Signal servers have minimal knowledge about group existence, memberships, or metadata. Here's a detailed breakdown based on Signal's official documentation and technical specifications:
+
+#### Core Technical Protocol
+Signal groups rely on the **Signal Protocol** (formerly TextSecure Protocol), which is an open-source cryptographic framework for end-to-end encrypted messaging. For groups, it extends the Double Ratchet Algorithm (used for 1:1 chats) with additional mechanisms to handle multiple participants while maintaining forward secrecy and post-compromise security. The Double Ratchet provides ratcheting key agreement for message encryption, where each message advances encryption keys to prevent decryption if a key is compromised later.
+
+- **Encryption Model**: Groups use pairwise encrypted channels between members. Messages are encrypted individually for each recipient using their public keys, ensuring E2E protection. A shared **GroupMasterKey** (128-bit random key, unknown to servers) encrypts group state (e.g., membership list, title, avatar). This state is stored on servers in encrypted form, and members decrypt it locally.
+- **Member Management**: 
+  - Admins add/remove members via encrypted updates sent peer-to-peer (P2P). Servers don't know memberships—updates are tagged with a random 128-bit Group ID.
+  - Deterministic encryption ensures consistent ciphertexts for UIDs (user IDs) to avoid duplicates, without revealing identities.
+  - Authentication uses **Keyed-Verification Anonymous Credentials (KVAC)**, an extension of anonymous credentials with zero-knowledge proofs (Schnorr and Fiat-Shamir). Members prove possession of valid credentials (issued by servers tied to UIDs) without revealing who they are.
+- **Message Delivery**: 
+  - Active users receive messages in real-time via persistent connections (WebSockets or long-polling).
+  - Offline delivery uses server-side queuing: Undelivered messages are stored encrypted on servers until the recipient comes online, then pushed via platform notifications (APNS for iOS, FCM for Android).
+  - Delivery receipts and read statuses are handled client-side, with optional "seen by" in groups.
+- **Updates Since 2019**: The 2019 "Private Group System" blog introduced the core model, but by 2025, Signal has enhanced it with post-quantum cryptography (PQXDH key agreement) to protect against future quantum threats, while maintaining the same group architecture. No major overhauls to groups, but improvements in efficiency and metadata minimization (e.g., reduced side-channel risks like delivery receipts potentially leaking metadata).
+
+Signal's groups are limited to 1,000 members, with admin controls for permissions (e.g., who can add members or edit info). The system ensures servers can't learn group details, making it highly private compared to centralized apps like WhatsApp.
+
+### Implementing Signal-Like Groups in SwipeMe
+
+SwipeMe currently uses XMTP for messaging, which is inspired by Signal's protocol and supports similar E2E encryption. However, XMTP's group support is in beta (v3 with MLS—Message Layer Security, an IETF standard Signal also uses for larger groups). To replicate Signal's privacy-focused groups (encrypted memberships, pairwise delivery, offline queuing, and receipts), we can upgrade XMTP and add server-side relays for queuing/pushes—keeping decentralization while achieving "always-on" reliability. This fits your repo: Extend ChatScreen.tsx for groups, use existing expo-notifications for pushes, and add Socket.io for receipts.
+
+#### Recommended Implementation Plan
+We'll build incrementally: Start with group creation/encryption (using XMTP v3), add real-time receipts via WebSockets, and offline delivery with pushes/queuing. No major cost—free deps/tools.
+
+1. **Upgrade to XMTP v3 for Group Encryption**:
+   - Install/update `@xmtp/react-native-sdk` to latest (^0.3.0+ for MLS groups).
+   - In client/lib/xmtp-client.ts:
+     ```tsx
+     import { Client } from '@xmtp/react-native-sdk';
+
+     async function createGroup(members) {
+       const client = await getXMTPClient(); // Your init function
+       const group = await client.conversations.newGroup(members); // Members: array of addresses
+       return group;
+     }
+
+     async function sendGroupMessage(group, text) {
+       await group.send(text);
+       // Mark as 'sent' locally
+     }
+     ```
+   - Privacy: Like Signal, use GroupMasterKey equivalent in XMTP (MLS handles shared keys anonymously).
+
+2. **Add Delivery/Read Receipts (Ticks Like Signal)**:
+   - Use Socket.io for real-time status (single tick: sent to server; double: delivered/read).
+   - Server (index.ts): Add status column to messages table (`status: varchar.default('pending')`).
+     ```js
+     io.on('connection', (socket) => {
+       socket.on('messageSent', (msgId) => io.emit('updateTick', { msgId, status: 'sent' })); // Single tick
+       socket.on('messageDelivered', (msgId) => io.emit('updateTick', { msgId, status: 'delivered' })); // Double tick
+       socket.on('messageRead', (msgId) => io.emit('updateTick', { msgId, status: 'read' })); // Blue ticks
+     });
+     ```
+   - Client (ChatScreen.tsx): On send, emit 'messageSent'; on receive, emit 'messageDelivered'; on view, 'messageRead'. UI: Icons for ticks (gray/single, gray/double, blue/double).
+
+3. **Offline Queuing and Real-Time Delivery (Signal/WhatsApp Style)**:
+   - Server Queuing: If recipient offline, store in pending_messages table; on reconnect (socket 'join'), deliver via XMTP.
+   - Pushes: Use expo-notifications (in deps) for alerts—server sends via expo-server-sdk when new message queued.
+     ```tsx
+     // Client: Register token as before, on push: Fetch pending via /api/sync and decrypt with XMTP.
+     ```
+   - Background Sync: Expo BackgroundFetch to poll/pull on wake.
+
+4. **Member Management (Admin Controls Like Signal)**:
+   - Add group schema (new table: groups with adminId, members jsonb array).
+   - API /api/groups/create: Verify auth, generate GroupID, share master key via XMTP pairwise.
+   - Add/Remove: Admin emits updates via group.send (XMTP handles propagation).
+
+5. **Testing and Edge Cases**:
+   - Simulate offline: Send message, close app—push alerts; reopen to sync/ticks.
+   - Scale: Socket.io handles 10k+ connections; Redis free for queuing if needed.
+
+This makes groups Signal-worthy: Private (no server metadata), reliable (offline pushes), and intuitive (ticks). Integrate with your payments—e.g., group tips. Replit Prompt: "Implement Signal-like groups with XMTP v3, Socket.io ticks, and Expo pushes in my app." It's transformative—groups become secure financial hubs.
