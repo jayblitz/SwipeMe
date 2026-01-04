@@ -28,6 +28,7 @@ import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
 import { useXMTP } from "@/contexts/XMTPContext";
 import { findOrCreateDm, sendXMTPMessage, getMessages as getXMTPMessages, streamMessages, type XMTPConversation } from "@/lib/xmtp";
 import { PaymentCelebration } from "@/components/PaymentCelebration";
+import { realtimeClient } from "@/lib/realtime";
 
 interface AttachmentOption {
   id: string;
@@ -1334,8 +1335,9 @@ export default function ChatScreen() {
           
           const content = msg.content;
           const contentStr = typeof content === "string" ? content : String(content || "");
+          const messageId = msg.id || `xmtp-stream-${Date.now()}`;
           const newMessage: Message = {
-            id: msg.id || `xmtp-stream-${Date.now()}`,
+            id: messageId,
             chatId: chatId,
             senderId: msg.senderInboxId || "unknown",
             content: contentStr,
@@ -1347,6 +1349,10 @@ export default function ChatScreen() {
             if (prev.some(m => m.id === newMessage.id)) return prev;
             return [newMessage, ...prev].sort((a, b) => b.timestamp - a.timestamp);
           });
+          
+          if (realtimeClient.isConnected() && msg.senderInboxId) {
+            realtimeClient.sendDelivered(messageId, chatId, msg.senderInboxId);
+          }
         });
         
         if (isCancelled) {
@@ -1375,6 +1381,40 @@ export default function ChatScreen() {
       }
     };
   }, [useXMTPMode, xmtpDm, client?.inboxId, chatId]);
+
+  useEffect(() => {
+    const unsubscribe = realtimeClient.subscribe("status_update", (data) => {
+      if (data.conversationId !== chatId) return;
+      
+      const messageId = data.messageId;
+      const newStatus = data.status;
+      if (!messageId || !newStatus) return;
+      
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, status: newStatus } : msg
+      ));
+    });
+    
+    return () => unsubscribe();
+  }, [chatId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const unreadMessages = messages.filter(
+        msg => msg.senderId !== "me" && msg.status !== "read"
+      );
+      
+      if (unreadMessages.length > 0 && realtimeClient.isConnected()) {
+        const messageIds = unreadMessages.map(msg => msg.id);
+        const senderId = unreadMessages[0]?.senderId || "";
+        realtimeClient.sendRead(messageIds, chatId, senderId);
+        
+        setMessages(prev => prev.map(msg => 
+          messageIds.includes(msg.id) ? { ...msg, status: "read" } : msg
+        ));
+      }
+    }, [messages, chatId])
+  );
 
   const handleSend = async () => {
     if (!inputText.trim()) return;

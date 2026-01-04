@@ -93,12 +93,31 @@ export const messages = pgTable("messages", {
   content: text("content"),
   type: text("type").notNull().default("text"),
   metadata: jsonb("metadata"),
+  status: text("status").notNull().default("sent"), // pending, sent, delivered, read
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
   expiresAt: timestamp("expires_at"), // For disappearing messages - null means never expires
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("messages_chat_created_idx").on(table.chatId, table.createdAt),
   index("messages_sender_idx").on(table.senderId),
   index("messages_expires_idx").on(table.expiresAt),
+  index("messages_status_idx").on(table.status),
+]);
+
+// Message delivery receipts for group chats (track per-user delivery)
+export const messageReceipts = pgTable("message_receipts", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").notNull().references(() => messages.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("delivered"), // delivered, read
+  deliveredAt: timestamp("delivered_at").defaultNow(),
+  readAt: timestamp("read_at"),
+}, (table) => [
+  index("message_receipts_message_idx").on(table.messageId),
+  index("message_receipts_user_idx").on(table.userId),
 ]);
 
 export const transactions = pgTable("transactions", {
@@ -197,6 +216,7 @@ export type Contact = typeof contacts.$inferSelect;
 export type Chat = typeof chats.$inferSelect;
 export type ChatParticipant = typeof chatParticipants.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type MessageReceipt = typeof messageReceipts.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 
 export const waitlistSignups = pgTable("waitlist_signups", {

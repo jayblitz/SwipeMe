@@ -6,6 +6,7 @@ export interface RealtimeMessage {
   type: string;
   conversationId?: string;
   messageId?: string;
+  messageIds?: string[];
   senderId?: string;
   content?: string;
   timestamp?: string;
@@ -14,6 +15,9 @@ export interface RealtimeMessage {
   transactionHash?: string;
   isTyping?: boolean;
   userId?: string;
+  status?: "sent" | "delivered" | "read";
+  deliveredAt?: string;
+  readAt?: string;
   [key: string]: unknown;
 }
 
@@ -25,6 +29,7 @@ interface RealtimeConfig {
   onNewMessage?: (data: RealtimeMessage) => void;
   onPaymentReceived?: (data: RealtimeMessage) => void;
   onTyping?: (data: RealtimeMessage) => void;
+  onStatusUpdate?: (data: RealtimeMessage) => void;
 }
 
 class RealtimeClient {
@@ -129,6 +134,11 @@ class RealtimeClient {
         this.emit("typing", data);
         break;
 
+      case "status_update":
+        this.config.onStatusUpdate?.(data);
+        this.emit("status_update", data);
+        break;
+
       default:
         this.emit(data.type, data);
     }
@@ -177,6 +187,24 @@ class RealtimeClient {
 
   sendAck(messageId: string) {
     this.send({ type: "ack", messageId });
+  }
+
+  sendDelivered(messageId: string, conversationId: string, senderId: string) {
+    this.send({ 
+      type: "message:delivered", 
+      messageId, 
+      conversationId, 
+      senderId 
+    });
+  }
+
+  sendRead(messageIds: string[], conversationId: string, senderId: string) {
+    this.send({ 
+      type: "message:read", 
+      messageIds, 
+      conversationId, 
+      senderId 
+    });
   }
 
   subscribe(eventType: string, handler: MessageHandler) {

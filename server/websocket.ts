@@ -157,11 +157,53 @@ class RealtimeService {
         case "subscribe":
           break;
         
+        case "message:delivered":
+          this.handleMessageDelivered(connection, message);
+          break;
+        
+        case "message:read":
+          this.handleMessageRead(connection, message);
+          break;
+        
         default:
           console.log(`Unknown message type: ${message.type}`);
       }
     } catch (error) {
       console.error("Error handling WebSocket message:", error);
+    }
+  }
+
+  private handleMessageDelivered(_connection: Connection, message: MessagePayload) {
+    const { messageId, conversationId, senderId } = message;
+    if (!messageId || !senderId) return;
+    
+    const payload: MessagePayload = {
+      type: "status_update",
+      messageId,
+      conversationId,
+      status: "delivered",
+      deliveredAt: new Date().toISOString(),
+    };
+    
+    this.sendToUser(senderId, payload);
+  }
+
+  private handleMessageRead(_connection: Connection, message: MessagePayload) {
+    const { messageIds, conversationId, senderId } = message;
+    if (!messageIds || !senderId) return;
+    
+    const ids = Array.isArray(messageIds) ? messageIds : [messageIds];
+    
+    for (const messageId of ids) {
+      const payload: MessagePayload = {
+        type: "status_update",
+        messageId: messageId as string,
+        conversationId,
+        status: "read",
+        readAt: new Date().toISOString(),
+      };
+      
+      this.sendToUser(senderId, payload);
     }
   }
 
