@@ -23,6 +23,7 @@ import { Video, ResizeMode } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { Share } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
@@ -88,6 +89,12 @@ export default function MomentsScreen() {
   const [showTipModal, setShowTipModal] = useState(false);
   const [tipPostId, setTipPostId] = useState<string | null>(null);
   const [tipLoading, setTipLoading] = useState(false);
+  
+  const [composeStep, setComposeStep] = useState<"picker" | "preview">("picker");
+  const [selectedMedia, setSelectedMedia] = useState<{
+    uri: string;
+    type: "photo" | "video";
+  } | null>(null);
   
   const viewStartTimeRef = useRef<number>(0);
   const likeAnimations = useRef<Map<string, Animated.Value>>(new Map());
@@ -169,18 +176,109 @@ export default function MomentsScreen() {
   }).current;
 
   const createPostMutation = useMutation({
-    mutationFn: async (data: { content: string }) => {
+    mutationFn: async (data: { content: string; mediaType?: string; mediaUrls?: string[] }) => {
       return apiRequest("POST", "/api/moments", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/moments"] });
-      setIsComposeOpen(false);
-      setComposeText("");
+      handleCloseCompose();
     },
     onError: (error: Error) => {
       Alert.alert("Post Failed", error.message || "Could not create post. Please try again.");
     },
   });
+
+  const handleCloseCompose = useCallback(() => {
+    setIsComposeOpen(false);
+    setComposeText("");
+    setSelectedMedia(null);
+    setComposeStep("picker");
+  }, []);
+
+  const pickImage = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission Required", "Photo library access is needed to select photos.");
+      return;
+    }
+    
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images",
+      allowsEditing: true,
+      aspect: [9, 16],
+      quality: 0.8,
+    });
+    
+    if (!result.canceled && result.assets[0]) {
+      setSelectedMedia({ uri: result.assets[0].uri, type: "photo" });
+      setComposeStep("preview");
+    }
+  }, []);
+
+  const pickVideo = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission Required", "Photo library access is needed to select videos.");
+      return;
+    }
+    
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "videos",
+      allowsEditing: true,
+      videoMaxDuration: 60,
+      quality: 0.8,
+    });
+    
+    if (!result.canceled && result.assets[0]) {
+      setSelectedMedia({ uri: result.assets[0].uri, type: "video" });
+      setComposeStep("preview");
+    }
+  }, []);
+
+  const takePhoto = useCallback(async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission Required", "Camera access is needed to take photos.");
+      return;
+    }
+    
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: "images",
+      allowsEditing: true,
+      aspect: [9, 16],
+      quality: 0.8,
+    });
+    
+    if (!result.canceled && result.assets[0]) {
+      setSelectedMedia({ uri: result.assets[0].uri, type: "photo" });
+      setComposeStep("preview");
+    }
+  }, []);
+
+  const recordVideo = useCallback(async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission Required", "Camera access is needed to record videos.");
+      return;
+    }
+    
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: "videos",
+      allowsEditing: true,
+      videoMaxDuration: 60,
+      quality: 0.8,
+    });
+    
+    if (!result.canceled && result.assets[0]) {
+      setSelectedMedia({ uri: result.assets[0].uri, type: "video" });
+      setComposeStep("preview");
+    }
+  }, []);
+
+  const skipMedia = useCallback(() => {
+    setSelectedMedia(null);
+    setComposeStep("preview");
+  }, []);
 
   const likeMutation = useMutation({
     mutationFn: async (postId: string) => {
@@ -209,9 +307,23 @@ export default function MomentsScreen() {
   });
 
   const handlePost = useCallback(() => {
-    if (!composeText.trim()) return;
-    createPostMutation.mutate({ content: composeText.trim() });
-  }, [composeText, createPostMutation]);
+    const postData: { content: string; mediaType?: string; mediaUrls?: string[] } = {
+      content: composeText.trim(),
+    };
+    
+    if (selectedMedia) {
+      Alert.alert(
+        "Coming Soon",
+        "Media posts are coming soon. For now, you can create text-only posts.",
+        [{ text: "OK" }]
+      );
+      return;
+    } else if (!composeText.trim()) {
+      return;
+    }
+    
+    createPostMutation.mutate(postData);
+  }, [composeText, selectedMedia, createPostMutation]);
 
   const handleTip = useCallback(async () => {
     if (!tipPostId || !tipAmount) return;
@@ -364,11 +476,15 @@ export default function MomentsScreen() {
 
     const renderMediaContent = () => {
       if (hasMedia && isVideo) {
+        const isActiveVideo = currentIndex === index;
         return (
           <Video
             ref={(ref) => {
               if (ref) {
                 videoRefs.current.set(item.id, ref);
+                if (isActiveVideo) {
+                  ref.playAsync();
+                }
               } else {
                 videoRefs.current.delete(item.id);
               }
@@ -377,8 +493,15 @@ export default function MomentsScreen() {
             style={styles.fullScreenMedia}
             resizeMode={ResizeMode.COVER}
             isLooping={true}
-            shouldPlay={currentIndex === index}
+            shouldPlay={isActiveVideo}
             isMuted={false}
+            useNativeControls={false}
+            onReadyForDisplay={() => {
+              if (isActiveVideo) {
+                const videoRef = videoRefs.current.get(item.id);
+                videoRef?.playAsync();
+              }
+            }}
           />
         );
       } else if (hasMedia) {
@@ -631,45 +754,175 @@ export default function MomentsScreen() {
       <Modal
         visible={isComposeOpen}
         animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setIsComposeOpen(false)}
+        presentationStyle="fullScreen"
+        onRequestClose={handleCloseCompose}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}
-        >
-          <View style={[styles.modalHeader, { paddingTop: insets.top }]}>
-            <Pressable onPress={() => setIsComposeOpen(false)}>
-              <Text style={[styles.cancelText, { color: theme.textSecondary }]}>Cancel</Text>
-            </Pressable>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>New Moment</Text>
-            <Pressable
-              onPress={handlePost}
-              disabled={createPostMutation.isPending || !composeText.trim()}
-            >
-              <Text
-                style={[
-                  styles.postButtonText,
-                  { color: !composeText.trim() ? theme.textSecondary : Colors.light.primary },
-                ]}
+        <View style={[styles.composeFullScreen, { backgroundColor: theme.backgroundRoot }]}>
+          {composeStep === "picker" ? (
+            <View style={[styles.pickerContainer, { paddingTop: insets.top }]}>
+              <View style={styles.pickerHeader}>
+                <Pressable onPress={handleCloseCompose} style={styles.pickerClose}>
+                  <Feather name="x" size={24} color={theme.text} />
+                </Pressable>
+                <Text style={[styles.pickerTitle, { color: theme.text }]}>Create Moment</Text>
+                <View style={{ width: 40 }} />
+              </View>
+              
+              <View style={styles.mediaOptionsGrid}>
+                <Pressable 
+                  style={[styles.mediaOptionCard, { backgroundColor: theme.backgroundSecondary }]}
+                  onPress={takePhoto}
+                >
+                  <View style={[styles.mediaOptionIcon, { backgroundColor: "#FF2D55" }]}>
+                    <Feather name="camera" size={32} color="#FFF" />
+                  </View>
+                  <Text style={[styles.mediaOptionTitle, { color: theme.text }]}>Take Photo</Text>
+                  <Text style={[styles.mediaOptionDesc, { color: theme.textSecondary }]}>
+                    Capture a moment now
+                  </Text>
+                </Pressable>
+                
+                <Pressable 
+                  style={[styles.mediaOptionCard, { backgroundColor: theme.backgroundSecondary }]}
+                  onPress={recordVideo}
+                >
+                  <View style={[styles.mediaOptionIcon, { backgroundColor: "#FF3B30" }]}>
+                    <Feather name="video" size={32} color="#FFF" />
+                  </View>
+                  <Text style={[styles.mediaOptionTitle, { color: theme.text }]}>Record Video</Text>
+                  <Text style={[styles.mediaOptionDesc, { color: theme.textSecondary }]}>
+                    Up to 60 seconds
+                  </Text>
+                </Pressable>
+                
+                <Pressable 
+                  style={[styles.mediaOptionCard, { backgroundColor: theme.backgroundSecondary }]}
+                  onPress={pickImage}
+                >
+                  <View style={[styles.mediaOptionIcon, { backgroundColor: "#007AFF" }]}>
+                    <Feather name="image" size={32} color="#FFF" />
+                  </View>
+                  <Text style={[styles.mediaOptionTitle, { color: theme.text }]}>Photo Library</Text>
+                  <Text style={[styles.mediaOptionDesc, { color: theme.textSecondary }]}>
+                    Choose from gallery
+                  </Text>
+                </Pressable>
+                
+                <Pressable 
+                  style={[styles.mediaOptionCard, { backgroundColor: theme.backgroundSecondary }]}
+                  onPress={pickVideo}
+                >
+                  <View style={[styles.mediaOptionIcon, { backgroundColor: "#5856D6" }]}>
+                    <Feather name="film" size={32} color="#FFF" />
+                  </View>
+                  <Text style={[styles.mediaOptionTitle, { color: theme.text }]}>Video Library</Text>
+                  <Text style={[styles.mediaOptionDesc, { color: theme.textSecondary }]}>
+                    Select existing video
+                  </Text>
+                </Pressable>
+              </View>
+              
+              <Pressable 
+                style={[styles.textOnlyButton, { borderColor: theme.border }]}
+                onPress={skipMedia}
               >
-                {createPostMutation.isPending ? "Posting..." : "Post"}
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.composeContent}>
-            <TextInput
-              style={[styles.composeInput, { color: theme.text }]}
-              placeholder="What's on your mind?"
-              placeholderTextColor={theme.textSecondary}
-              multiline
-              value={composeText}
-              onChangeText={setComposeText}
-              autoFocus
-            />
-          </View>
-        </KeyboardAvoidingView>
+                <Feather name="type" size={20} color={theme.text} />
+                <Text style={[styles.textOnlyButtonText, { color: theme.text }]}>
+                  Text Only Post
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={styles.previewContainer}
+            >
+              <View style={[styles.previewHeader, { paddingTop: insets.top }]}>
+                <Pressable 
+                  onPress={() => setComposeStep("picker")}
+                  style={styles.previewBack}
+                >
+                  <Feather name="arrow-left" size={24} color={theme.text} />
+                </Pressable>
+                <Text style={[styles.previewTitle, { color: theme.text }]}>Add Caption</Text>
+                <Pressable
+                  onPress={handlePost}
+                  disabled={createPostMutation.isPending || (!composeText.trim() && !selectedMedia)}
+                  style={[
+                    styles.postButton,
+                    { 
+                      backgroundColor: (!composeText.trim() && !selectedMedia) 
+                        ? theme.backgroundSecondary 
+                        : Colors.light.primary 
+                    }
+                  ]}
+                >
+                  {createPostMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={[
+                      styles.postButtonLabel,
+                      { color: (!composeText.trim() && !selectedMedia) ? theme.textSecondary : "#FFF" }
+                    ]}>
+                      Post
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+              
+              {selectedMedia ? (
+                <View style={styles.mediaPreviewContainer}>
+                  {selectedMedia.type === "video" ? (
+                    <Video
+                      source={{ uri: selectedMedia.uri }}
+                      style={styles.mediaPreview}
+                      resizeMode={ResizeMode.CONTAIN}
+                      isLooping
+                      shouldPlay
+                      isMuted={false}
+                    />
+                  ) : (
+                    <Image 
+                      source={{ uri: selectedMedia.uri }} 
+                      style={styles.mediaPreview}
+                      contentFit="contain"
+                    />
+                  )}
+                  <Pressable 
+                    style={styles.removeMediaButton}
+                    onPress={() => {
+                      setSelectedMedia(null);
+                      setComposeStep("picker");
+                    }}
+                  >
+                    <Feather name="x" size={20} color="#FFF" />
+                  </Pressable>
+                </View>
+              ) : null}
+              
+              <View style={[styles.captionContainer, { backgroundColor: theme.backgroundSecondary }]}>
+                <TextInput
+                  style={[styles.captionInput, { color: theme.text }]}
+                  placeholder={selectedMedia ? "Add a caption..." : "What's on your mind?"}
+                  placeholderTextColor={theme.textSecondary}
+                  multiline
+                  value={composeText}
+                  onChangeText={setComposeText}
+                  autoFocus={!selectedMedia}
+                />
+              </View>
+              
+              <View style={[styles.previewTip, { paddingBottom: insets.bottom + Spacing.lg }]}>
+                <Feather name="info" size={14} color={theme.textSecondary} />
+                <Text style={[styles.previewTipText, { color: theme.textSecondary }]}>
+                  {selectedMedia 
+                    ? "Your moment will be shared with all followers"
+                    : "Add media for more engagement"}
+                </Text>
+              </View>
+            </KeyboardAvoidingView>
+          )}
+        </View>
       </Modal>
 
       <Modal
@@ -1226,6 +1479,150 @@ function createStyles(theme: ReturnType<typeof useTheme>["theme"], _isDark: bool
       color: "#FFF",
       fontSize: 16,
       fontWeight: "600",
+    },
+    composeFullScreen: {
+      flex: 1,
+    },
+    pickerContainer: {
+      flex: 1,
+      paddingHorizontal: Spacing.lg,
+    },
+    pickerHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: Spacing.md,
+      marginBottom: Spacing.lg,
+    },
+    pickerClose: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    pickerTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    mediaOptionsGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: Spacing.md,
+      marginBottom: Spacing.lg,
+    },
+    mediaOptionCard: {
+      width: (SCREEN_WIDTH - Spacing.lg * 2 - Spacing.md) / 2,
+      padding: Spacing.lg,
+      borderRadius: BorderRadius.lg,
+      alignItems: "center",
+    },
+    mediaOptionIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: Spacing.md,
+    },
+    mediaOptionTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      marginBottom: Spacing.xs,
+    },
+    mediaOptionDesc: {
+      fontSize: 12,
+      textAlign: "center",
+    },
+    textOnlyButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: Spacing.sm,
+      paddingVertical: Spacing.lg,
+      borderWidth: 1,
+      borderRadius: BorderRadius.lg,
+      marginTop: Spacing.md,
+    },
+    textOnlyButtonText: {
+      fontSize: 16,
+      fontWeight: "500",
+    },
+    previewContainer: {
+      flex: 1,
+    },
+    previewHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.md,
+    },
+    previewBack: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    previewTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+    },
+    postButton: {
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.sm,
+      borderRadius: BorderRadius.lg,
+      minWidth: 80,
+      alignItems: "center",
+    },
+    postButtonLabel: {
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    mediaPreviewContainer: {
+      height: SCREEN_HEIGHT * 0.45,
+      marginHorizontal: Spacing.md,
+      borderRadius: BorderRadius.lg,
+      overflow: "hidden",
+      backgroundColor: "#000",
+      marginBottom: Spacing.md,
+    },
+    mediaPreview: {
+      width: "100%",
+      height: "100%",
+    },
+    removeMediaButton: {
+      position: "absolute",
+      top: Spacing.md,
+      right: Spacing.md,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    captionContainer: {
+      marginHorizontal: Spacing.md,
+      borderRadius: BorderRadius.lg,
+      padding: Spacing.md,
+      flex: 1,
+      marginBottom: Spacing.md,
+    },
+    captionInput: {
+      fontSize: 16,
+      lineHeight: 24,
+      flex: 1,
+      textAlignVertical: "top",
+    },
+    previewTip: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: Spacing.xs,
+      paddingHorizontal: Spacing.lg,
+    },
+    previewTipText: {
+      fontSize: 12,
     },
   });
 }

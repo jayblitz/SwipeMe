@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Modal,
+  TextInput,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Card } from "@/components/Card";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Spacing } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 
@@ -73,6 +76,8 @@ export default function CreatorEarningsScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
 
   const {
     data: earnings,
@@ -102,23 +107,41 @@ export default function CreatorEarningsScreen() {
     setRefreshing(false);
   };
 
-  const handleWithdraw = () => {
+  const handleOpenWithdrawModal = () => {
     if (!earnings || parseFloat(earnings.pendingBalance) <= 0) {
       Alert.alert("No Balance", "You don't have any pending balance to withdraw");
       return;
     }
+    setWithdrawAmount("");
+    setWithdrawModalVisible(true);
+  };
 
-    Alert.alert(
-      "Withdraw Earnings",
-      `Withdraw $${parseFloat(earnings.pendingBalance).toFixed(2)} to your wallet?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Withdraw",
-          onPress: () => withdrawMutation.mutate(earnings.pendingBalance),
-        },
-      ]
-    );
+  const handleConfirmWithdraw = () => {
+    const amount = parseFloat(withdrawAmount);
+    const maxBalance = parseFloat(earnings?.pendingBalance || "0");
+    
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid amount");
+      return;
+    }
+    if (amount > maxBalance) {
+      Alert.alert("Insufficient Balance", `Maximum available: $${maxBalance.toFixed(2)}`);
+      return;
+    }
+    
+    setWithdrawModalVisible(false);
+    withdrawMutation.mutate(withdrawAmount);
+  };
+
+  const handlePresetAmount = (preset: number) => {
+    const maxBalance = parseFloat(earnings?.pendingBalance || "0");
+    const amount = Math.min(preset, maxBalance);
+    setWithdrawAmount(amount.toFixed(2));
+  };
+
+  const handleWithdrawAll = () => {
+    const maxBalance = parseFloat(earnings?.pendingBalance || "0");
+    setWithdrawAmount(maxBalance.toFixed(2));
   };
 
   if (isLoading) {
@@ -244,7 +267,7 @@ export default function CreatorEarningsScreen() {
               backgroundColor: canWithdraw ? theme.money : theme.backgroundTertiary,
             },
           ]}
-          onPress={handleWithdraw}
+          onPress={handleOpenWithdrawModal}
           disabled={!canWithdraw || withdrawMutation.isPending}
         >
           {withdrawMutation.isPending ? (
@@ -269,6 +292,104 @@ export default function CreatorEarningsScreen() {
           </ThemedText>
         ) : null}
       </ScrollView>
+
+      <Modal
+        visible={withdrawModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setWithdrawModalVisible(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay} 
+          onPress={() => setWithdrawModalVisible(false)}
+        >
+          <Pressable 
+            style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <KeyboardAwareScrollViewCompat
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+            <View style={styles.modalHeader}>
+              <ThemedText type="h3">Withdraw Earnings</ThemedText>
+              <Pressable onPress={() => setWithdrawModalVisible(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+
+            <ThemedText style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              Available balance: ${parseFloat(earnings?.pendingBalance || "0").toFixed(2)}
+            </ThemedText>
+
+            <View style={[styles.amountInputContainer, { backgroundColor: theme.backgroundSecondary }]}>
+              <ThemedText style={styles.currencySymbol}>$</ThemedText>
+              <TextInput
+                style={[styles.amountInput, { color: theme.text }]}
+                value={withdrawAmount}
+                onChangeText={setWithdrawAmount}
+                placeholder="0.00"
+                placeholderTextColor={theme.textSecondary}
+                keyboardType="decimal-pad"
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.presetButtonsRow}>
+              <Pressable
+                style={[styles.presetButton, { backgroundColor: theme.backgroundSecondary }]}
+                onPress={() => handlePresetAmount(10)}
+              >
+                <ThemedText style={styles.presetButtonText}>$10</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.presetButton, { backgroundColor: theme.backgroundSecondary }]}
+                onPress={() => handlePresetAmount(25)}
+              >
+                <ThemedText style={styles.presetButtonText}>$25</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.presetButton, { backgroundColor: theme.backgroundSecondary }]}
+                onPress={() => handlePresetAmount(50)}
+              >
+                <ThemedText style={styles.presetButtonText}>$50</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.presetButton, { backgroundColor: theme.backgroundSecondary }]}
+                onPress={() => handlePresetAmount(100)}
+              >
+                <ThemedText style={styles.presetButtonText}>$100</ThemedText>
+              </Pressable>
+            </View>
+
+            <Pressable
+              style={[styles.withdrawAllButton, { borderColor: theme.primary }]}
+              onPress={handleWithdrawAll}
+            >
+              <ThemedText style={[styles.withdrawAllText, { color: theme.primary }]}>
+                Withdraw All (${parseFloat(earnings?.pendingBalance || "0").toFixed(2)})
+              </ThemedText>
+            </Pressable>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.cancelButton, { backgroundColor: theme.backgroundSecondary }]}
+                onPress={() => setWithdrawModalVisible(false)}
+              >
+                <ThemedText>Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmButton, { backgroundColor: theme.money }]}
+                onPress={handleConfirmWithdraw}
+                disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0}
+              >
+                <ThemedText style={styles.confirmButtonText}>Confirm</ThemedText>
+              </Pressable>
+            </View>
+            </KeyboardAwareScrollViewCompat>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ThemedView>
   );
 }
@@ -388,5 +509,95 @@ const styles = StyleSheet.create({
   nextWithdrawalDays: {
     fontSize: 13,
     fontWeight: "500",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.lg,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: Spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    marginBottom: Spacing.lg,
+  },
+  amountInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  currencySymbol: {
+    fontSize: 32,
+    fontWeight: "600",
+    marginRight: Spacing.sm,
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: 32,
+    fontWeight: "600",
+    paddingVertical: Spacing.lg,
+  },
+  presetButtonsRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  presetButton: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  presetButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  withdrawAllButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: Spacing.md,
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  withdrawAllText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: Spacing.md,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: Spacing.lg,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: Spacing.lg,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  confirmButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  modalScrollContent: {
+    flexGrow: 1,
   },
 });

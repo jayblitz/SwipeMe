@@ -33,6 +33,7 @@ import {
   tempoTestnet,
   createWalletClientForAccount,
   transferERC20Token,
+  transferFromTreasury,
   signMessage,
   type TransferParams
 } from "./wallet";
@@ -2580,7 +2581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No wallet found for withdrawal" });
       }
       
-      // Create withdrawal record
+      // Create withdrawal record in pending state
       const withdrawal = await storage.createWithdrawal({
         creatorId: userId,
         amount: amount,
@@ -2588,13 +2589,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         destinationWallet: wallet.address,
       });
       
-      // Process the withdrawal (deduct from pending balance)
+      // Token address for pathUSD on Tempo testnet
+      const PATHUSD_ADDRESS = "0x20c0000000000000000000000000000000000000" as `0x${string}`;
+      const TOKEN_DECIMALS = 6;
+      
+      let txHash: string | undefined;
+      
+      try {
+        // Execute the actual blockchain transfer from treasury to user wallet
+        txHash = await transferFromTreasury({
+          tokenAddress: PATHUSD_ADDRESS,
+          toAddress: wallet.address as `0x${string}`,
+          amount: amount,
+          decimals: TOKEN_DECIMALS,
+        });
+        
+        console.log(`Creator withdrawal: Transferred ${amount} ${currency} to ${wallet.address}, tx: ${txHash}`);
+      } catch (transferError) {
+        console.error("Treasury transfer failed:", transferError);
+        const errorMsg = transferError instanceof Error ? transferError.message : "Blockchain transfer failed";
+        
+        // Update withdrawal status to failed
+        await storage.updateWithdrawalStatus(withdrawal.id, 'failed');
+        
+        return res.status(500).json({ 
+          error: errorMsg,
+          withdrawalId: withdrawal.id,
+          hint: "Your balance has not been deducted. Please try again later or contact support."
+        });
+      }
+      
+      // Process the withdrawal (deduct from pending balance) only after successful transfer
       await storage.processWithdrawal(userId, amount);
       
-      // Mark as completed (in production, this would involve actual blockchain transfer)
+      // Update withdrawal with tx hash and completed status
       const completedWithdrawal = await storage.updateWithdrawalStatus(
         withdrawal.id, 
-        'completed'
+        'completed',
+        txHash
       );
       
       res.json({
@@ -2605,6 +2637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currency: completedWithdrawal.currency,
           status: completedWithdrawal.status,
           destinationWallet: completedWithdrawal.destinationWallet,
+          tempoTxHash: txHash,
           createdAt: completedWithdrawal.createdAt,
           completedAt: completedWithdrawal.completedAt,
         },

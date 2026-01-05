@@ -210,3 +210,49 @@ export async function transferERC20Token(
   
   return hash;
 }
+
+export function createTreasuryWalletClient() {
+  const encryptedTreasuryKey = process.env.TREASURY_PRIVATE_KEY_ENCRYPTED;
+  
+  if (!encryptedTreasuryKey) {
+    throw new Error("TREASURY_PRIVATE_KEY_ENCRYPTED not configured - withdrawals disabled");
+  }
+  
+  let treasuryKey: string;
+  try {
+    treasuryKey = decryptSensitiveData(encryptedTreasuryKey);
+  } catch (error) {
+    throw new Error("Failed to decrypt treasury key - check WALLET_ENCRYPTION_KEY");
+  }
+  
+  let normalizedKey = treasuryKey.trim();
+  if (!normalizedKey.startsWith("0x")) {
+    normalizedKey = `0x${normalizedKey}`;
+  }
+  
+  if (normalizedKey.length !== 66) {
+    throw new Error("Invalid treasury key format after decryption");
+  }
+  
+  const account = privateKeyToAccount(normalizedKey as `0x${string}`);
+  
+  const expectedAddress = process.env.PLATFORM_TREASURY_ADDRESS;
+  if (expectedAddress && account.address.toLowerCase() !== expectedAddress.toLowerCase()) {
+    throw new Error("Decrypted treasury key does not match PLATFORM_TREASURY_ADDRESS");
+  }
+  
+  return createWalletClient({
+    account,
+    chain: tempoTestnet,
+    transport: http(),
+  });
+}
+
+export async function transferFromTreasury(params: TransferParams): Promise<string> {
+  const treasuryClient = createTreasuryWalletClient();
+  return transferERC20Token(treasuryClient, params);
+}
+
+export function encryptTreasuryKey(plainPrivateKey: string): string {
+  return encryptSensitiveData(plainPrivateKey);
+}
