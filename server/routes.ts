@@ -1,7 +1,9 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
 import { randomBytes } from "crypto";
+import multer from "multer";
 import { storage, verifyPassword } from "./storage";
+import { uploadMedia, getMediaBuffer, getMimeTypeFromKey } from "./mediaStorage";
 import { sendVerificationEmail, sendWaitlistWelcomeEmail } from "./email";
 import { 
   signupSchema, 
@@ -40,6 +42,24 @@ import {
 import { sendPaymentNotification, sendMessageNotification } from "./pushNotifications";
 import { pool } from "./db";
 import { realtimeService } from "./websocket";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = [
+      "image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif",
+      "video/mp4", "video/quicktime", "video/webm", "video/x-m4v"
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only images and videos are allowed."));
+    }
+  }
+});
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -108,6 +128,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         database: { connected: false },
         error: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+  });
+
+  app.post("/api/media/upload", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const result = await uploadMedia(req.file.buffer, req.file.originalname, req.file.mimetype);
+      
+      if (!result.success) {
+        return res.status(500).json({ error: result.error || "Upload failed" });
+      }
+
+      res.json({ 
+        success: true,
+        url: result.url,
+        key: result.key,
+        mimeType: req.file.mimetype
+      });
+    } catch (error) {
+      console.error("Media upload error:", error);
+      res.status(500).json({ error: "Upload failed" });
+    }
+  });
+
+  app.get("/api/media/:key(*)", async (req: Request, res: Response) => {
+    try {
+      const key = decodeURIComponent(req.params.key);
+      const buffer = await getMediaBuffer(key);
+      
+      if (!buffer) {
+        return res.status(404).json({ error: "Media not found" });
+      }
+
+      const mimeType = getMimeTypeFromKey(key);
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.send(buffer);
+    } catch (error) {
+      console.error("Media serve error:", error);
+      res.status(500).json({ error: "Failed to retrieve media" });
     }
   });
 
