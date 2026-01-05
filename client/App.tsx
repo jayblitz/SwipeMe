@@ -15,6 +15,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { XMTPProvider } from "@/contexts/XMTPContext";
+import { RealtimeProvider } from "@/contexts/RealtimeContext";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { NotificationHandler } from "@/components/NotificationHandler";
@@ -66,19 +67,21 @@ export default function App() {
           <NotificationProvider>
             <WalletProvider>
               <XMTPProvider>
-                <ThemeProvider>
-                  <SafeAreaProvider>
-                    <GestureHandlerRootView style={styles.root}>
-                      <KeyboardProvider>
-                        <NavigationContainer linking={linking}>
-                          <NotificationHandler />
-                          <RootStackNavigator />
-                        </NavigationContainer>
-                        <StatusBar style="auto" />
-                      </KeyboardProvider>
-                    </GestureHandlerRootView>
-                  </SafeAreaProvider>
-                </ThemeProvider>
+                <RealtimeProvider>
+                  <ThemeProvider>
+                    <SafeAreaProvider>
+                      <GestureHandlerRootView style={styles.root}>
+                        <KeyboardProvider>
+                          <NavigationContainer linking={linking}>
+                            <NotificationHandler />
+                            <RootStackNavigator />
+                          </NavigationContainer>
+                          <StatusBar style="auto" />
+                        </KeyboardProvider>
+                      </GestureHandlerRootView>
+                    </SafeAreaProvider>
+                  </ThemeProvider>
+                </RealtimeProvider>
               </XMTPProvider>
             </WalletProvider>
           </NotificationProvider>

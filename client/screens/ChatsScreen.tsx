@@ -150,7 +150,17 @@ function EmptyState() {
   );
 }
 
-function XMTPStatus({ isInitializing, error }: { isInitializing: boolean; error: string | null }) {
+function XMTPStatus({ 
+  isInitializing, 
+  error, 
+  retryCount,
+  onRetry 
+}: { 
+  isInitializing: boolean; 
+  error: string | null;
+  retryCount: number;
+  onRetry: () => void;
+}) {
   const { theme } = useTheme();
 
   if (isInitializing) {
@@ -158,7 +168,9 @@ function XMTPStatus({ isInitializing, error }: { isInitializing: boolean; error:
       <View style={styles.statusContainer}>
         <ActivityIndicator size="small" color={theme.primary} />
         <ThemedText style={[styles.statusText, { color: theme.textSecondary }]}>
-          Connecting to secure messaging...
+          {retryCount > 0 
+            ? `Connecting... (attempt ${retryCount}/3)` 
+            : "Connecting to secure messaging..."}
         </ThemedText>
       </View>
     );
@@ -167,10 +179,18 @@ function XMTPStatus({ isInitializing, error }: { isInitializing: boolean; error:
   if (error) {
     return (
       <View style={[styles.statusContainer, styles.errorContainer]}>
-        <Feather name="alert-circle" size={16} color={theme.error} />
-        <ThemedText style={[styles.statusText, { color: theme.error }]}>
-          {error}
-        </ThemedText>
+        <View style={styles.errorRow}>
+          <Feather name="alert-circle" size={16} color={theme.error} />
+          <ThemedText style={[styles.statusText, { color: theme.error }]} numberOfLines={2}>
+            {error}
+          </ThemedText>
+        </View>
+        <Pressable 
+          onPress={onRetry}
+          style={[styles.retryButton, { backgroundColor: theme.primary }]}
+        >
+          <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+        </Pressable>
       </View>
     );
   }
@@ -183,7 +203,7 @@ export default function ChatsScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<ChatsStackParamList>>();
-  const { client, isInitializing, isSupported, error } = useXMTP();
+  const { client, isInitializing, isSupported, error, retryCount, retry } = useXMTP();
   
   const [xmtpConversations, setXmtpConversations] = useState<XMTPConversationItem[]>([]);
   const [legacyChats, setLegacyChats] = useState<Chat[]>([]);
@@ -458,7 +478,7 @@ export default function ChatsScreen() {
         </View>
       </View>
 
-      <XMTPStatus isInitializing={isInitializing} error={error} />
+      <XMTPStatus isInitializing={isInitializing} error={error} retryCount={retryCount} onRetry={retry} />
       
       <FlatList
         data={combinedChats}
@@ -618,8 +638,27 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     backgroundColor: "rgba(255, 0, 0, 0.1)",
+    flexDirection: "column",
+    gap: Spacing.xs,
+  },
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  retryButton: {
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    alignSelf: "center",
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
   },
   statusText: {
     fontSize: 13,
+    flex: 1,
   },
 });

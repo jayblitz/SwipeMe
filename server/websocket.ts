@@ -2,7 +2,6 @@ import { WebSocket, WebSocketServer } from "ws";
 import type { Server } from "http";
 import type { IncomingMessage } from "http";
 import { parse as parseUrl } from "url";
-import { parse as parseCookie } from "cookie";
 import jwt from "jsonwebtoken";
 import { sendMessageNotification, sendPaymentNotification } from "./pushNotifications";
 import { db } from "./db";
@@ -104,16 +103,8 @@ class RealtimeService {
         try {
           const decoded = jwt.verify(token, sessionSecret) as { userId: string };
           return decoded.userId;
-        } catch {
-          return null;
-        }
-      }
-
-      const cookies = req.headers.cookie;
-      if (cookies) {
-        const parsed = parseCookie(cookies);
-        const sessionCookie = parsed["swipeme.sid"];
-        if (sessionCookie) {
+        } catch (err) {
+          console.error("WebSocket token verification failed:", err);
           return null;
         }
       }
