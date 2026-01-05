@@ -213,3 +213,73 @@ export async function hasNotificationPermission(): Promise<boolean> {
   const status = await getNotificationPermissionStatus();
   return status === "granted";
 }
+
+const MAX_NOTIFY_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = MAX_NOTIFY_RETRIES
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok || response.status < 500) {
+        return response;
+      }
+      lastError = new Error(`Server error: ${response.status}`);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+    
+    if (attempt < retries) {
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+    }
+  }
+  
+  throw lastError || new Error("Request failed after retries");
+}
+
+export async function sendMessageNotification(
+  recipientId: string,
+  message: string,
+  chatId: string
+): Promise<void> {
+  const { getApiUrl } = await import("@/lib/query-client");
+  try {
+    await fetchWithRetry(
+      new URL("/api/notify/message", getApiUrl()).toString(),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ recipientId, message, chatId }),
+      }
+    );
+  } catch (error) {
+    console.error("Failed to send message notification after retries:", error);
+  }
+}
+
+export async function sendGroupMessageNotification(
+  groupId: string,
+  message: string
+): Promise<void> {
+  const { getApiUrl } = await import("@/lib/query-client");
+  try {
+    await fetchWithRetry(
+      new URL("/api/notify/group-message", getApiUrl()).toString(),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ groupId, message }),
+      }
+    );
+  } catch (error) {
+    console.error("Failed to send group notification after retries:", error);
+  }
+}

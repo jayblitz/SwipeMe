@@ -29,6 +29,7 @@ import { useXMTP } from "@/contexts/XMTPContext";
 import { findOrCreateDm, sendXMTPMessage, getMessages as getXMTPMessages, streamMessages, type XMTPConversation } from "@/lib/xmtp";
 import { PaymentCelebration } from "@/components/PaymentCelebration";
 import { realtimeClient } from "@/lib/realtime";
+import { sendMessageNotification, sendGroupMessageNotification } from "@/lib/notifications";
 
 interface AttachmentOption {
   id: string;
@@ -1508,12 +1509,7 @@ export default function ChatScreen() {
         
         if (chat?.participants?.[0]?.id) {
           const recipientId = chat.participants[0].id;
-          fetch(new URL("/api/notify/message", getApiUrl()), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ recipientId, message: messageText, chatId }),
-          }).catch(err => console.error("Notification send failed:", err));
+          sendMessageNotification(recipientId, messageText, chatId);
         }
       } catch (error) {
         console.error("Failed to send XMTP message:", error);
@@ -1525,20 +1521,10 @@ export default function ChatScreen() {
       setMessages(prev => [newMessage, ...prev]);
       
       if (isGroup) {
-        fetch(new URL("/api/notify/group-message", getApiUrl()), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ groupId: chatId, message: messageText }),
-        }).catch(err => console.error("Group notification send failed:", err));
+        sendGroupMessageNotification(chatId, messageText);
       } else if (chat?.participants?.[0]?.id) {
         const recipientId = chat.participants[0].id;
-        fetch(new URL("/api/notify/message", getApiUrl()), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ recipientId, message: messageText, chatId }),
-        }).catch(err => console.error("Notification send failed:", err));
+        sendMessageNotification(recipientId, messageText, chatId);
       }
     }
   };
