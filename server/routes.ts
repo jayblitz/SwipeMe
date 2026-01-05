@@ -43,18 +43,47 @@ import { sendPaymentNotification, sendMessageNotification } from "./pushNotifica
 import { pool } from "./db";
 import { realtimeService } from "./websocket";
 
+const allowedMimeTypes = [
+  "image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif",
+  "video/mp4", "video/quicktime", "video/webm", "video/x-m4v"
+];
+
+const allowedExtensions = [
+  ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif",
+  ".mp4", ".mov", ".webm", ".m4v"
+];
+
+function getMimeFromExtension(filename: string): string | null {
+  const ext = filename.toLowerCase().substring(filename.lastIndexOf("."));
+  const extToMime: Record<string, string> = {
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".png": "image/png", ".gif": "image/gif",
+    ".webp": "image/webp", ".heic": "image/heic", ".heif": "image/heif",
+    ".mp4": "video/mp4", ".mov": "video/quicktime",
+    ".webm": "video/webm", ".m4v": "video/x-m4v"
+  };
+  return extToMime[ext] || null;
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024,
   },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = [
-      "image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif",
-      "video/mp4", "video/quicktime", "video/webm", "video/x-m4v"
-    ];
-    if (allowedTypes.includes(file.mimetype)) {
+    if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
+    } else if (file.mimetype === "application/octet-stream" && file.originalname) {
+      const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf("."));
+      if (allowedExtensions.includes(ext)) {
+        const inferredMime = getMimeFromExtension(file.originalname);
+        if (inferredMime) {
+          file.mimetype = inferredMime;
+        }
+        cb(null, true);
+      } else {
+        cb(new Error("Invalid file type. Only images and videos are allowed."));
+      }
     } else {
       cb(new Error("Invalid file type. Only images and videos are allowed."));
     }

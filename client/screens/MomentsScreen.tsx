@@ -24,6 +24,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
+import { fetch as expoFetch } from "expo/fetch";
 import { Share } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
@@ -317,29 +319,49 @@ export default function MomentsScreen() {
       setIsUploading(true);
       try {
         const formData = new FormData();
-        const fileName = selectedMedia.uri.split("/").pop() || "media";
-        const mimeType = selectedMedia.type === "photo" ? "image/jpeg" : "video/mp4";
         
-        formData.append("file", {
-          uri: selectedMedia.uri,
-          name: fileName,
-          type: mimeType,
-        } as any);
+        if (Platform.OS === "web") {
+          const fileName = selectedMedia.uri.split("/").pop() || "media";
+          const mimeType = selectedMedia.type === "photo" ? "image/jpeg" : "video/mp4";
+          formData.append("file", {
+            uri: selectedMedia.uri,
+            name: fileName,
+            type: mimeType,
+          } as any);
+          
+          const uploadResponse = await fetch(new URL("/api/media/upload", getApiUrl()).toString(), {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+          });
 
-        const uploadResponse = await fetch(new URL("/api/media/upload", getApiUrl()).toString(), {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
+          if (!uploadResponse.ok) {
+            const error = await uploadResponse.json().catch(() => ({}));
+            throw new Error(error.error || "Upload failed");
+          }
 
-        if (!uploadResponse.ok) {
-          const error = await uploadResponse.json().catch(() => ({}));
-          throw new Error(error.error || "Upload failed");
+          const uploadResult = await uploadResponse.json();
+          postData.mediaType = selectedMedia.type;
+          postData.mediaUrls = [uploadResult.url];
+        } else {
+          const file = new File(selectedMedia.uri);
+          formData.append("file", file);
+          
+          const uploadResponse = await expoFetch(new URL("/api/media/upload", getApiUrl()).toString(), {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+          });
+
+          if (!uploadResponse.ok) {
+            const error = await uploadResponse.json().catch(() => ({}));
+            throw new Error(error.error || "Upload failed");
+          }
+
+          const uploadResult = await uploadResponse.json();
+          postData.mediaType = selectedMedia.type;
+          postData.mediaUrls = [uploadResult.url];
         }
-
-        const uploadResult = await uploadResponse.json();
-        postData.mediaType = selectedMedia.type;
-        postData.mediaUrls = [uploadResult.url];
       } catch (error) {
         console.error("Media upload error:", error);
         Alert.alert("Upload Failed", error instanceof Error ? error.message : "Could not upload media");
