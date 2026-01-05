@@ -875,7 +875,7 @@ function FABMenu({ visible, onClose, onNewContact, onNewGroup, onPayAnyone }: FA
   const { theme } = useTheme();
 
   const menuItems = [
-    { icon: "user-plus" as const, label: "New Contact", onPress: onNewContact },
+    { icon: "user" as const, label: "New Contact", onPress: onNewContact },
     { icon: "users" as const, label: "New Group", onPress: onNewGroup },
     { icon: "send" as const, label: "Pay Anyone", onPress: onPayAnyone },
   ];
