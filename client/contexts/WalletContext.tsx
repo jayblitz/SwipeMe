@@ -41,6 +41,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+  const currentUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    currentUserIdRef.current = user?.id || null;
+    if (retryTimeoutRef.current && !user) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+  }, [user]);
 
   const loadStoredWallet = useCallback(async (): Promise<Wallet | null> => {
     try {
@@ -63,7 +80,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const fetchWalletFromServer = useCallback(async (isRetry = false): Promise<Wallet | null> => {
+  const fetchWalletFromServer = useCallback(async (_isRetry = false, currentRetryCount = 0): Promise<Wallet | null> => {
     if (!user) return null;
 
     try {
@@ -100,18 +117,22 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error("Failed to fetch wallet:", err);
       
-      const currentRetry = isRetry ? retryCount : 0;
-      
-      if (currentRetry < MAX_RETRIES) {
-        setRetryCount(currentRetry + 1);
+      if (currentRetryCount < MAX_RETRIES) {
+        const nextRetryCount = currentRetryCount + 1;
+        setRetryCount(nextRetryCount);
         setError("network");
-        setErrorMessage(`Connection issue. Retrying... (${currentRetry + 1}/${MAX_RETRIES})`);
+        setErrorMessage(`Connection issue. Retrying... (${nextRetryCount}/${MAX_RETRIES})`);
         
         return new Promise((resolve) => {
+          const capturedUserId = user.id;
           retryTimeoutRef.current = setTimeout(async () => {
-            const result = await fetchWalletFromServer(true);
+            if (!isMountedRef.current || currentUserIdRef.current !== capturedUserId) {
+              resolve(null);
+              return;
+            }
+            const result = await fetchWalletFromServer(true, nextRetryCount);
             resolve(result);
-          }, RETRY_DELAY_MS * (currentRetry + 1));
+          }, RETRY_DELAY_MS * nextRetryCount);
         });
       }
       
@@ -119,7 +140,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setErrorMessage("Unable to connect to server. Please check your connection.");
       return wallet;
     }
-  }, [user, wallet, retryCount]);
+  }, [user, wallet]);
 
   const refreshWallet = useCallback(async (): Promise<Wallet | null> => {
     setIsLoading(true);

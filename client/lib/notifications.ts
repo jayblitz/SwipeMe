@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const PUSH_TOKEN_KEY = "@swipeme_push_token";
 const NOTIFICATION_PREFS_KEY = "@swipeme_notification_prefs";
+const PERMISSION_DENIED_KEY = "@swipeme_notification_denied";
 
 export interface NotificationPreferences {
   messages: boolean;
@@ -18,6 +19,21 @@ const DEFAULT_PREFS: NotificationPreferences = {
   marketing: false,
 };
 
+export type NotificationRegistrationStatus = 
+  | "granted"
+  | "denied"
+  | "denied_permanently"
+  | "not_device"
+  | "web_unsupported"
+  | "error";
+
+export interface NotificationRegistrationResult {
+  status: NotificationRegistrationStatus;
+  token: string | null;
+  message: string;
+  canAskAgain: boolean;
+}
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -28,30 +44,58 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function registerForPushNotifications(): Promise<string | null> {
+export async function registerForPushNotificationsWithDetails(): Promise<NotificationRegistrationResult> {
   if (Platform.OS === "web") {
-    return null;
+    return {
+      status: "web_unsupported",
+      token: null,
+      message: "Push notifications are not available on web. Use the mobile app for notifications.",
+      canAskAgain: false,
+    };
   }
 
   if (!Device.isDevice) {
-    return null;
+    return {
+      status: "not_device",
+      token: null,
+      message: "Push notifications require a physical device. Try using Expo Go on your phone.",
+      canAskAgain: false,
+    };
   }
 
   try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus, canAskAgain } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
+    let canRequestAgain = canAskAgain;
 
     if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+      const result = await Notifications.requestPermissionsAsync();
+      finalStatus = result.status;
+      canRequestAgain = result.canAskAgain;
     }
 
     if (finalStatus !== "granted") {
-      return null;
+      await AsyncStorage.setItem(PERMISSION_DENIED_KEY, "true");
+      
+      if (!canRequestAgain) {
+        return {
+          status: "denied_permanently",
+          token: null,
+          message: "Notifications are disabled. Go to Settings to enable them for SwipeMe.",
+          canAskAgain: false,
+        };
+      }
+      
+      return {
+        status: "denied",
+        token: null,
+        message: "Enable notifications to get alerts for new messages and payments.",
+        canAskAgain: true,
+      };
     }
 
+    await AsyncStorage.removeItem(PERMISSION_DENIED_KEY);
     const token = await Notifications.getExpoPushTokenAsync();
-
     await AsyncStorage.setItem(PUSH_TOKEN_KEY, token.data);
 
     if (Platform.OS === "android") {
@@ -77,10 +121,48 @@ export async function registerForPushNotifications(): Promise<string | null> {
       });
     }
 
-    return token.data;
+    return {
+      status: "granted",
+      token: token.data,
+      message: "Notifications enabled successfully.",
+      canAskAgain: false,
+    };
   } catch (error) {
     console.error("Failed to register for push notifications:", error);
-    return null;
+    return {
+      status: "error",
+      token: null,
+      message: "Something went wrong enabling notifications. Please try again.",
+      canAskAgain: true,
+    };
+  }
+}
+
+export async function registerForPushNotifications(): Promise<string | null> {
+  const result = await registerForPushNotificationsWithDetails();
+  return result.token;
+}
+
+export async function getNotificationPermissionStatus(): Promise<NotificationRegistrationStatus> {
+  if (Platform.OS === "web") return "web_unsupported";
+  if (!Device.isDevice) return "not_device";
+  
+  try {
+    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    if (status === "granted") return "granted";
+    if (!canAskAgain) return "denied_permanently";
+    return "denied";
+  } catch {
+    return "error";
+  }
+}
+
+export async function wasNotificationPermissionDenied(): Promise<boolean> {
+  try {
+    const denied = await AsyncStorage.getItem(PERMISSION_DENIED_KEY);
+    return denied === "true";
+  } catch {
+    return false;
   }
 }
 
@@ -202,11 +284,6 @@ export function addNotificationResponseListener(
   callback: (response: Notifications.NotificationResponse) => void
 ): Notifications.EventSubscription {
   return Notifications.addNotificationResponseReceivedListener(callback);
-}
-
-export async function getNotificationPermissionStatus(): Promise<Notifications.PermissionStatus> {
-  const { status } = await Notifications.getPermissionsAsync();
-  return status;
 }
 
 export async function hasNotificationPermission(): Promise<boolean> {
