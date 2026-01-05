@@ -3,6 +3,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { registerAndSavePushToken } from "@/lib/notifications";
 
+const USER_STORAGE_KEY = "@swipeme_user";
+
+async function clearUserSession() {
+  try {
+    await AsyncStorage.removeItem(USER_STORAGE_KEY);
+  } catch (error) {
+    console.error("Failed to clear user session:", error);
+  }
+}
+
 export interface User {
   id: string;
   email: string;
@@ -50,8 +60,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const USER_STORAGE_KEY = "@swipeme_user";
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
@@ -82,13 +90,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pingPresence = async () => {
       try {
         const baseUrl = getApiUrl();
-        await fetch(new URL("/api/users/presence/ping", baseUrl), {
+        const response = await fetch(new URL("/api/users/presence/ping", baseUrl), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
         });
+        
+        if (response.status === 401) {
+          console.warn("Session expired during presence ping");
+          await clearUserSession();
+          setUser(null);
+        }
       } catch (error) {
-        // Silently fail - presence is not critical
+        // Network errors are acceptable - presence is not critical
       }
     };
     
@@ -317,6 +331,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch(new URL(`/api/user/${user.id}`, baseUrl), {
         credentials: "include",
       });
+      
+      if (response.status === 401) {
+        console.warn("Session expired during user refresh");
+        await clearUserSession();
+        setUser(null);
+        return;
+      }
+      
+      if (!response.ok) {
+        console.error(`Refresh user failed with status ${response.status}`);
+        return;
+      }
+      
       const data = await response.json();
       
       if (data.user) {

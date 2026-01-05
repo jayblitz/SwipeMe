@@ -7,6 +7,7 @@ import {
   type XMTPClient 
 } from "@/lib/xmtp";
 import { useAuth } from "./AuthContext";
+import { useWallet, type WalletErrorType } from "./WalletContext";
 
 interface Wallet {
   address: string;
@@ -17,6 +18,8 @@ interface XMTPContextType {
   isInitializing: boolean;
   isSupported: boolean;
   error: string | null;
+  walletError: WalletErrorType;
+  isWalletReady: boolean;
   retryCount: number;
   initialize: () => Promise<void>;
   disconnect: () => Promise<void>;
@@ -30,6 +33,7 @@ const RETRY_DELAY_MS = 2000;
 
 export function XMTPProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { wallet: walletFromContext, error: walletError, isLoading: walletLoading } = useWallet();
   const [client, setClient] = useState<XMTPClient | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,13 +46,26 @@ export function XMTPProvider({ children }: { children: ReactNode }) {
     enabled: !!user?.id,
   });
 
-  const wallet = walletData?.wallet;
+  const wallet = walletFromContext || walletData?.wallet;
   const isSupported = isXMTPSupported();
+  const isWalletReady = !!wallet?.address && !walletLoading && !walletError;
 
   const initialize = useCallback(async (isRetry = false) => {
-    if (!user?.id || !wallet?.address) {
+    if (!user?.id) {
       if (!isRetry) {
         setError(null);
+      }
+      return;
+    }
+
+    if (walletError) {
+      setError("Wallet connection required for messaging. Please check your connection.");
+      return;
+    }
+
+    if (!wallet?.address) {
+      if (!isRetry) {
+        setError("Create or import a wallet to enable messaging");
       }
       return;
     }
@@ -98,7 +115,7 @@ export function XMTPProvider({ children }: { children: ReactNode }) {
         isInitializingRef.current = false;
       }
     }
-  }, [user?.id, wallet?.address, client, isSupported, retryCount]);
+  }, [user?.id, wallet?.address, client, isSupported, retryCount, walletError]);
 
   const retry = useCallback(async () => {
     if (retryTimeoutRef.current) {
@@ -150,6 +167,8 @@ export function XMTPProvider({ children }: { children: ReactNode }) {
         isInitializing,
         isSupported,
         error,
+        walletError,
+        isWalletReady,
         retryCount,
         initialize: () => initialize(false),
         disconnect,
