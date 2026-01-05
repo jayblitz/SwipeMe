@@ -2,6 +2,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import FeedScreen from "@/screens/FeedScreen";
 import MomentsScreen from "@/screens/MomentsScreen";
+import MomentViewScreen from "@/screens/MomentViewScreen";
 import CreatePostScreen from "@/screens/CreatePostScreen";
 import CreatorProfileScreen from "@/screens/CreatorProfileScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -9,6 +10,7 @@ import { useScreenOptions } from "@/hooks/useScreenOptions";
 export type MomentsStackParamList = {
   Feed: undefined;
   MomentsList: undefined;
+  MomentView: { postId: string };
   CreatePost: undefined;
   CreatorProfile: { userId: string };
 };
@@ -34,6 +36,11 @@ export default function MomentsStackNavigator() {
         name="CreatePost"
         component={CreatePostScreen}
         options={{ headerTitle: "New Post" }}
+      />
+      <Stack.Screen
+        name="MomentView"
+        component={MomentViewScreen}
+        options={{ headerTitle: "Moment" }}
       />
       <Stack.Screen
         name="CreatorProfile"

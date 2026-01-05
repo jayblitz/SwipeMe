@@ -28,7 +28,7 @@ import { Share } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -306,18 +306,48 @@ export default function MomentsScreen() {
     },
   });
 
-  const handlePost = useCallback(() => {
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handlePost = useCallback(async () => {
     const postData: { content: string; mediaType?: string; mediaUrls?: string[] } = {
       content: composeText.trim(),
     };
     
     if (selectedMedia) {
-      Alert.alert(
-        "Coming Soon",
-        "Media posts are coming soon. For now, you can create text-only posts.",
-        [{ text: "OK" }]
-      );
-      return;
+      setIsUploading(true);
+      try {
+        const formData = new FormData();
+        const fileName = selectedMedia.uri.split("/").pop() || "media";
+        const mimeType = selectedMedia.type === "photo" ? "image/jpeg" : "video/mp4";
+        
+        formData.append("file", {
+          uri: selectedMedia.uri,
+          name: fileName,
+          type: mimeType,
+        } as any);
+
+        const uploadResponse = await fetch(new URL("/api/media/upload", getApiUrl()).toString(), {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json().catch(() => ({}));
+          throw new Error(error.error || "Upload failed");
+        }
+
+        const uploadResult = await uploadResponse.json();
+        postData.mediaType = selectedMedia.type;
+        postData.mediaUrls = [uploadResult.url];
+      } catch (error) {
+        console.error("Media upload error:", error);
+        Alert.alert("Upload Failed", error instanceof Error ? error.message : "Could not upload media");
+        setIsUploading(false);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
     } else if (!composeText.trim()) {
       return;
     }
@@ -847,7 +877,7 @@ export default function MomentsScreen() {
                 <Text style={[styles.previewTitle, { color: theme.text }]}>Add Caption</Text>
                 <Pressable
                   onPress={handlePost}
-                  disabled={createPostMutation.isPending || (!composeText.trim() && !selectedMedia)}
+                  disabled={isUploading || createPostMutation.isPending || (!composeText.trim() && !selectedMedia)}
                   style={[
                     styles.postButton,
                     { 
@@ -857,7 +887,7 @@ export default function MomentsScreen() {
                     }
                   ]}
                 >
-                  {createPostMutation.isPending ? (
+                  {isUploading || createPostMutation.isPending ? (
                     <ActivityIndicator size="small" color="#FFF" />
                   ) : (
                     <Text style={[

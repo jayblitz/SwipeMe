@@ -978,6 +978,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/moments/:postId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { postId } = req.params;
+      
+      const post = await storage.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      
+      if (post.visibility !== "public" && post.authorId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const author = await storage.getUserById(post.authorId);
+      const isLiked = await storage.hasUserLikedPost(postId, userId);
+      
+      res.json({
+        ...post,
+        author: author ? {
+          id: author.id,
+          username: author.username,
+          displayName: author.displayName,
+          profileImage: author.profileImage,
+        } : null,
+        isLiked,
+      });
+    } catch (error) {
+      console.error("Get moment by ID error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/moments", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
@@ -2758,4 +2791,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
   realtimeService.initialize(httpServer);
   
   return httpServer;
+}
+
+function escapeHtml(text: string): string {
+  const htmlEscapes: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, (char) => htmlEscapes[char] || char);
+}
+
+export async function serveSharedMoment(req: Request, res: Response) {
+  try {
+    const { postId } = req.params;
+    const template = res.locals.momentShareTemplate as string;
+    
+    if (!template) {
+      return res.status(404).send("Page not found");
+    }
+    
+    const post = await storage.getPostById(postId);
+    if (!post || post.visibility !== "public") {
+      return res.status(404).send("Moment not found or is private");
+    }
+    
+    const author = await storage.getUserById(post.authorId);
+    if (!author) {
+      return res.status(404).send("Author not found");
+    }
+    
+    const domain = process.env.EXPO_PUBLIC_DOMAIN || "swipeme.app";
+    const shareUrl = `https://${domain}/moments/${postId}`;
+    const deepLink = `swipeme://moments/${postId}`;
+    
+    const rawDisplayName = author.displayName || author.username || "SwipeMe User";
+    const rawUsername = author.username || "user";
+    const displayName = escapeHtml(rawDisplayName);
+    const username = escapeHtml(rawUsername);
+    const avatarInitial = displayName.charAt(0).toUpperCase();
+    
+    let avatarContent = avatarInitial;
+    if (author.profileImage) {
+      const safeProfileImage = escapeHtml(author.profileImage);
+      avatarContent = `<img src="${safeProfileImage}" alt="${displayName}">`;
+    }
+    
+    let mediaSection = "";
+    if (post.mediaUrls && post.mediaUrls.length > 0) {
+      const mediaUrl = escapeHtml(post.mediaUrls[0]);
+      if (post.mediaType === "video") {
+        mediaSection = `
+          <div class="media-container">
+            <video controls playsinline preload="metadata">
+              <source src="${mediaUrl}" type="video/mp4">
+            </video>
+          </div>
+        `;
+      } else if (post.mediaType === "photo") {
+        mediaSection = `
+          <div class="media-container">
+            <img src="${mediaUrl}" alt="Post media">
+          </div>
+        `;
+      }
+    }
+    
+    const rawContent = post.content || "";
+    const escapedContent = escapeHtml(rawContent);
+    const contentPreview = escapedContent.substring(0, 200) + (escapedContent.length > 200 ? "..." : "")
+      || `Check out ${displayName}'s moment on SwipeMe`;
+    
+    const formattedContent = escapedContent.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
+    
+    const postDate = post.createdAt ? new Date(post.createdAt) : new Date();
+    const now = new Date();
+    const diffMs = now.getTime() - postDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    let postTime: string;
+    if (diffMins < 1) {
+      postTime = "Just now";
+    } else if (diffMins < 60) {
+      postTime = `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+      postTime = `${diffHours}h ago`;
+    } else if (diffDays < 7) {
+      postTime = `${diffDays}d ago`;
+    } else {
+      postTime = postDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+    
+    const ogImage = post.mediaUrls && post.mediaUrls.length > 0 && post.mediaType === "photo"
+      ? post.mediaUrls[0]
+      : `https://${domain}/assets/images/icon.png`;
+    
+    const html = template
+      .replace(/\{\{AUTHOR_NAME\}\}/g, displayName)
+      .replace(/\{\{DISPLAY_NAME\}\}/g, displayName)
+      .replace(/\{\{USERNAME\}\}/g, username)
+      .replace(/\{\{AVATAR_CONTENT\}\}/g, avatarContent)
+      .replace(/\{\{POST_CONTENT\}\}/g, formattedContent)
+      .replace(/\{\{CONTENT_PREVIEW\}\}/g, contentPreview)
+      .replace(/\{\{MEDIA_SECTION\}\}/g, mediaSection)
+      .replace(/\{\{POST_TIME\}\}/g, postTime)
+      .replace(/\{\{LIKES_COUNT\}\}/g, post.likesCount || "0")
+      .replace(/\{\{COMMENTS_COUNT\}\}/g, post.commentsCount || "0")
+      .replace(/\{\{TIPS_TOTAL\}\}/g, parseFloat(post.tipsTotal || "0").toFixed(2))
+      .replace(/\{\{SHARE_URL\}\}/g, shareUrl)
+      .replace(/\{\{DEEP_LINK\}\}/g, deepLink)
+      .replace(/\{\{OG_IMAGE\}\}/g, ogImage);
+    
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.status(200).send(html);
+  } catch (error) {
+    console.error("Serve shared moment error:", error);
+    res.status(500).send("Something went wrong");
+  }
 }

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0066FF">
+  <title>{{AUTHOR_NAME}} on SwipeMe</title>
+  <meta name="description" content="{{CONTENT_PREVIEW}}">
+  <meta property="og:title" content="{{AUTHOR_NAME}} on SwipeMe">
+  <meta property="og:description" content="{{CONTENT_PREVIEW}}">
+  <meta property="og:image" content="{{OG_IMAGE}}">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="{{SHARE_URL}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{AUTHOR_NAME}} on SwipeMe">
+  <meta name="twitter:description" content="{{CONTENT_PREVIEW}}">
+  <meta name="twitter:image" content="{{OG_IMAGE}}">
+  <link rel="icon" type="image/png" href="/assets/images/favicon.png">
+  <link rel="apple-touch-icon" href="/assets/images/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0066FF;
+      --bg: #0a0a0a;
+      --card: #1a1a1a;
+      --text: #ffffff;
+      --text-secondary: #888888;
+      --border: #333333;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .logo img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+    }
+    .get-app-btn {
+      background: var(--primary);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 14px;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .get-app-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 20px rgba(0, 102, 255, 0.4);
+    }
+    .content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+    .post-card {
+      background: var(--card);
+      border-radius: 16px;
+      max-width: 500px;
+      width: 100%;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .author-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+    }
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary) 0%, #00C8FF 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+      color: white;
+      overflow: hidden;
+    }
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .author-info {
+      flex: 1;
+    }
+    .author-name {
+      font-weight: 600;
+      font-size: 16px;
+    }
+    .author-username {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .post-time {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+    .media-container {
+      width: 100%;
+      background: #000;
+      position: relative;
+    }
+    .media-container img,
+    .media-container video {
+      width: 100%;
+      max-height: 600px;
+      object-fit: contain;
+    }
+    .post-content {
+      padding: 16px;
+      font-size: 16px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .hashtag {
+      color: var(--primary);
+    }
+    .post-stats {
+      display: flex;
+      gap: 24px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .open-in-app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 24px 16px;
+      background: linear-gradient(to top, rgba(0,102,255,0.1), transparent);
+    }
+    .open-in-app-text {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .open-app-btn {
+      background: var(--primary);
+      color: white;
+      padding: 14px 32px;
+      border-radius: 25px;
+      font-weight: 600;
+      font-size: 16px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .open-app-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 20px rgba(0, 102, 255, 0.4);
+    }
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+    .footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    @media (max-width: 600px) {
+      .content {
+        padding: 20px 12px;
+      }
+      .post-card {
+        border-radius: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <a href="/" class="logo">
+      <img src="/assets/images/icon.png" alt="SwipeMe">
+      <span>SwipeMe</span>
+    </a>
+    <a href="{{DEEP_LINK}}" class="get-app-btn">Get the App</a>
+  </header>
+  
+  <main class="content">
+    <article class="post-card">
+      <div class="author-section">
+        <div class="avatar">
+          {{AVATAR_CONTENT}}
+        </div>
+        <div class="author-info">
+          <div class="author-name">{{DISPLAY_NAME}}</div>
+          <div class="author-username">@{{USERNAME}}</div>
+        </div>
+        <div class="post-time">{{POST_TIME}}</div>
+      </div>
+      
+      {{MEDIA_SECTION}}
+      
+      <div class="post-content">{{POST_CONTENT}}</div>
+      
+      <div class="post-stats">
+        <div class="stat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          {{LIKES_COUNT}}
+        </div>
+        <div class="stat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          {{COMMENTS_COUNT}}
+        </div>
+        <div class="stat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          ${{TIPS_TOTAL}}
+        </div>
+      </div>
+      
+      <div class="open-in-app">
+        <p class="open-in-app-text">See more moments and connect with {{DISPLAY_NAME}}</p>
+        <a href="{{DEEP_LINK}}" class="open-app-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          Open in SwipeMe
+        </a>
+      </div>
+    </article>
+  </main>
+  
+  <footer class="footer">
+    <p>SwipeMe - Instant money, straight from your chat</p>
+    <p><a href="/">Learn more</a></p>
+  </footer>
+  
+  <script>
+    const deepLink = "{{DEEP_LINK}}";
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroid = /Android/.test(navigator.userAgent);
+    
+    if (isIOS || isAndroid) {
+      setTimeout(() => {
+        window.location.href = deepLink;
+      }, 100);
+      
+      setTimeout(() => {
+        if (document.hidden === false) {
+          window.location.href = isIOS 
+            ? "https://apps.apple.com/app/swipeme" 
+            : "https://play.google.com/store/apps/details?id=com.swipeme.app";
+        }
+      }, 2500);
+    }
+  </script>
+</body>
+</html>

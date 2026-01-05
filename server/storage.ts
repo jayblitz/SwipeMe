@@ -459,6 +459,13 @@ export const storage = {
     return result.length > 0;
   },
 
+  async hasUserLikedPost(postId: string, userId: string): Promise<boolean> {
+    const [existing] = await db.select()
+      .from(postLikes)
+      .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)));
+    return !!existing;
+  },
+
   async likePost(postId: string, userId: string): Promise<boolean> {
     const [existing] = await db.select()
       .from(postLikes)

@@ -267,7 +267,16 @@ function configureExpoAndLanding(app: express.Application) {
     "templates",
     "landing-page.html",
   );
+  const momentShareTemplatePath = path.resolve(
+    process.cwd(),
+    "server",
+    "templates",
+    "moment-share.html",
+  );
   const landingPageTemplate = fs.readFileSync(templatePath, "utf-8");
+  const momentShareTemplate = fs.existsSync(momentShareTemplatePath)
+    ? fs.readFileSync(momentShareTemplatePath, "utf-8")
+    : null;
   const appName = getAppName();
 
   log("Serving static Expo files with dynamic manifest routing");
@@ -296,6 +305,20 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     next();
+  });
+
+  app.get("/moments/:postId", async (req: Request, res: Response) => {
+    if (!momentShareTemplate) {
+      return res.status(404).send("Page not found");
+    }
+    
+    res.locals.momentShareTemplate = momentShareTemplate;
+    res.locals.serveLandingPage = serveLandingPage;
+    res.locals.landingPageTemplate = landingPageTemplate;
+    res.locals.appName = appName;
+    
+    const { serveSharedMoment } = await import("./routes");
+    serveSharedMoment(req, res);
   });
 
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));

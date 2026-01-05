@@ -2,7 +2,22 @@ import { Client } from "@replit/object-storage";
 import { randomBytes } from "crypto";
 import path from "path";
 
-const client = new Client();
+let client: Client | null = null;
+let storageAvailable = true;
+
+function getClient(): Client | null {
+  if (!storageAvailable) return null;
+  if (client) return client;
+  
+  try {
+    client = new Client();
+    return client;
+  } catch (error) {
+    console.error("Object Storage not available:", error);
+    storageAvailable = false;
+    return null;
+  }
+}
 
 export interface UploadResult {
   success: boolean;
@@ -17,10 +32,18 @@ export async function uploadMedia(
   mimeType: string
 ): Promise<UploadResult> {
   try {
+    const storageClient = getClient();
+    if (!storageClient) {
+      return { 
+        success: false, 
+        error: "Object Storage not configured. Please create a bucket in App Storage." 
+      };
+    }
+
     const ext = path.extname(originalName) || getExtensionFromMimeType(mimeType);
     const key = `moments/${randomBytes(16).toString("hex")}${ext}`;
     
-    const { ok, error } = await client.uploadFromBytes(key, buffer);
+    const { ok, error } = await storageClient.uploadFromBytes(key, buffer);
     
     if (!ok) {
       console.error("Object storage upload failed:", error);
@@ -36,6 +59,13 @@ export async function uploadMedia(
     };
   } catch (error) {
     console.error("Media upload error:", error);
+    if (error instanceof Error && error.message.includes("bucket name")) {
+      storageAvailable = false;
+      return { 
+        success: false, 
+        error: "Object Storage not configured. Please create a bucket in App Storage." 
+      };
+    }
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Unknown error" 
@@ -50,7 +80,13 @@ export async function getPublicUrl(key: string): Promise<string> {
 
 export async function getMediaBuffer(key: string): Promise<Buffer | null> {
   try {
-    const { ok, value, error } = await client.downloadAsBytes(key);
+    const storageClient = getClient();
+    if (!storageClient) {
+      console.error("Object Storage not available");
+      return null;
+    }
+    
+    const { ok, value, error } = await storageClient.downloadAsBytes(key);
     if (!ok || !value) {
       console.error("Failed to download media:", error);
       return null;
@@ -65,7 +101,13 @@ export async function getMediaBuffer(key: string): Promise<Buffer | null> {
 
 export async function deleteMedia(key: string): Promise<boolean> {
   try {
-    const { ok } = await client.delete(key);
+    const storageClient = getClient();
+    if (!storageClient) {
+      console.error("Object Storage not available");
+      return false;
+    }
+    
+    const { ok } = await storageClient.delete(key);
     return ok;
   } catch (error) {
     console.error("Error deleting media:", error);
