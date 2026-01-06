@@ -5,6 +5,8 @@ import MomentsScreen from "@/screens/MomentsScreen";
 import MomentViewScreen from "@/screens/MomentViewScreen";
 import CreatePostScreen from "@/screens/CreatePostScreen";
 import CreatorProfileScreen from "@/screens/CreatorProfileScreen";
+import RecordVideoScreen from "@/screens/RecordVideoScreen";
+import VideoPreviewScreen from "@/screens/VideoPreviewScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
 export type MomentsStackParamList = {
@@ -13,6 +15,8 @@ export type MomentsStackParamList = {
   MomentView: { postId: string };
   CreatePost: undefined;
   CreatorProfile: { userId: string };
+  RecordVideo: undefined;
+  VideoPreview: { videoUri: string };
 };
 
 const Stack = createNativeStackNavigator<MomentsStackParamList>();
@@ -46,6 +50,16 @@ export default function MomentsStackNavigator() {
         name="CreatorProfile"
         component={CreatorProfileScreen}
         options={{ headerTitle: "Profile" }}
+      />
+      <Stack.Screen
+        name="RecordVideo"
+        component={RecordVideoScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="VideoPreview"
+        component={VideoPreviewScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

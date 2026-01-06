@@ -28,10 +28,15 @@ import { File } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
 import { Share } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { MomentsStackParamList } from "@/navigation/MomentsStackNavigator";
+
+type NavigationProp = NativeStackNavigationProp<MomentsStackParamList>;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -81,6 +86,7 @@ export default function MomentsScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const navigation = useNavigation<NavigationProp>();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -276,25 +282,10 @@ export default function MomentsScreen() {
     }
   }, []);
 
-  const recordVideo = useCallback(async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("Permission Required", "Camera access is needed to record videos.");
-      return;
-    }
-    
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: "videos",
-      allowsEditing: true,
-      videoMaxDuration: 60,
-      quality: 0.8,
-    });
-    
-    if (!result.canceled && result.assets[0]) {
-      setSelectedMedia({ uri: result.assets[0].uri, type: "video" });
-      setComposeStep("preview");
-    }
-  }, []);
+  const recordVideo = useCallback(() => {
+    setIsComposeOpen(false);
+    navigation.navigate("RecordVideo");
+  }, [navigation]);
 
   const skipMedia = useCallback(() => {
     setSelectedMedia(null);
