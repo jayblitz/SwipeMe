@@ -1469,6 +1469,72 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, [chatId]);
 
+  useEffect(() => {
+    const eventType = isGroup ? "group_message" : "new_message";
+    
+    const unsubscribe = realtimeClient.subscribe(eventType, async (data) => {
+      if (data.conversationId !== chatId) return;
+      if (data.senderId === user?.id) return;
+      
+      try {
+        if (isGroup) {
+          const baseUrl = getApiUrl();
+          const response = await fetch(new URL(`/api/groups/${chatId}/messages?limit=10`, baseUrl), {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+          });
+          
+          if (response.ok) {
+            const serverMessages = await response.json();
+            if (serverMessages.length > 0) {
+              setMessages(prev => {
+                const existingIds = new Set(prev.map(m => m.id));
+                const newMessages: Message[] = serverMessages
+                  .filter((msg: { id: string }) => !existingIds.has(msg.id))
+                  .map((msg: { id: string; chatId: string; senderId: string; content?: string; createdAt: string; type?: string; status?: string; sender?: { displayName?: string; username?: string } }) => ({
+                    id: msg.id,
+                    chatId: msg.chatId,
+                    senderId: msg.senderId === user?.id ? "me" : msg.senderId,
+                    content: msg.content || "",
+                    timestamp: new Date(msg.createdAt).getTime(),
+                    type: (msg.type || "text") as "text" | "payment" | "image" | "audio" | "location" | "contact" | "document" | "system",
+                    status: msg.status || "sent",
+                  }));
+                
+                if (newMessages.length === 0) return prev;
+                return [...newMessages, ...prev].sort((a, b) => b.timestamp - a.timestamp);
+              });
+            }
+          }
+        } else {
+          const newMessage: Message = {
+            id: data.messageId || `realtime-${Date.now()}`,
+            chatId: chatId,
+            senderId: data.senderId || "unknown",
+            content: data.content || "",
+            timestamp: data.timestamp ? new Date(data.timestamp).getTime() : Date.now(),
+            type: "text",
+            status: "delivered",
+          };
+          
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [newMessage, ...prev].sort((a, b) => b.timestamp - a.timestamp);
+          });
+          
+          if (realtimeClient.isConnected() && data.senderId && data.messageId) {
+            realtimeClient.sendDelivered(data.messageId, chatId, data.senderId);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to handle realtime message:", error);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [chatId, isGroup, user?.id]);
+
   useFocusEffect(
     useCallback(() => {
       const unreadMessages = messages.filter(

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -176,6 +176,24 @@ export default function MomentsScreen() {
     itemVisiblePercentThreshold: 80,
     minimumViewTime: 100,
   }).current;
+
+  useEffect(() => {
+    if (!posts.length) return;
+    
+    const prefetchRange = 3;
+    const startIndex = Math.max(0, currentIndex);
+    const endIndex = Math.min(posts.length - 1, currentIndex + prefetchRange);
+    
+    for (let i = startIndex; i <= endIndex; i++) {
+      const post = posts[i];
+      if (post.mediaUrls && post.mediaUrls.length > 0) {
+        const mediaUrl = post.mediaUrls[0];
+        if (post.mediaType === "photo") {
+          Image.prefetch(mediaUrl).catch(() => {});
+        }
+      }
+    }
+  }, [currentIndex, posts]);
 
   const createPostMutation = useMutation({
     mutationFn: async (data: { content: string; mediaType?: string; mediaUrls?: string[] }) => {
@@ -546,14 +564,16 @@ export default function MomentsScreen() {
             resizeMode={ResizeMode.COVER}
             isLooping={true}
             shouldPlay={isActiveVideo}
-            isMuted={false}
+            isMuted={!isActiveVideo}
             useNativeControls={false}
+            progressUpdateIntervalMillis={isActiveVideo ? 100 : 1000}
             onReadyForDisplay={() => {
               if (isActiveVideo) {
                 const videoRef = videoRefs.current.get(item.id);
                 videoRef?.playAsync();
               }
             }}
+            volume={isActiveVideo ? 1 : 0}
           />
         );
       } else if (hasMedia) {

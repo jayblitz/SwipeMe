@@ -323,7 +323,8 @@ async function fetchWithRetry(
 export async function sendMessageNotification(
   recipientId: string,
   message: string,
-  chatId: string
+  chatId: string,
+  messageId?: string
 ): Promise<void> {
   const { getApiUrl } = await import("@/lib/query-client");
   try {
@@ -333,7 +334,7 @@ export async function sendMessageNotification(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ recipientId, message, chatId }),
+        body: JSON.stringify({ recipientId, message, chatId, messageId }),
       }
     );
   } catch (error) {

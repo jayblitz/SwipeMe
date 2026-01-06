@@ -39,7 +39,7 @@ import {
   signMessage,
   type TransferParams
 } from "./wallet";
-import { sendPaymentNotification, sendMessageNotification } from "./pushNotifications";
+import { sendPaymentNotification } from "./pushNotifications";
 import { pool } from "./db";
 import { realtimeService } from "./websocket";
 
@@ -1449,7 +1449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/notify/message", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { recipientId, message, chatId } = req.body;
+      const { recipientId, message, chatId, messageId } = req.body;
       const senderId = req.session.userId;
       
       if (!recipientId || !message || !chatId) {
@@ -1468,25 +1468,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Recipient is not in this chat" });
       }
       
-      const recipient = await storage.getUserById(recipientId);
-      if (!recipient?.pushToken) {
-        return res.json({ success: false, reason: "Recipient has no push token" });
-      }
-      
       const sender = await storage.getUserById(senderId!);
       const senderUsername = sender?.username || sender?.displayName || sender?.email?.split("@")[0] || "Someone";
       
-      // Truncate message for security
-      const truncatedMessage = message.length > 100 ? message.slice(0, 97) + "..." : message;
+      // Broadcast via WebSocket for real-time delivery
+      const timestamp = new Date().toISOString();
+      realtimeService.broadcastNewMessage({
+        conversationId: chatId,
+        messageId: messageId || `msg-${Date.now()}`,
+        senderId: senderId!,
+        senderName: senderUsername,
+        recipientIds: [recipientId],
+        content: message,
+        timestamp,
+      });
       
-      const sent = await sendMessageNotification(
-        recipient.pushToken,
-        senderUsername,
-        truncatedMessage,
-        chatId
-      );
-      
-      res.json({ success: sent });
+      // Also send push notification for offline users (handled by broadcastNewMessage)
+      res.json({ success: true });
     } catch (error) {
       console.error("Send notification error:", error);
       res.status(500).json({ error: "Internal server error" });
