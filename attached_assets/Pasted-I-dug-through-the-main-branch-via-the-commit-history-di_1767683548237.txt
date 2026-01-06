@@ -1,0 +1,239 @@
+I dug through the **main** branch via the commit history + diffs (GitHub isn’t serving raw file contents reliably in this environment, but the commit diffs *do* show what’s actually implemented vs missing). Here’s what’s missing for the two big items you called out: **real-time messaging** and **TikTok-style Moments**.
+
+---
+
+## 1) Messaging: what exists vs what’s missing
+
+### What you already have (in the repo)
+
+**Group chat persistence + fetch** is implemented:
+
+* Client `ChatScreen.tsx` was changed to fetch group messages from the server: `GET /api/groups/${chatId}/messages?limit=50` using `credentials: "include"` (cookie session auth). ([GitHub][1])
+* Server added a group-messages endpoint: `GET /api/groups/:groupId/messages` and returns “sanitizedMessages” with sender info. ([GitHub][1])
+* Storage added DB functions like `createGroupMessage(...)` and `getGroupMessages(...)`. ([GitHub][1])
+
+### What’s missing (this is why it’s not “Signal real-time”)
+
+#### A) **No real-time transport is wired end-to-end**
+
+Right now the flow is: **persist → later fetch**. There’s no working “push” path that updates the recipient’s UI instantly.
+
+There’s a commit note claiming “real-time WebSocket broadcast,” but the visible diff around the group message notification is only tweaking content (e.g., removing truncation) — not introducing an actual socket server + client subscription. ([GitHub][2])
+
+So you still need one of these:
+
+* **WebSockets** (recommended for RN + web)
+* **Socket.IO** (WebSockets + fallbacks, easier rooms)
+* **XMTP streaming** (if 1:1 is XMTP-driven, you still need a stream subscription on the client)
+
+#### B) **Your cookie/session settings can silently break messaging in production**
+
+Your notes say you moved cookies to `SameSite=Strict` for CSRF hardening. ([GitHub][2])
+That’s good security *but* it will break cross-site session cookies.
+
+If your API is on a different origin (common examples):
+
+* Web: `swipeme.org` calling `api.swipeme.org`
+* Mobile app calling an API domain
+  …then `SameSite=Strict` will often prevent cookies from being sent → `requireAuth` fails → “messages don’t send / don’t load” even though the code *looks* correct (`credentials: "include"`). ([GitHub][1])
+
+**This is a very common “it works locally but not in prod” cause.**
+
+---
+
+## 2) How to make SwipeMe messaging real-time (the missing pieces to implement)
+
+### Step 1 — Fix auth so the client can reliably call the API
+
+Pick one:
+
+**Option 1 (keep cookie sessions):**
+
+* If frontend and API are different origins, set cookie to:
+
+  * `SameSite=None`
+  * `Secure=true`
+  * set proper CORS (`Access-Control-Allow-Credentials: true` + explicit origin)
+* Or serve API under the **same site** as the app so you can keep `Lax/Strict`.
+
+**Option 2 (simpler for WS + mobile):**
+
+* Use **Bearer JWT** for API calls + WebSockets, and stop relying on cookies for mobile.
+
+> If you want Signal-like reliability, JWT + refresh tokens usually reduces “mystery auth failures” a lot.
+
+---
+
+### Step 2 — Add real-time delivery for group messages (Socket.IO pattern)
+
+You already have:
+
+* DB persistence (`createGroupMessage`, `getGroupMessages`) ([GitHub][1])
+* Fetch endpoint ([GitHub][1])
+
+Now add:
+
+#### Server: create a socket server + “rooms” per group
+
+* Attach Socket.IO to the same HTTP server as Express
+* Auth the socket (JWT or session)
+* When a user opens a group chat, client emits `join_group`
+* When a message is created, server emits `group_message` to that room
+
+Minimal shape (illustrative):
+
+```ts
+// server/index.ts (conceptual)
+const httpServer = http.createServer(app);
+
+const io = new IOServer(httpServer, {
+  cors: { origin: CLIENT_ORIGIN, credentials: true },
+});
+
+io.use(async (socket, next) => {
+  // validate JWT or session, set socket.data.userId
+  next();
+});
+
+io.on("connection", (socket) => {
+  socket.on("join_group", (groupId: string) => {
+    socket.join(`group:${groupId}`);
+  });
+
+  socket.on("leave_group", (groupId: string) => {
+    socket.leave(`group:${groupId}`);
+  });
+});
+
+// export io so routes can emit
+export { io };
+```
+
+#### Server route: on POST create + emit
+
+Wherever your “send group message” endpoint is (you have fetch + storage, so this exists somewhere), after `createGroupMessage(...)` do:
+
+```ts
+io.to(`group:${groupId}`).emit("group_message", {
+  id: message.id,
+  chatId: groupId,
+  senderId,
+  content: ciphertextOrContent,
+  createdAt: message.createdAt,
+});
+```
+
+#### Client (`ChatScreen.tsx`): connect + subscribe
+
+You already fetch initial messages. ([GitHub][1])
+Add:
+
+* socket connect on screen mount
+* `join_group(chatId)`
+* on `group_message`, append to state
+* handle reconnect + re-join
+
+---
+
+### Step 3 — Add “offline real-time” (push notifications)
+
+Signal-like UX also means:
+
+* If the app is backgrounded/killed, you still get a push notification
+* When opened, it loads the latest messages
+
+So: store Expo push tokens per user, and on group message creation:
+
+* emit socket event to online users
+* send push to offline recipients
+
+---
+
+### Step 4 — If 1:1 chat is XMTP: you likely still need streaming
+
+Your project description explicitly calls out “Future ambitions include real-time message streaming.” ([GitHub][2])
+That usually means: you’re loading message history but not subscribing to the stream.
+
+On the client, you typically need something like:
+
+* `conversation.streamMessages()` (or equivalent in your XMTP SDK version)
+  …and update UI when new messages arrive.
+
+---
+
+## 3) Moments: what exists vs what’s missing for “TikTok-style”
+
+### What exists (in the repo)
+
+The “Moments” feature got a lot of work:
+
+* New navigation/screens: `MomentsScreen`, `MomentViewScreen`, `MomentsStackNavigator` ([GitHub][3])
+* Deep links for moments exist: `Feed: "moments"` and `MomentView: "moments/:postId"` ([GitHub][3])
+* Server additions include `mediaStorage.ts` and `moment-share.html` template ([GitHub][3])
+
+So: you have “feed + view/share + media plumbing” foundations.
+
+### What’s missing for “just like TikTok”
+
+TikTok isn’t “a posts list.” It’s specifically:
+
+#### A) Full-screen vertical pager feed (1 item = 1 video)
+
+* Each swipe changes the active video
+* Only the active video plays
+* Next/prev videos are prefetched
+
+If your `MomentsScreen` is currently a scrolling list of posts (very common), you’ll need to restructure it into:
+
+* `FlatList` with `pagingEnabled` (simple)
+* or `PagerView` (even closer to TikTok)
+
+#### B) Video delivery pipeline that scales
+
+If `mediaStorage.ts` is serving from local disk, it can work in dev but fail in production (ephemeral filesystem, no CDN, no transcoding). ([GitHub][3])
+
+TikTok-like video needs:
+
+* byte-range support / streaming
+* ideally HLS/DASH + multiple bitrates
+* thumbnails
+* CDN
+
+**Practical approach:**
+
+* Upload originals to S3/GCS via signed URLs
+* Background job transcodes to HLS
+* Serve via CDN
+
+#### C) Feed API optimized for infinite swipe
+
+You want a cursor-based feed endpoint (not “give me all moments”):
+
+* `GET /api/moments/feed?cursor=...&limit=...`
+* return “nextCursor”
+* include `videoUrl`, `thumbUrl`, `duration`, `creator`, counts, etc.
+
+---
+
+## The “missing list” in plain terms
+
+### Messaging (most urgent)
+
+1. **A working real-time channel** (Socket.IO/WebSockets or XMTP streaming subscription)
+2. **Client subscribes + updates UI** (not just fetch-on-open)
+3. **Auth works cross-origin** (your `SameSite=Strict` change can break cookies in prod) ([GitHub][2])
+4. **Push notifications** for offline delivery
+
+### Moments (to reach TikTok feel)
+
+1. Switch feed UI to a **vertical pager** with single active playback
+2. Add **prefetching + playback state management** (pause offscreen, resume onscreen)
+3. Make media hosting **production-grade** (signed upload + CDN + streaming format)
+
+---
+
+If you tell me where your API is hosted relative to the clients (same domain vs subdomain vs separate), I can give you the exact **cookie/CORS** settings that will stop auth from breaking message send/load. That’s the most likely reason you’re seeing “messages not sent/delivered” even before we add sockets.
+
+[1]: https://github.com/jayblitz/SwipeMe/commit/53e8bec1fe9d3ff31043423a2a8d6a06c24fc19f "Update group messaging to fetch from server and add versioning · jayblitz/SwipeMe@53e8bec · GitHub"
+[2]: https://github.com/jayblitz/SwipeMe/commit/9e43c8f438f4b9f9d71c1c0db2bbcf16dd2c42a9 "Update app to include group chat and security enhancements · jayblitz/SwipeMe@9e43c8f · GitHub"
+[3]: https://github.com/jayblitz/SwipeMe/commit/b496b0428f647ecc9d675c0792c79d228d74fb01 "Add ability to view and share individual moments · jayblitz/SwipeMe@b496b04 · GitHub"
