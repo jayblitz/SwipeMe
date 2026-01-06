@@ -40,8 +40,10 @@ import {
   type TransferParams
 } from "./wallet";
 import { sendPaymentNotification } from "./pushNotifications";
-import { pool } from "./db";
+import { pool, db } from "./db";
 import { realtimeService } from "./websocket";
+import { posts, postEngagements } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
 
 const allowedMimeTypes = [
   "image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif",
@@ -1260,16 +1262,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.session.userId!;
       const { postId } = req.params;
-      const { eventType, durationMs, wasSkipped } = req.body;
+      const { eventType, watchTimeSeconds, completionPercentage } = req.body;
       
       if (!eventType) {
         return res.status(400).json({ error: "Event type is required" });
       }
       
-      console.log(`Engagement: ${eventType} on post ${postId} by user ${userId}`, {
-        durationMs,
-        wasSkipped
+      // Persist all engagement events for analytics
+      await db.insert(postEngagements).values({
+        postId,
+        userId,
+        eventType,
+        watchTimeSeconds: watchTimeSeconds ? Math.round(watchTimeSeconds) : null,
+        completionPercentage: completionPercentage ? Math.round(completionPercentage) : null,
       });
+      
+      // Update views count on view_started (using COALESCE with NULLIF for safety)
+      if (eventType === "view_started") {
+        await db.update(posts)
+          .set({ viewsCount: sql`COALESCE(NULLIF(${posts.viewsCount}, '')::integer, 0) + 1` })
+          .where(eq(posts.id, postId));
+      }
       
       res.json({ success: true });
     } catch (error) {

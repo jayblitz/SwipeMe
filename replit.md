@@ -8,6 +8,9 @@ Production build phase. Version 1.0.2 (build 3). Focus is on stability, polished
 
 **Completed Features:**
 - Moments social feed with text posts, likes, comments
+- TikTok-style video recording with expo-camera (flip, flash, timer, 15-60s limits)
+- Video preview with playback controls, caption input, and upload
+- FYP algorithm with engagement scoring (watch time, completion rate, likes, tips)
 - Blockchain tipping for posts using pathUSD on Tempo testnet
 - Mini-apps marketplace with functional Calculator app
 - AI Assistant was removed due to security concerns

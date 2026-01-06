@@ -110,6 +110,7 @@ export default function MomentsScreen() {
   const heartAnimationRef = useRef<Map<string, Animated.Value>>(new Map());
   const videoRefs = useRef<Map<string, Video>>(new Map());
   const videoPositionsRef = useRef<Map<string, number>>(new Map());
+  const videoDurationRef = useRef<Map<string, number>>(new Map());
 
   const [feedMode, _setFeedMode] = useState<"recommended" | "chronological">("recommended");
   
@@ -151,17 +152,33 @@ export default function MomentsScreen() {
       const newIndex = visibleItem.index ?? 0;
       
       if (currentIndex !== newIndex && posts[currentIndex]) {
-        const viewDuration = Date.now() - viewStartTimeRef.current;
-        trackEngagement(posts[currentIndex].id, "view_completed", { 
-          durationMs: viewDuration,
-          wasSkipped: viewDuration < 2000
-        });
-        
         const previousPost = posts[currentIndex];
+        const wallClockMs = Date.now() - viewStartTimeRef.current;
+        const watchTimeSeconds = Math.max(1, Math.round(wallClockMs / 1000)); // Minimum 1s
+        
+        let completionPercentage = 0;
+        
         if (previousPost.mediaType === "video") {
           const previousVideo = videoRefs.current.get(previousPost.id);
           previousVideo?.pauseAsync();
+          
+          const videoDurationMs = videoDurationRef.current.get(previousPost.id) || 0;
+          
+          if (videoDurationMs > 0) {
+            // Calculate completion based on actual wall-clock time vs video duration
+            // Allows >100% if user watched loops, capped at 200% for scoring
+            const rawCompletion = (wallClockMs / videoDurationMs) * 100;
+            completionPercentage = Math.min(200, Math.round(rawCompletion));
+          }
+        } else {
+          // For photos/text: full "completion" if viewed for 3+ seconds
+          completionPercentage = wallClockMs >= 3000 ? 100 : Math.round((wallClockMs / 3000) * 100);
         }
+        
+        trackEngagement(previousPost.id, "view_completed", { 
+          watchTimeSeconds,
+          completionPercentage,
+        });
       }
       
       setCurrentIndex(newIndex);
@@ -565,8 +582,13 @@ export default function MomentsScreen() {
             useNativeControls={false}
             progressUpdateIntervalMillis={isActiveVideo ? 100 : 500}
             onPlaybackStatusUpdate={(status) => {
-              if (status.isLoaded && status.positionMillis !== undefined) {
-                videoPositionsRef.current.set(item.id, status.positionMillis);
+              if (status.isLoaded) {
+                if (status.positionMillis !== undefined) {
+                  videoPositionsRef.current.set(item.id, status.positionMillis);
+                }
+                if (status.durationMillis !== undefined && status.durationMillis > 0) {
+                  videoDurationRef.current.set(item.id, status.durationMillis);
+                }
               }
             }}
             onReadyForDisplay={() => {
