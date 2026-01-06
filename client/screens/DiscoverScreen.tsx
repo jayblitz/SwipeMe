@@ -16,7 +16,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing, BorderRadius, Shadows } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { createChat, Contact } from "@/lib/storage";
 import { apiRequest } from "@/lib/query-client";
 import { ChatsStackParamList } from "@/navigation/ChatsStackNavigator";
@@ -1343,13 +1343,6 @@ export default function DiscoverScreen() {
         visible={showDiary}
         onClose={() => setShowDiary(false)}
       />
-
-      <Pressable
-        onPress={() => setShowMenu(true)}
-        style={[styles.fab, { bottom: tabBarHeight + Spacing.lg }]}
-      >
-        <Feather name="plus" size={28} color="#FFFFFF" />
-      </Pressable>
     </ThemedView>
   );
 }
@@ -1395,17 +1388,6 @@ const styles = StyleSheet.create({
   miniAppName: {
     fontSize: 12,
     textAlign: "center",
-  },
-  fab: {
-    position: "absolute",
-    right: Spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.light.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    ...Shadows.fab,
   },
   modalOverlay: {
     flex: 1,
