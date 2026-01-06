@@ -779,6 +779,7 @@ export default function MomentsScreen() {
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        onMomentumScrollEnd={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
         getItemLayout={(_, index) => ({
           length: SCREEN_HEIGHT,
           offset: SCREEN_HEIGHT * index,
