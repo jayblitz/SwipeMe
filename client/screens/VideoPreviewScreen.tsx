@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,10 +12,11 @@ import {
   ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Video, ResizeMode } from "expo-av";
+import { Video, ResizeMode, Audio, AVPlaybackStatus } from "expo-av";
 import { File } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
 import * as Haptics from "expo-haptics";
+import * as DocumentPicker from "expo-document-picker";
 import { Feather } from "@expo/vector-icons";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -24,6 +25,12 @@ import { useTheme } from "@/hooks/useTheme";
 import { getApiUrl } from "@/lib/query-client";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { MomentsStackParamList } from "@/navigation/MomentsStackNavigator";
+
+interface SelectedAudio {
+  uri: string;
+  name: string;
+  duration?: number;
+}
 
 type NavigationProp = NativeStackNavigationProp<MomentsStackParamList, "VideoPreview">;
 type VideoPreviewRouteProp = RouteProp<MomentsStackParamList, "VideoPreview">;
@@ -38,11 +45,14 @@ export default function VideoPreviewScreen() {
   const { videoUri } = route.params || { videoUri: "" };
   
   const videoRef = useRef<Video>(null);
+  const audioRef = useRef<Audio.Sound | null>(null);
   
   const [caption, setCaption] = useState("");
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedAudio, setSelectedAudio] = useState<SelectedAudio | null>(null);
+  const [originalVideoMuted, setOriginalVideoMuted] = useState(false);
 
   const createPostMutation = useMutation({
     mutationFn: async (postData: { content: string; mediaUrl: string; mediaType: string }) => {
@@ -165,6 +175,92 @@ export default function VideoPreviewScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [isMuted]);
 
+  const pickAudio = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "audio/*",
+        copyToCacheDirectory: true,
+      });
+      
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        
+        if (audioRef.current) {
+          await audioRef.current.unloadAsync();
+        }
+        
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: asset.uri },
+          { isLooping: true, volume: 1 }
+        );
+        audioRef.current = sound;
+        
+        const status = await sound.getStatusAsync();
+        const duration = status.isLoaded ? status.durationMillis : undefined;
+        
+        setSelectedAudio({
+          uri: asset.uri,
+          name: asset.name || "Audio Track",
+          duration,
+        });
+        
+        if (isPlaying) {
+          await sound.playAsync();
+        }
+        
+        setOriginalVideoMuted(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (error) {
+      console.error("Audio picker error:", error);
+      Alert.alert("Error", "Could not load audio file");
+    }
+  }, [isPlaying]);
+
+  const removeAudio = useCallback(async () => {
+    if (audioRef.current) {
+      await audioRef.current.stopAsync();
+      await audioRef.current.unloadAsync();
+      audioRef.current = null;
+    }
+    setSelectedAudio(null);
+    setOriginalVideoMuted(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const toggleOriginalAudio = useCallback(() => {
+    setOriginalVideoMuted(!originalVideoMuted);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [originalVideoMuted]);
+
+  const syncAudioWithVideo = useCallback(async (status: AVPlaybackStatus) => {
+    if (!audioRef.current || !status.isLoaded) return;
+    
+    if (status.isPlaying && !isPlaying) {
+      await audioRef.current.playAsync();
+    } else if (!status.isPlaying && isPlaying) {
+      await audioRef.current.pauseAsync();
+    }
+    
+    if (status.positionMillis !== undefined) {
+      const audioStatus = await audioRef.current.getStatusAsync();
+      if (audioStatus.isLoaded) {
+        const diff = Math.abs(status.positionMillis - audioStatus.positionMillis);
+        if (diff > 200) {
+          await audioRef.current.setPositionAsync(status.positionMillis);
+        }
+      }
+    }
+  }, [isPlaying]);
+
+  const formatDuration = useCallback((ms?: number) => {
+    if (!ms) return "0:00";
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  }, []);
+
   return (
     <KeyboardAvoidingView 
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
@@ -207,7 +303,8 @@ export default function VideoPreviewScreen() {
             resizeMode={ResizeMode.CONTAIN}
             isLooping
             shouldPlay={isPlaying}
-            isMuted={isMuted}
+            isMuted={isMuted || originalVideoMuted}
+            onPlaybackStatusUpdate={selectedAudio ? syncAudioWithVideo : undefined}
           />
           
           {!isPlaying ? (
@@ -224,6 +321,63 @@ export default function VideoPreviewScreen() {
             </Pressable>
           </View>
         </Pressable>
+
+        <View style={styles.audioSection}>
+          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Audio Track</Text>
+          
+          {selectedAudio ? (
+            <View style={[styles.audioTrack, { backgroundColor: theme.backgroundSecondary }]}>
+              <View style={styles.audioTrackInfo}>
+                <View style={[styles.audioIcon, { backgroundColor: Colors.light.primary }]}>
+                  <Feather name="music" size={16} color="#FFF" />
+                </View>
+                <View style={styles.audioTrackDetails}>
+                  <Text style={[styles.audioTrackName, { color: theme.text }]} numberOfLines={1}>
+                    {selectedAudio.name}
+                  </Text>
+                  <Text style={[styles.audioTrackDuration, { color: theme.textSecondary }]}>
+                    {formatDuration(selectedAudio.duration)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.audioTrackActions}>
+                <Pressable 
+                  style={styles.audioControlButton}
+                  onPress={toggleOriginalAudio}
+                >
+                  <Feather 
+                    name={originalVideoMuted ? "video-off" : "video"} 
+                    size={18} 
+                    color={originalVideoMuted ? theme.textSecondary : Colors.light.primary} 
+                  />
+                </Pressable>
+                <Pressable style={styles.audioControlButton} onPress={removeAudio}>
+                  <Feather name="x" size={18} color="#FF3B30" />
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Pressable 
+              style={[styles.addAudioButton, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+              onPress={pickAudio}
+            >
+              <Feather name="music" size={20} color={Colors.light.primary} />
+              <Text style={[styles.addAudioText, { color: theme.text }]}>Add Music</Text>
+              <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+            </Pressable>
+          )}
+          
+          {selectedAudio ? (
+            <View style={styles.audioHint}>
+              <Feather name="info" size={12} color={theme.textSecondary} />
+              <Text style={[styles.audioHintText, { color: theme.textSecondary }]}>
+                {originalVideoMuted 
+                  ? "Original video audio is muted" 
+                  : "Original video audio plays with music"}
+              </Text>
+            </View>
+          ) : null}
+        </View>
 
         <View style={styles.captionContainer}>
           <TextInput
@@ -408,5 +562,80 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 14,
     fontWeight: "500",
+  },
+  audioSection: {
+    marginTop: Spacing.lg,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: Spacing.sm,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  audioTrack: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  audioTrackInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: Spacing.sm,
+  },
+  audioIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  audioTrackDetails: {
+    flex: 1,
+  },
+  audioTrackName: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  audioTrackDuration: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  audioTrackActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  audioControlButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addAudioButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    gap: Spacing.sm,
+  },
+  addAudioText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  audioHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  audioHintText: {
+    fontSize: 12,
   },
 });
