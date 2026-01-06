@@ -1,0 +1,143 @@
+### Expanding on SwipeMe's Moments Feature: A TikTok-Beating Implementation
+
+Building on the draft plan, let's dive deeper into each high/medium priority feature we can implement now—focusing on low/no-cost tools like your existing deps (expo-av for media, FlatList for UI, Socket.io for real-time). This keeps development lean (no new paid services) while making Moments superior to TikTok: Instant stablecoin tips mean creators earn 95% directly (vs TikTok's 50% cut with delays), E2E encrypted comments add privacy TikTok lacks, and super app integration (e.g., share to chats) creates seamless social-finance loops. We'll expand with more code details, UI tips, performance tweaks, and why it's transformative—turning passive scrolling into active earning. All buildable in Replit; test on testnet for free.
+
+Phases remain: Core in Phase 1 (build now, 1-2 weeks), engagements in Phase 2 (1-2 weeks). Total: A polished feed ready for beta.
+
+#### Phase 1: Core Video Creation and Feed – Build Now
+These form the addictive backbone—effortless upload and scrolling that feels smoother than TikTok, with crypto twists.
+
+- **Vertical Swipe + Autoplay (Easy, High Priority)**:  
+  TikTok's magic is the endless vertical scroll with auto-playing videos—users spend hours without thinking. In SwipeMe, make it better by tying swipes to micro-tips (e.g., swipe up reveals "Tip Creator" button). This transforms passive viewing into financial interaction, shaking creator economies.  
+  **Expanded Implementation**: Use FlatList's paging for snaps; onViewableItemsChanged plays only visible videos to save battery (better than TikTok's aggressive preload). Add haptic feedback (expo-haptics in deps) for satisfying swipes.  
+  ```tsx
+  import { FlatList, Dimensions, View } from 'react-native';
+  import { Video } from 'expo-av';
+  import * as Haptics from 'expo-haptics';
+  const { height } = Dimensions.get('window');
+
+  const MomentsScreen = () => {
+    const [feed, setFeed] = useState([]);
+    const videoRefs = useRef({});
+
+    // Fetch as in draft
+    const onViewableItemsChanged = ({ viewableItems }) => {
+      viewableItems.forEach(item => videoRefs.current[item.id]?.playAsync());
+      // Pause non-viewable: Object.keys(videoRefs.current).forEach(id => if (!viewableIds.includes(id)) videoRefs.current[id]?.pauseAsync());
+    };
+
+    const onMomentumScrollEnd = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); // Swipe feel
+
+    return (
+      <FlatList
+        data={feed}
+        renderItem={({ item }) => (
+          <View style={{ height, width: '100%' }}>
+            <Video ref={ref => videoRefs.current[item.id] = ref} source={{ uri: item.videoUrl }} style={{ flex: 1 }} resizeMode="cover" isLooping shouldPlay={false} />
+            {/* Tip button on swipe reveal – add GestureDetector for pull-up */}
+          </View>
+        )}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        // Rest as in draft
+      />
+    );
+  };
+  ```
+  **Why Better Than TikTok**: Swipes trigger contextual actions (e.g., tip previews)—monetization baked in, not ads interrupting.
+
+- **Video Recording and Editing Tools (Medium, High Priority)**:  
+  TikTok thrives on easy creation—record, trim, speed up. Expand to include caption/hashtag input during edit for instant trending. In SwipeMe, add tip prompts post-upload (e.g., "Set tip goal for viewers").  
+  **Expanded Implementation**: Use expo-camera for live recording (better quality than picker); add sliders for speed (0.5x-2x via expo-av rate). Compress client-side to reduce upload time.  
+  ```tsx
+  import * as ImagePicker from 'expo-image-picker';
+  import { Camera } from 'expo-camera';
+  import { Video } from 'expo-av';
+
+  const UploadScreen = () => {
+    const [permission, requestPermission] = Camera.useCameraPermissions();
+    const [speed, setSpeed] = useState(1); // Slider for 0.5-2x
+
+    async function recordVideo() {
+      if (!permission.granted) await requestPermission();
+      const video = await cameraRef.recordAsync({ maxDuration: 60 });
+      // Preview with speed: <Video source={{ uri: video.uri }} rate={speed} />
+      await uploadToServer(video.uri, speed); // Send speed to server for processing if needed
+    };
+
+    // Upload as in draft, add hashtags/caption fields
+  };
+  ```
+  **Why Better Than TikTok**: Edits include "tip request" metadata—viewers see "Tip to unlock full video" for monetization tease.
+
+- **Music and Audio Integration (Medium, Medium Priority)**:  
+  TikTok's sound library sparks trends—users "use this sound." In SwipeMe, make it collaborative: Share custom audio clips with tips attached.  
+  **Expanded Implementation**: Audio picker from library; mix with expo-av Audio.Sound (overlay on video export). Free library: Integrate FreeSound API (no licensing issues for non-commercial).  
+  ```tsx
+  const addAudio = async () => {
+    const audio = await ImagePicker.launchLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Audios });
+    if (!audio.canceled) {
+      const sound = new Audio.Sound();
+      await sound.loadAsync({ uri: audio.assets[0].uri });
+      // Mix: Use expo-av AVPlaybackSource for overlay on video (set positions)
+    };
+  };
+  ```
+  **Why Better Than TikTok**: Audio shares earn tips—creators monetize sounds directly, no royalty splits.
+
+- **Discovery and Algorithm (FYP) (Medium, Medium Priority)**:  
+  TikTok's FYP is AI magic—personalized by watch time. Start simple in SwipeMe, then add prefs.  
+  **Expanded Implementation**: Server-side sort with user follows/likes; client-side refine with local storage.  
+  ```js
+  // Server /api/moments/feed: ORDER BY (CASE WHEN user_follows_creator THEN 1 ELSE 0 END) DESC, (likes * 0.6 + views * 0.4) DESC
+  ```
+  **Why Better Than TikTok**: FYP prioritizes tipped content—boosts paying creators, creating a merit-based economy.
+
+#### Phase 2: Engagement Boost – Build Now/Soon
+- **Likes/Hearts with Animation (Easy, High Priority)**:  
+  TikTok hearts pop for satisfaction. In SwipeMe, double-tap likes trigger tip prompts.  
+  **Expanded Implementation**: Add GestureHandler for double-tap; keyframes animation.  
+  ```tsx
+  import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+
+  <GestureDetector gesture={Gesture.Tap().numberOfTaps(2).onStart(() => api.post('/like'))}>
+    <Animated.View style={[styles.heart, useAnimatedStyle(() => ({ transform: [{ scale: withSpring(1.5) }] }) ])} />
+  </GestureDetector>
+  ```
+  **Why Better Than TikTok**: Likes link to optional tips—turns engagement into income.
+
+- **Comments (Medium, High Priority)**:  
+  TikTok comments build community. Use XMTP for E2E in SwipeMe.  
+  **Expanded Implementation**: Threaded list; post with encryption.  
+  **Why Better Than TikTok**: Private threads—no moderation overreach.
+
+- **Tipping/Gifts (Medium, High Priority)**:  
+  TikTok gifts are virtual; make real stablecoins in SwipeMe.  
+  **Expanded Implementation**: Button opens amount selector—call transfer API.  
+  **Why Better Than TikTok**: 95% payouts, instant withdrawals—no delays.
+
+- **Share to WhatsApp/Signal (Easy, High Priority)**:  
+  TikTok shares boost virality. In SwipeMe, shares include tip links.  
+  **Expanded Implementation**: expo-sharing with custom message.  
+  **Why Better Than TikTok**: Shares to chats trigger payments—cross-app economy.
+
+- **Follow/Notifications (Medium, Medium Priority)**:  
+  TikTok follows personalize. Add pushes for new content.  
+  **Expanded Implementation**: API /api/follow; Expo Notifications for alerts.  
+  **Why Better Than TikTok**: Notifications include tip opportunities.
+
+- **Creator Analytics (Medium, Medium Priority)**:  
+  TikTok dashboards show views. Add earnings in SwipeMe.  
+  **Expanded Implementation**: Profile query for tips/likes.  
+  **Why Better Than TikTok**: On-chain verifiable earnings—no disputes.
+
+- **Trending/Hashtags (Medium, Medium Priority)**:  
+  TikTok trends go viral. Add with tip bounties.  
+  **Expanded Implementation**: Hashtag search in feed; trending carousel.  
+  **Why Better Than TikTok**: Trends with crypto prizes—real incentives.
+
+#### Server Updates for Speed/Reliability
+Yes—scale with free tiers: S3 for videos (aws-sdk), Redis for caching (Upstash), sharp for compression. Dockerize for deploys. This ensures smooth 10k+ users without lag.
+
+This expanded plan makes Moments TikTok-beating: Fun + finance in one—creators thrive instantly. Build high priorities first in Replit.
