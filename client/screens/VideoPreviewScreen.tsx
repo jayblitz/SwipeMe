@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -53,6 +53,16 @@ export default function VideoPreviewScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedAudio, setSelectedAudio] = useState<SelectedAudio | null>(null);
   const [originalVideoMuted, setOriginalVideoMuted] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.stopAsync();
+        audioRef.current.unloadAsync();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const createPostMutation = useMutation({
     mutationFn: async (postData: { content: string; mediaUrl: string; mediaType: string }) => {
@@ -164,8 +174,14 @@ export default function VideoPreviewScreen() {
     
     if (isPlaying) {
       await videoRef.current.pauseAsync();
+      if (audioRef.current) {
+        await audioRef.current.pauseAsync();
+      }
     } else {
       await videoRef.current.playAsync();
+      if (audioRef.current) {
+        await audioRef.current.playAsync();
+      }
     }
     setIsPlaying(!isPlaying);
   }, [isPlaying]);
@@ -236,22 +252,16 @@ export default function VideoPreviewScreen() {
   const syncAudioWithVideo = useCallback(async (status: AVPlaybackStatus) => {
     if (!audioRef.current || !status.isLoaded) return;
     
-    if (status.isPlaying && !isPlaying) {
-      await audioRef.current.playAsync();
-    } else if (!status.isPlaying && isPlaying) {
-      await audioRef.current.pauseAsync();
-    }
-    
     if (status.positionMillis !== undefined) {
       const audioStatus = await audioRef.current.getStatusAsync();
       if (audioStatus.isLoaded) {
         const diff = Math.abs(status.positionMillis - audioStatus.positionMillis);
-        if (diff > 200) {
+        if (diff > 300) {
           await audioRef.current.setPositionAsync(status.positionMillis);
         }
       }
     }
-  }, [isPlaying]);
+  }, []);
 
   const formatDuration = useCallback((ms?: number) => {
     if (!ms) return "0:00";
