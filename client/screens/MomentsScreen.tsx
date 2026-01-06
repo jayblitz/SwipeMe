@@ -103,6 +103,7 @@ export default function MomentsScreen() {
   const lastTapRef = useRef<Map<string, number>>(new Map());
   const heartAnimationRef = useRef<Map<string, Animated.Value>>(new Map());
   const videoRefs = useRef<Map<string, Video>>(new Map());
+  const videoPositionsRef = useRef<Map<string, number>>(new Map());
 
   const [feedMode, _setFeedMode] = useState<"recommended" | "chronological">("recommended");
   
@@ -553,7 +554,12 @@ export default function MomentsScreen() {
               if (ref) {
                 videoRefs.current.set(item.id, ref);
                 if (isActiveVideo) {
-                  ref.playAsync();
+                  const savedPosition = videoPositionsRef.current.get(item.id);
+                  if (savedPosition && savedPosition > 0) {
+                    ref.setStatusAsync({ positionMillis: savedPosition, shouldPlay: true });
+                  } else {
+                    ref.playAsync();
+                  }
                 }
               } else {
                 videoRefs.current.delete(item.id);
@@ -566,11 +572,21 @@ export default function MomentsScreen() {
             shouldPlay={isActiveVideo}
             isMuted={!isActiveVideo}
             useNativeControls={false}
-            progressUpdateIntervalMillis={isActiveVideo ? 100 : 1000}
+            progressUpdateIntervalMillis={isActiveVideo ? 100 : 500}
+            onPlaybackStatusUpdate={(status) => {
+              if (status.isLoaded && status.positionMillis !== undefined) {
+                videoPositionsRef.current.set(item.id, status.positionMillis);
+              }
+            }}
             onReadyForDisplay={() => {
               if (isActiveVideo) {
                 const videoRef = videoRefs.current.get(item.id);
-                videoRef?.playAsync();
+                const savedPosition = videoPositionsRef.current.get(item.id);
+                if (savedPosition && savedPosition > 0) {
+                  videoRef?.setStatusAsync({ positionMillis: savedPosition, shouldPlay: true });
+                } else {
+                  videoRef?.playAsync();
+                }
               }
             }}
             volume={isActiveVideo ? 1 : 0}
