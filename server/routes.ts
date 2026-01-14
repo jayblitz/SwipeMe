@@ -596,7 +596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  apiRouter.post("/contacts/match", async (req: Request, res: Response) => {
+  apiRouter.post("/contacts/match", requireAuth, async (req: Request, res: Response) => {
     try {
       const { emails } = req.body;
       
@@ -626,7 +626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  apiRouter.post("/contacts/check", async (req: Request, res: Response) => {
+  apiRouter.post("/contacts/check", requireAuth, async (req: Request, res: Response) => {
     try {
       const { email } = req.body;
       

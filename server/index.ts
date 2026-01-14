@@ -119,6 +119,14 @@ function setupRateLimiting(app: express.Application) {
     validate: { xForwardedForHeader: false },
   });
 
+  const contactLookupLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 20,
+    message: { error: "Too many contact lookup requests, please try again in 5 minutes" },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   // Apply rate limiting to both /api and /api/v1 paths
   app.use("/api/", globalLimiter);
   app.use("/api/v1/", globalLimiter);
@@ -134,6 +142,8 @@ function setupRateLimiting(app: express.Application) {
     app.use(`${prefix}/auth/2fa/verify`, authLimiter);
     app.use(`${prefix}/auth/verify-2fa`, authLimiter);
     app.use(`${prefix}/auth/signup/complete`, verifyLimiter);
+    app.use(`${prefix}/contacts/match`, contactLookupLimiter);
+    app.use(`${prefix}/contacts/check`, contactLookupLimiter);
   });
 }
 
