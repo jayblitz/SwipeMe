@@ -506,9 +506,23 @@ export const storage = {
     return commentsWithAuthors;
   },
 
-  async addPostComment(postId: string, authorId: string, content: string): Promise<PostComment> {
+  async getCommentById(commentId: string): Promise<PostComment | null> {
+    const [comment] = await db.select()
+      .from(postComments)
+      .where(eq(postComments.id, commentId));
+    return comment || null;
+  },
+
+  async addPostComment(postId: string, authorId: string, content: string, parentId?: string): Promise<PostComment> {
+    if (parentId) {
+      const parentComment = await this.getCommentById(parentId);
+      if (!parentComment || parentComment.postId !== postId) {
+        throw new Error("Invalid parent comment");
+      }
+    }
+    
     const [comment] = await db.insert(postComments)
-      .values({ postId, authorId, content })
+      .values({ postId, authorId, content, parentId: parentId || null })
       .returning();
     
     const post = await this.getPostById(postId);

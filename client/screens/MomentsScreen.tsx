@@ -10,12 +10,18 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
-  KeyboardAvoidingView,
   Alert,
   Animated,
   ScrollView,
   type ViewToken,
 } from "react-native";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import ReAnimated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -72,6 +78,7 @@ interface TrendingHashtag {
 interface Comment {
   id: string;
   content: string;
+  parentId: string | null;
   createdAt: string;
   author: PostAuthor;
 }
@@ -93,6 +100,7 @@ export default function MomentsScreen() {
   const [composeText, setComposeText] = useState("");
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
+  const [replyToComment, setReplyToComment] = useState<Comment | null>(null);
   const [tipAmount, setTipAmount] = useState("");
   const [showTipModal, setShowTipModal] = useState(false);
   const [tipPostId, setTipPostId] = useState<string | null>(null);
@@ -116,6 +124,9 @@ export default function MomentsScreen() {
   
   const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null);
   const [showTrending, setShowTrending] = useState(true);
+  const [tipPromptVisible, setTipPromptVisible] = useState<string | null>(null);
+  
+  const tipPromptY = useSharedValue(100);
 
   const { data: posts = [], isLoading } = useQuery<Post[]>({
     queryKey: selectedHashtag 
@@ -133,6 +144,19 @@ export default function MomentsScreen() {
     queryKey: ["/api/moments", selectedPostId, "comments"],
     enabled: !!selectedPostId,
   });
+
+  const threadedComments = useMemo(() => {
+    const topLevel = comments.filter(c => !c.parentId);
+    const repliesMap = new Map<string, Comment[]>();
+    comments.forEach(c => {
+      if (c.parentId) {
+        const existing = repliesMap.get(c.parentId) || [];
+        existing.push(c);
+        repliesMap.set(c.parentId, existing);
+      }
+    });
+    return { topLevel, repliesMap };
+  }, [comments]);
 
   const styles = useMemo(() => createStyles(theme, isDark, insets), [theme, isDark, insets]);
 
@@ -322,13 +346,14 @@ export default function MomentsScreen() {
   });
 
   const addCommentMutation = useMutation({
-    mutationFn: async ({ postId, content }: { postId: string; content: string }) => {
-      return apiRequest("POST", `/api/moments/${postId}/comments`, { content });
+    mutationFn: async ({ postId, content, parentId }: { postId: string; content: string; parentId?: string }) => {
+      return apiRequest("POST", `/api/moments/${postId}/comments`, { content, parentId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/moments", selectedPostId, "comments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/moments"] });
       setCommentText("");
+      setReplyToComment(null);
     },
     onError: (error: Error) => {
       Alert.alert("Error", error.message || "Could not add comment.");
@@ -546,6 +571,27 @@ export default function MomentsScreen() {
     return n.toString();
   }, []);
 
+  const showTipPrompt = useCallback((postId: string) => {
+    setTipPromptVisible(postId);
+    tipPromptY.value = withSpring(0, { damping: 15, stiffness: 120 });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [tipPromptY]);
+
+  const hideTipPrompt = useCallback(() => {
+    tipPromptY.value = withTiming(100, { duration: 200 });
+    setTimeout(() => setTipPromptVisible(null), 200);
+  }, [tipPromptY]);
+
+  const openTipFromPrompt = useCallback((postId: string) => {
+    hideTipPrompt();
+    setTipPostId(postId);
+    setShowTipModal(true);
+  }, [hideTipPrompt]);
+
+  const tipPromptAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: tipPromptY.value }],
+  }));
+
   const renderPost = useCallback(({ item, index }: { item: Post; index: number }) => {
     const authorName = item.author.displayName || item.author.username || "Anonymous";
     const authorUsername = item.author.username ? `@${item.author.username}` : "";
@@ -754,9 +800,54 @@ export default function MomentsScreen() {
             {index + 1} / {posts.length}
           </Text>
         </View>
+
+        {currentIndex === index && user?.id !== item.authorId ? (
+          <Pressable 
+            style={styles.swipeUpHint}
+            onPress={() => showTipPrompt(item.id)}
+          >
+            <View style={styles.swipeUpLine} />
+            <View style={styles.swipeUpContent}>
+              <Feather name="chevron-up" size={16} color="rgba(255,255,255,0.9)" />
+              <Text style={styles.swipeUpText}>Swipe up to tip</Text>
+            </View>
+          </Pressable>
+        ) : null}
+
+        {tipPromptVisible === item.id ? (
+          <ReAnimated.View style={[styles.tipPromptBanner, tipPromptAnimatedStyle]}>
+            <Pressable style={styles.tipPromptBackdrop} onPress={hideTipPrompt} />
+            <View style={styles.tipPromptCard}>
+              <Text style={styles.tipPromptTitle}>Support this creator</Text>
+              <Text style={styles.tipPromptSubtitle}>
+                Send a tip to {authorName}
+              </Text>
+              <View style={styles.tipPromptButtons}>
+                {["5", "10", "25"].map((amount) => (
+                  <Pressable
+                    key={amount}
+                    style={styles.tipPromptAmountButton}
+                    onPress={() => {
+                      setTipAmount(amount);
+                      openTipFromPrompt(item.id);
+                    }}
+                  >
+                    <Text style={styles.tipPromptAmountText}>${amount}</Text>
+                  </Pressable>
+                ))}
+                <Pressable
+                  style={styles.tipPromptCustomButton}
+                  onPress={() => openTipFromPrompt(item.id)}
+                >
+                  <Feather name="edit-2" size={16} color="#FFF" />
+                </Pressable>
+              </View>
+            </View>
+          </ReAnimated.View>
+        ) : null}
       </Pressable>
     );
-  }, [theme, formatTime, formatNumber, handleLike, handleTap, handleShare, posts.length, styles, isDark, trackEngagement, currentIndex]);
+  }, [theme, formatTime, formatNumber, handleLike, handleTap, handleShare, posts.length, styles, isDark, trackEngagement, currentIndex, user, showTipPrompt, tipPromptVisible, tipPromptAnimatedStyle, hideTipPrompt, openTipFromPrompt]);
 
   if (isLoading) {
     return (
@@ -935,9 +1026,9 @@ export default function MomentsScreen() {
               </Pressable>
             </View>
           ) : (
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              style={styles.previewContainer}
+            <KeyboardAwareScrollViewCompat
+              contentContainerStyle={styles.previewContainer}
+              keyboardShouldPersistTaps="handled"
             >
               <View style={[styles.previewHeader, { paddingTop: insets.top }]}>
                 <Pressable 
@@ -1022,7 +1113,7 @@ export default function MomentsScreen() {
                     : "Add media for more engagement"}
                 </Text>
               </View>
-            </KeyboardAvoidingView>
+            </KeyboardAwareScrollViewCompat>
           )}
         </View>
       </Modal>
@@ -1031,11 +1122,20 @@ export default function MomentsScreen() {
         visible={!!selectedPostId}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setSelectedPostId(null)}
+        onRequestClose={() => {
+          setSelectedPostId(null);
+          setReplyToComment(null);
+        }}
       >
-        <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
+        <KeyboardAwareScrollViewCompat
+          contentContainerStyle={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={[styles.modalHeader, { paddingTop: insets.top }]}>
-            <Pressable onPress={() => setSelectedPostId(null)}>
+            <Pressable onPress={() => {
+              setSelectedPostId(null);
+              setReplyToComment(null);
+            }}>
               <Feather name="x" size={24} color={theme.text} />
             </Pressable>
             <Text style={[styles.modalTitle, { color: theme.text }]}>Comments</Text>
@@ -1043,9 +1143,10 @@ export default function MomentsScreen() {
           </View>
 
           <FlatList
-            data={comments}
+            data={threadedComments.topLevel}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: Spacing.md, flexGrow: 1 }}
+            scrollEnabled={false}
             ListEmptyComponent={
               commentsLoading ? (
                 <ActivityIndicator size="small" color={Colors.light.primary} />
@@ -1055,32 +1156,82 @@ export default function MomentsScreen() {
                 </Text>
               )
             }
-            renderItem={({ item }) => (
-              <View style={styles.commentItem}>
-                <View style={[styles.commentAvatar, { backgroundColor: theme.border }]}>
-                  {item.author.profileImage ? (
-                    <Image source={{ uri: item.author.profileImage }} style={styles.smallAvatar} />
-                  ) : (
-                    <Feather name="user" size={14} color={theme.textSecondary} />
-                  )}
+            renderItem={({ item }) => {
+              const replies = threadedComments.repliesMap.get(item.id) || [];
+              return (
+                <View>
+                  <Pressable 
+                    style={styles.commentItem}
+                    onLongPress={() => {
+                      setReplyToComment(item);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  >
+                    <View style={[styles.commentAvatar, { backgroundColor: theme.border }]}>
+                      {item.author.profileImage ? (
+                        <Image source={{ uri: item.author.profileImage }} style={styles.smallAvatar} />
+                      ) : (
+                        <Feather name="user" size={14} color={theme.textSecondary} />
+                      )}
+                    </View>
+                    <View style={styles.commentContent}>
+                      <Text style={[styles.commentAuthor, { color: theme.text }]}>
+                        {item.author.displayName || item.author.username || "Anonymous"}
+                      </Text>
+                      <Text style={[styles.commentText, { color: theme.text }]}>{item.content}</Text>
+                      <View style={styles.commentActions}>
+                        <Text style={[styles.commentTime, { color: theme.textSecondary }]}>
+                          {formatTime(item.createdAt)}
+                        </Text>
+                        <Pressable 
+                          style={styles.replyButton}
+                          onPress={() => setReplyToComment(item)}
+                        >
+                          <Text style={[styles.replyButtonText, { color: theme.textSecondary }]}>Reply</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </Pressable>
+                  {replies.map(reply => (
+                    <View key={reply.id} style={[styles.commentItem, styles.replyItem]}>
+                      <View style={[styles.commentAvatar, styles.replyAvatar, { backgroundColor: theme.border }]}>
+                        {reply.author.profileImage ? (
+                          <Image source={{ uri: reply.author.profileImage }} style={styles.smallAvatar} />
+                        ) : (
+                          <Feather name="user" size={12} color={theme.textSecondary} />
+                        )}
+                      </View>
+                      <View style={styles.commentContent}>
+                        <Text style={[styles.commentAuthor, { color: theme.text, fontSize: 13 }]}>
+                          {reply.author.displayName || reply.author.username || "Anonymous"}
+                        </Text>
+                        <Text style={[styles.commentText, { color: theme.text, fontSize: 13 }]}>{reply.content}</Text>
+                        <Text style={[styles.commentTime, { color: theme.textSecondary, fontSize: 11 }]}>
+                          {formatTime(reply.createdAt)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
                 </View>
-                <View style={styles.commentContent}>
-                  <Text style={[styles.commentAuthor, { color: theme.text }]}>
-                    {item.author.displayName || item.author.username || "Anonymous"}
-                  </Text>
-                  <Text style={[styles.commentText, { color: theme.text }]}>{item.content}</Text>
-                  <Text style={[styles.commentTime, { color: theme.textSecondary }]}>
-                    {formatTime(item.createdAt)}
-                  </Text>
-                </View>
-              </View>
-            )}
+              );
+            }}
           />
+
+          {replyToComment ? (
+            <View style={[styles.replyingToBar, { backgroundColor: theme.backgroundSecondary, borderTopColor: theme.border }]}>
+              <Text style={[styles.replyingToText, { color: theme.textSecondary }]}>
+                Replying to {replyToComment.author.displayName || replyToComment.author.username}
+              </Text>
+              <Pressable onPress={() => setReplyToComment(null)}>
+                <Feather name="x" size={16} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+          ) : null}
 
           <View style={[styles.commentInputRow, { paddingBottom: insets.bottom + Spacing.sm, borderTopColor: theme.border }]}>
             <TextInput
               style={[styles.commentInput, { color: theme.text, backgroundColor: theme.backgroundSecondary }]}
-              placeholder="Add a comment..."
+              placeholder={replyToComment ? "Write a reply..." : "Add a comment..."}
               placeholderTextColor={theme.textSecondary}
               value={commentText}
               onChangeText={setCommentText}
@@ -1089,7 +1240,11 @@ export default function MomentsScreen() {
               style={styles.sendButton}
               onPress={() => {
                 if (selectedPostId && commentText.trim()) {
-                  addCommentMutation.mutate({ postId: selectedPostId, content: commentText.trim() });
+                  addCommentMutation.mutate({ 
+                    postId: selectedPostId, 
+                    content: commentText.trim(),
+                    parentId: replyToComment?.id,
+                  });
                 }
               }}
               disabled={!commentText.trim() || addCommentMutation.isPending}
@@ -1101,7 +1256,7 @@ export default function MomentsScreen() {
               />
             </Pressable>
           </View>
-        </View>
+        </KeyboardAwareScrollViewCompat>
       </Modal>
 
       <Modal
@@ -1110,7 +1265,10 @@ export default function MomentsScreen() {
         transparent
         onRequestClose={() => setShowTipModal(false)}
       >
-        <View style={styles.tipModalOverlay}>
+        <KeyboardAwareScrollViewCompat
+          contentContainerStyle={styles.tipModalOverlay}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={[styles.tipModalContent, { backgroundColor: theme.backgroundSecondary }]}>
             <Text style={[styles.tipModalTitle, { color: theme.text }]}>Send a Tip</Text>
             <Text style={[styles.tipModalSubtitle, { color: theme.textSecondary }]}>
@@ -1177,7 +1335,7 @@ export default function MomentsScreen() {
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAwareScrollViewCompat>
       </Modal>
     </View>
   );
@@ -1485,6 +1643,39 @@ function createStyles(theme: ReturnType<typeof useTheme>["theme"], _isDark: bool
       fontSize: 12,
       marginTop: 4,
     },
+    commentActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 4,
+      gap: Spacing.md,
+    },
+    replyButton: {
+      paddingVertical: 2,
+    },
+    replyButtonText: {
+      fontSize: 12,
+      fontWeight: "500",
+    },
+    replyItem: {
+      marginLeft: 44,
+      marginTop: Spacing.xs,
+    },
+    replyAvatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+    },
+    replyingToBar: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      borderTopWidth: 1,
+    },
+    replyingToText: {
+      fontSize: 13,
+    },
     emptyComments: {
       textAlign: "center",
       marginTop: Spacing.xl,
@@ -1725,6 +1916,93 @@ function createStyles(theme: ReturnType<typeof useTheme>["theme"], _isDark: bool
     },
     previewTipText: {
       fontSize: 12,
+    },
+    swipeUpHint: {
+      position: "absolute",
+      bottom: insets.bottom + 16,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+    },
+    swipeUpLine: {
+      width: 40,
+      height: 4,
+      backgroundColor: "rgba(255,255,255,0.4)",
+      borderRadius: 2,
+      marginBottom: 8,
+    },
+    swipeUpContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+    },
+    swipeUpText: {
+      color: "rgba(255,255,255,0.9)",
+      fontSize: 13,
+      fontWeight: "500",
+    },
+    tipPromptBanner: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: "100%",
+    },
+    tipPromptBackdrop: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.4)",
+    },
+    tipPromptCard: {
+      position: "absolute",
+      bottom: insets.bottom + 24,
+      left: Spacing.lg,
+      right: Spacing.lg,
+      backgroundColor: "rgba(30,30,30,0.95)",
+      borderRadius: BorderRadius.lg,
+      padding: Spacing.lg,
+      alignItems: "center",
+    },
+    tipPromptTitle: {
+      color: "#FFF",
+      fontSize: 18,
+      fontWeight: "700",
+      marginBottom: 4,
+    },
+    tipPromptSubtitle: {
+      color: "rgba(255,255,255,0.7)",
+      fontSize: 14,
+      marginBottom: Spacing.md,
+    },
+    tipPromptButtons: {
+      flexDirection: "row",
+      gap: Spacing.sm,
+    },
+    tipPromptAmountButton: {
+      backgroundColor: Colors.light.primary,
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.sm,
+      borderRadius: BorderRadius.full,
+    },
+    tipPromptAmountText: {
+      color: "#FFF",
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    tipPromptCustomButton: {
+      backgroundColor: "rgba(255,255,255,0.2)",
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: "center",
+      justifyContent: "center",
     },
   });
 }

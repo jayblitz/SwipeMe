@@ -367,11 +367,13 @@ export const postComments = pgTable("post_comments", {
     .default(sql`gen_random_uuid()`),
   postId: varchar("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
   authorId: varchar("author_id").notNull().references(() => users.id),
+  parentId: varchar("parent_id"), // For threaded replies - null means top-level comment
   content: text("content").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("post_comments_post_idx").on(table.postId),
   index("post_comments_author_idx").on(table.authorId),
+  index("post_comments_parent_idx").on(table.parentId),
 ]);
 
 export const postTips = pgTable("post_tips", {

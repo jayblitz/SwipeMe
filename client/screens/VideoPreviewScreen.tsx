@@ -6,11 +6,10 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
   Alert,
-  ScrollView,
 } from "react-native";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Video, ResizeMode, Audio, AVPlaybackStatus } from "expo-av";
 import { File } from "expo-file-system";
@@ -272,10 +271,7 @@ export default function VideoPreviewScreen() {
   }, []);
 
   return (
-    <KeyboardAvoidingView 
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
         <Pressable style={styles.headerButton} onPress={handleDiscard}>
           <Feather name="x" size={24} color={theme.text} />
@@ -300,7 +296,7 @@ export default function VideoPreviewScreen() {
         </Pressable>
       </View>
 
-      <ScrollView 
+      <KeyboardAwareScrollViewCompat 
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
@@ -428,8 +424,8 @@ export default function VideoPreviewScreen() {
             <Text style={[styles.actionButtonText, { color: theme.text }]}>Retake</Text>
           </Pressable>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareScrollViewCompat>
+    </View>
   );
 }
 

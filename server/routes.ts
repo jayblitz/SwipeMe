@@ -1123,7 +1123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.session.userId!;
       const { postId } = req.params;
-      const { content } = req.body;
+      const { content, parentId } = req.body;
       
       if (!content || content.trim().length === 0) {
         return res.status(400).json({ error: "Comment content is required" });
@@ -1134,11 +1134,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Post not found" });
       }
       
-      const comment = await storage.addPostComment(postId, userId, content.trim());
+      const comment = await storage.addPostComment(postId, userId, content.trim(), parentId);
       const author = await storage.getUserById(userId);
       res.json({ ...comment, author });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Add comment error:", error);
+      if (error instanceof Error && error.message === "Invalid parent comment") {
+        return res.status(400).json({ error: "Invalid parent comment" });
+      }
       res.status(500).json({ error: "Internal server error" });
     }
   });
