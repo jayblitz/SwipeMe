@@ -11,6 +11,14 @@ Production build phase. Version 1.0.2 (build 3). Focus is on stability, polished
 - TikTok-style video recording with expo-camera (flip, flash, timer, 15-60s limits)
 - Video preview with playback controls, caption input, and upload
 - FYP algorithm with engagement scoring (watch time, completion rate, likes, tips)
+- Trending feed with engagement velocity algorithm: (likes*2 + comments*3 + tips*10 + views*0.1) / hours_elapsed
+- Following feed showing chronological posts from followed creators
+- Segmented control in Moments (For You / Trending / Following) with haptic feedback
+- Trending hashtags bar with real-time post counts
+- Hashtag discovery with tappable hashtags and filtered feed views
+- Threaded comments with nested replies and parent validation
+- Push notifications for likes, comments, and tips with deep linking to posts
+- Notification preferences toggles in Settings (likes, comments, tips, payments)
 - Blockchain tipping for posts using pathUSD on Tempo testnet
 - Mini-apps marketplace with functional Calculator app
 - AI Assistant was removed due to security concerns
