@@ -1286,17 +1286,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update creator balance - full amount is tracked as pending (held in treasury)
       await storage.updateCreatorBalance(post.authorId, tipAmount.toFixed(6), "0");
       
-      // Send notification to author
-      const author = await storage.getUserById(post.authorId);
-      if (author?.pushToken) {
-        const tipper = await storage.getUserById(userId);
-        const tipperUsername = tipper?.username || tipper?.displayName || "Someone";
-        sendTipNotification(
-          author.pushToken,
-          tipperUsername,
-          amount,
-          postId
-        ).catch(err => console.error("Tip notification error:", err));
+      // Send notification to author (skip if self-tip)
+      if (post.authorId !== userId) {
+        const author = await storage.getUserById(post.authorId);
+        if (author?.pushToken) {
+          const tipper = await storage.getUserById(userId);
+          const tipperUsername = tipper?.username || tipper?.displayName || "Someone";
+          sendTipNotification(
+            author.pushToken,
+            tipperUsername,
+            amount,
+            postId
+          ).catch(err => console.error("Tip notification error:", err));
+        }
       }
       
       const explorerUrl = `${tempoTestnet.blockExplorers?.default.url || "https://explorer.testnet.tempo.xyz"}/tx/${txHash}`;

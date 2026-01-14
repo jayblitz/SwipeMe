@@ -118,7 +118,12 @@ export class RecommenderService {
         eq(posts.visibility, "public"),
         gte(posts.createdAt, oneDayAgo)
       ))
-      .orderBy(desc(sql`COALESCE(NULLIF(${posts.likesCount}, '')::integer, 0) + COALESCE(NULLIF(${posts.commentsCount}, '')::integer, 0) * 2 + COALESCE(NULLIF(${posts.viewsCount}, '')::integer, 0) * 0.1`))
+      .orderBy(desc(sql`(
+        COALESCE(NULLIF(${posts.likesCount}, '')::integer, 0) * 2 +
+        COALESCE(NULLIF(${posts.commentsCount}, '')::integer, 0) * 3 +
+        COALESCE(NULLIF(${posts.tipsTotal}, '')::numeric, 0) * 10 +
+        COALESCE(NULLIF(${posts.viewsCount}, '')::integer, 0) * 0.1
+      ) / GREATEST(EXTRACT(EPOCH FROM (NOW() - ${posts.createdAt})) / 3600, 1)`))
       .limit(Math.ceil(limit));
 
     return result;
