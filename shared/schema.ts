@@ -20,6 +20,12 @@ export const users = pgTable("users", {
   twoFactorSecret: text("two_factor_secret"),
   themePreference: text("theme_preference").default("system"),
   pushToken: text("push_token"),
+  notificationPreferences: jsonb("notification_preferences").$type<{
+    likes: boolean;
+    comments: boolean;
+    tips: boolean;
+    payments: boolean;
+  }>().default({ likes: true, comments: true, tips: true, payments: true }),
   lastSeenAt: timestamp("last_seen_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

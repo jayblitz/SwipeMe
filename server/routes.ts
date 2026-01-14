@@ -1137,7 +1137,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           storage.getUserById(post.authorId),
         ]);
         
-        if (postAuthor?.pushToken && liker) {
+        const prefs = postAuthor?.notificationPreferences as { likes?: boolean } | null;
+        const likesEnabled = prefs?.likes !== false;
+        
+        if (postAuthor?.pushToken && liker && likesEnabled) {
           sendLikeNotification(
             postAuthor.pushToken,
             liker.username || liker.displayName || "Someone",
@@ -1185,7 +1188,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (post.authorId !== userId) {
         const postAuthor = await storage.getUserById(post.authorId);
-        if (postAuthor?.pushToken && author) {
+        const prefs = postAuthor?.notificationPreferences as { comments?: boolean } | null;
+        const commentsEnabled = prefs?.comments !== false;
+        
+        if (postAuthor?.pushToken && author && commentsEnabled) {
           sendCommentNotification(
             postAuthor.pushToken,
             author.username || author.displayName || "Someone",
@@ -1289,7 +1295,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send notification to author (skip if self-tip)
       if (post.authorId !== userId) {
         const author = await storage.getUserById(post.authorId);
-        if (author?.pushToken) {
+        const prefs = author?.notificationPreferences as { tips?: boolean } | null;
+        const tipsEnabled = prefs?.tips !== false;
+        
+        if (author?.pushToken && tipsEnabled) {
           const tipper = await storage.getUserById(userId);
           const tipperUsername = tipper?.username || tipper?.displayName || "Someone";
           sendTipNotification(
@@ -1745,6 +1754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           themePreference: user.themePreference,
           biometricEnabled: user.biometricEnabled,
           twoFactorEnabled: user.twoFactorEnabled,
+          notificationPreferences: user.notificationPreferences || { likes: true, comments: true, tips: true, payments: true },
         } 
       });
     } catch (error) {
@@ -1755,7 +1765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   apiRouter.put("/user/:id", requireSameUser, async (req: Request, res: Response) => {
     try {
-      const { displayName, profileImage, status, twitterLink, telegramLink, themePreference, biometricEnabled, twoFactorEnabled, twoFactorSecret } = req.body;
+      const { displayName, profileImage, status, twitterLink, telegramLink, themePreference, biometricEnabled, twoFactorEnabled, twoFactorSecret, notificationPreferences } = req.body;
       
       const user = await storage.updateUser(req.params.id, {
         displayName,
@@ -1767,6 +1777,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         biometricEnabled,
         twoFactorEnabled,
         twoFactorSecret,
+        notificationPreferences,
       });
       
       if (!user) {
@@ -1787,6 +1798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           themePreference: user.themePreference,
           biometricEnabled: user.biometricEnabled,
           twoFactorEnabled: user.twoFactorEnabled,
+          notificationPreferences: user.notificationPreferences || { likes: true, comments: true, tips: true, payments: true },
         } 
       });
     } catch (error) {
@@ -2168,7 +2180,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Send notification
         const recipient = await storage.getUserById(recipientWallet.userId);
-        if (recipient?.pushToken) {
+        const prefs = recipient?.notificationPreferences as { payments?: boolean } | null;
+        const paymentsEnabled = prefs?.payments !== false;
+        
+        if (recipient?.pushToken && paymentsEnabled) {
           const sender = await storage.getUserById(userId);
           const senderUsername = sender?.username || sender?.displayName || sender?.email?.split("@")[0] || "Someone";
           sendPaymentNotification(

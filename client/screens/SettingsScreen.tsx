@@ -1,11 +1,22 @@
-import React from "react";
-import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, ScrollView, Pressable, Switch } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useTheme, ThemeMode } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/query-client";
+import * as Haptics from "expo-haptics";
+
+interface NotificationPreferences {
+  likes: boolean;
+  comments: boolean;
+  tips: boolean;
+  payments: boolean;
+}
 
 interface ThemeOption {
   mode: ThemeMode;
@@ -41,9 +52,52 @@ const themeOptions: ThemeOption[] = [
   },
 ];
 
+const defaultNotificationPrefs: NotificationPreferences = {
+  likes: true,
+  comments: true,
+  tips: true,
+  payments: true,
+};
+
+const notificationOptions: { key: keyof NotificationPreferences; title: string; subtitle: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: "likes", title: "Likes", subtitle: "When someone likes your post", icon: "heart" },
+  { key: "comments", title: "Comments", subtitle: "When someone comments on your post", icon: "message-circle" },
+  { key: "tips", title: "Tips", subtitle: "When someone tips your content", icon: "dollar-sign" },
+  { key: "payments", title: "Payments", subtitle: "When someone sends you money", icon: "credit-card" },
+];
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { theme, mode, setMode } = useTheme();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(
+    (user?.notificationPreferences as NotificationPreferences) || defaultNotificationPrefs
+  );
+
+  useEffect(() => {
+    if (user?.notificationPreferences) {
+      setNotificationPrefs(user.notificationPreferences as NotificationPreferences);
+    }
+  }, [user]);
+
+  const updatePrefsMutation = useMutation({
+    mutationFn: async (prefs: NotificationPreferences) => {
+      if (!user?.id) return;
+      return apiRequest("PUT", `/api/user/${user.id}`, { notificationPreferences: prefs });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user", user?.id] });
+    },
+  });
+
+  const handleToggleNotification = (key: keyof NotificationPreferences) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newPrefs = { ...notificationPrefs, [key]: !notificationPrefs[key] };
+    setNotificationPrefs(newPrefs);
+    updatePrefsMutation.mutate(newPrefs);
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -92,6 +146,47 @@ export default function SettingsScreen() {
                   <Feather name="check-circle" size={22} color={theme.primary} />
                 ) : null}
               </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="h4" style={styles.sectionTitle}>Notifications</ThemedText>
+          <ThemedText style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+            Control which notifications you receive
+          </ThemedText>
+          
+          <View style={[styles.themeGrid, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+            {notificationOptions.map((option, index) => (
+              <View
+                key={option.key}
+                style={[
+                  styles.themeOption,
+                  index !== notificationOptions.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border },
+                ]}
+              >
+                <View style={[styles.themeIconContainer, { backgroundColor: notificationPrefs[option.key] ? theme.primary : theme.backgroundTertiary }]}>
+                  <Feather 
+                    name={option.icon} 
+                    size={20} 
+                    color={notificationPrefs[option.key] ? "#FFFFFF" : theme.textSecondary} 
+                  />
+                </View>
+                <View style={styles.themeTextContainer}>
+                  <ThemedText style={[styles.themeTitle, notificationPrefs[option.key] && { color: theme.primary }]}>
+                    {option.title}
+                  </ThemedText>
+                  <ThemedText style={[styles.themeSubtitle, { color: theme.textSecondary }]}>
+                    {option.subtitle}
+                  </ThemedText>
+                </View>
+                <Switch
+                  value={notificationPrefs[option.key]}
+                  onValueChange={() => handleToggleNotification(option.key)}
+                  trackColor={{ false: theme.backgroundTertiary, true: theme.primaryLight }}
+                  thumbColor={notificationPrefs[option.key] ? theme.primary : theme.textSecondary}
+                />
+              </View>
             ))}
           </View>
         </View>

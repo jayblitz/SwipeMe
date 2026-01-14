@@ -25,6 +25,12 @@ export interface User {
   themePreference?: string | null;
   biometricEnabled?: boolean;
   twoFactorEnabled?: boolean;
+  notificationPreferences?: {
+    likes: boolean;
+    comments: boolean;
+    tips: boolean;
+    payments: boolean;
+  } | null;
 }
 
 export interface LoginResult {
