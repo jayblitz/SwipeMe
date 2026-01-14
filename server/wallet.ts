@@ -131,7 +131,11 @@ export function decryptSensitiveData(encryptedData: string): string {
   const authTag = Buffer.from(authTagHex, "hex");
   const key = getEncryptionKey();
   
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  if (authTag.length !== 16) {
+    throw new Error("Invalid authentication tag length");
+  }
+  
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, { authTagLength: 16 });
   decipher.setAuthTag(authTag);
   
   let decrypted = decipher.update(encrypted, "hex", "utf8");
