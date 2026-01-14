@@ -80,6 +80,7 @@ function setupSecurityHeaders(app: express.Application) {
   }));
 }
 
+
 function setupRateLimiting(app: express.Application) {
   const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -118,16 +119,22 @@ function setupRateLimiting(app: express.Application) {
     validate: { xForwardedForHeader: false },
   });
 
+  // Apply rate limiting to both /api and /api/v1 paths
   app.use("/api/", globalLimiter);
-  app.use("/api/auth/login", authLimiter);
-  app.use("/api/auth/signup/start", otpLimiter);
-  app.use("/api/auth/signup/verify", verifyLimiter);
-  app.use("/api/auth/password/reset/start", otpLimiter);
-  app.use("/api/auth/forgot-password", otpLimiter);
-  app.use("/api/auth/reset-password", verifyLimiter);
-  app.use("/api/auth/2fa/verify", authLimiter);
-  app.use("/api/auth/verify-2fa", authLimiter);
-  app.use("/api/auth/signup/complete", verifyLimiter);
+  app.use("/api/v1/", globalLimiter);
+  
+  // Auth rate limiting for both API versions
+  ["/api", "/api/v1"].forEach((prefix) => {
+    app.use(`${prefix}/auth/login`, authLimiter);
+    app.use(`${prefix}/auth/signup/start`, otpLimiter);
+    app.use(`${prefix}/auth/signup/verify`, verifyLimiter);
+    app.use(`${prefix}/auth/password/reset/start`, otpLimiter);
+    app.use(`${prefix}/auth/forgot-password`, otpLimiter);
+    app.use(`${prefix}/auth/reset-password`, verifyLimiter);
+    app.use(`${prefix}/auth/2fa/verify`, authLimiter);
+    app.use(`${prefix}/auth/verify-2fa`, authLimiter);
+    app.use(`${prefix}/auth/signup/complete`, verifyLimiter);
+  });
 }
 
 function setupSession(app: express.Application) {

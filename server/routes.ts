@@ -1,4 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import { Router } from "express";
 import { createServer, type Server } from "node:http";
 import { randomBytes } from "crypto";
 import multer from "multer";
@@ -130,8 +131,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }]);
   });
 
+  // Create API router - mounted at both /api and /api/v1 for versioning
+  const apiRouter = Router({ mergeParams: true });
+  
+  // API version info endpoint
+  apiRouter.get("/version", (req: Request, res: Response) => {
+    res.json({
+      api: "v1",
+      version: "1.0.2",
+      build: 3,
+      status: "stable",
+      deprecated: false,
+      documentation: "/api/docs",
+      availableVersions: ["v1"],
+      currentPrefix: req.baseUrl,
+    });
+  });
+
   // Health check endpoint for monitoring and load balancer
-  app.get("/api/health", async (_req: Request, res: Response) => {
+  apiRouter.get("/health", async (_req: Request, res: Response) => {
     try {
       const start = Date.now();
       await pool.query("SELECT 1");
@@ -162,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/media/upload", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
+  apiRouter.post("/media/upload", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -186,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/media/:key(*)", async (req: Request, res: Response) => {
+  apiRouter.get("/media/:key(*)", async (req: Request, res: Response) => {
     try {
       const key = decodeURIComponent(req.params.key);
       const buffer = await getMediaBuffer(key);
@@ -205,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/signup/start", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/signup/start", async (req: Request, res: Response) => {
     try {
       const { email } = signupSchema.parse(req.body);
       
@@ -231,7 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/signup/verify", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/signup/verify", async (req: Request, res: Response) => {
     try {
       const { email, code } = verifyCodeSchema.parse(req.body);
       
@@ -251,7 +269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/signup/complete", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/signup/complete", async (req: Request, res: Response) => {
     try {
       const { email, code, password } = setPasswordSchema.parse(req.body);
       
@@ -290,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/login", async (req: Request, res: Response) => {
     try {
       const { email, password } = loginSchema.parse(req.body);
       const clientIp = req.ip || req.socket.remoteAddress || "unknown";
@@ -346,7 +364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Password reset - request reset code
-  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/forgot-password", async (req: Request, res: Response) => {
     try {
       const { email } = forgotPasswordSchema.parse(req.body);
       
@@ -379,7 +397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Password reset - verify code and set new password
-  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/reset-password", async (req: Request, res: Response) => {
     try {
       const { email, code, newPassword } = resetPasswordSchema.parse(req.body);
       
@@ -410,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/verify-2fa", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/verify-2fa", async (req: Request, res: Response) => {
     try {
       const { userId, code } = verify2FASchema.parse(req.body);
       const clientIp = req.ip || req.socket.remoteAddress || "unknown";
@@ -469,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
+  apiRouter.post("/auth/logout", (req: Request, res: Response) => {
     req.session.destroy((err) => {
       if (err) {
         console.error("Logout error:", err);
@@ -480,7 +498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/auth/session", (req: Request, res: Response) => {
+  apiRouter.get("/auth/session", (req: Request, res: Response) => {
     if (req.session?.userId) {
       res.json({ 
         authenticated: true, 
@@ -492,7 +510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/username/check", async (req: Request, res: Response) => {
+  apiRouter.get("/username/check", async (req: Request, res: Response) => {
     try {
       const username = req.query.username as string;
       if (!username) {
@@ -516,7 +534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/user/username", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/user/username", requireAuth, async (req: Request, res: Response) => {
     try {
       const { username } = setUsernameSchema.parse(req.body);
       const userId = req.session.userId!;
@@ -542,7 +560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/waitlist", async (req: Request, res: Response) => {
+  apiRouter.post("/waitlist", async (req: Request, res: Response) => {
     try {
       const { email } = waitlistSchema.parse(req.body);
       
@@ -568,7 +586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/waitlist", requireAuth, async (_req: Request, res: Response) => {
+  apiRouter.get("/waitlist", requireAuth, async (_req: Request, res: Response) => {
     try {
       const signups = await storage.getAllWaitlistSignups();
       res.json({ signups });
@@ -578,7 +596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contacts/match", async (req: Request, res: Response) => {
+  apiRouter.post("/contacts/match", async (req: Request, res: Response) => {
     try {
       const { emails } = req.body;
       
@@ -608,7 +626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contacts/check", async (req: Request, res: Response) => {
+  apiRouter.post("/contacts/check", async (req: Request, res: Response) => {
     try {
       const { email } = req.body;
       
@@ -639,7 +657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users/:userId/public", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/users/:userId/public", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
       
@@ -665,7 +683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users/:userId/push-token", requireSameUser, async (req: Request, res: Response) => {
+  apiRouter.post("/users/:userId/push-token", requireSameUser, async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
       const { pushToken } = req.body;
@@ -683,7 +701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users/presence/ping", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/users/presence/ping", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       await storage.updateUserPresence(userId);
@@ -694,7 +712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/chats/:chatId/mute", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/chats/:chatId/mute", requireAuth, async (req: Request, res: Response) => {
     try {
       const { chatId } = req.params;
       const { duration } = req.body;
@@ -726,7 +744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/chats/:chatId/unmute", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/chats/:chatId/unmute", requireAuth, async (req: Request, res: Response) => {
     try {
       const { chatId } = req.params;
       const userId = req.session.userId!;
@@ -739,7 +757,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/chats/:chatId/mute-status", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/chats/:chatId/mute-status", requireAuth, async (req: Request, res: Response) => {
     try {
       const { chatId } = req.params;
       const userId = req.session.userId!;
@@ -755,7 +773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Group Chat endpoints
-  app.post("/api/groups", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/groups", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { name, description, avatarUrl, memberIds, xmtpGroupId } = req.body;
@@ -783,7 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/groups", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/groups", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const groups = await storage.getUserGroups(userId);
@@ -794,7 +812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/groups/:groupId", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/groups/:groupId", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { groupId } = req.params;
@@ -816,7 +834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/groups/:groupId", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.patch("/groups/:groupId", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { groupId } = req.params;
@@ -844,7 +862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/groups/:groupId/members", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/groups/:groupId/members", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { groupId } = req.params;
@@ -873,7 +891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/groups/:groupId/members/:memberId", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.delete("/groups/:groupId/members/:memberId", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { groupId, memberId } = req.params;
@@ -901,7 +919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/groups/:groupId/leave", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/groups/:groupId/leave", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { groupId } = req.params;
@@ -923,7 +941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/groups/:groupId/transfer-admin", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/groups/:groupId/transfer-admin", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { groupId } = req.params;
@@ -958,7 +976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/groups/:groupId", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.delete("/groups/:groupId", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { groupId } = req.params;
@@ -981,7 +999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Moments (Social Feed) endpoints
-  app.get("/api/moments", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/moments", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const limit = parseInt(req.query.limit as string) || 50;
@@ -1009,7 +1027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/moments/:postId", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/moments/:postId", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { postId } = req.params;
@@ -1042,7 +1060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/moments", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/moments", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { content, mediaUrls, mediaType, visibility, thumbnailUrl, durationSeconds } = req.body;
@@ -1067,7 +1085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/moments/:postId", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.delete("/moments/:postId", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { postId } = req.params;
@@ -1089,7 +1107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/moments/:postId/like", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/moments/:postId/like", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { postId } = req.params;
@@ -1107,7 +1125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/moments/:postId/comments", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/moments/:postId/comments", requireAuth, async (req: Request, res: Response) => {
     try {
       const { postId } = req.params;
       
@@ -1119,7 +1137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/moments/:postId/comments", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/moments/:postId/comments", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { postId } = req.params;
@@ -1146,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/moments/:postId/tip", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/moments/:postId/tip", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { postId } = req.params;
@@ -1261,7 +1279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/moments/:postId/engagement", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/moments/:postId/engagement", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { postId } = req.params;
@@ -1294,7 +1312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/moments/:postId/share", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/moments/:postId/share", requireAuth, async (req: Request, res: Response) => {
     try {
       const { postId } = req.params;
       
@@ -1319,7 +1337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/moments/trending", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/moments/trending", requireAuth, async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10;
       
@@ -1331,7 +1349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/moments/hashtag/:hashtag", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/moments/hashtag/:hashtag", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { hashtag } = req.params;
@@ -1347,7 +1365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Follow/Unfollow routes
-  app.post("/api/users/:userId/follow", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/users/:userId/follow", requireAuth, async (req: Request, res: Response) => {
     try {
       const followerId = req.session.userId!;
       const followingId = req.params.userId;
@@ -1369,7 +1387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/users/:userId/follow", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.delete("/users/:userId/follow", requireAuth, async (req: Request, res: Response) => {
     try {
       const followerId = req.session.userId!;
       const followingId = req.params.userId;
@@ -1382,7 +1400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users/:userId/profile", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/users/:userId/profile", requireAuth, async (req: Request, res: Response) => {
     try {
       const viewerId = req.session.userId!;
       const userId = req.params.userId;
@@ -1416,7 +1434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users/:userId/posts", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/users/:userId/posts", requireAuth, async (req: Request, res: Response) => {
     try {
       const viewerId = req.session.userId!;
       const userId = req.params.userId;
@@ -1431,7 +1449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users/:userId/followers", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/users/:userId/followers", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.params.userId;
       const followers = await storage.getFollowers(userId);
@@ -1447,7 +1465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users/:userId/following", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/users/:userId/following", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.params.userId;
       const following = await storage.getFollowing(userId);
@@ -1463,7 +1481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/notify/message", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/notify/message", requireAuth, async (req: Request, res: Response) => {
     try {
       const { recipientId, message, chatId, messageId } = req.body;
       const senderId = req.session.userId;
@@ -1507,7 +1525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/notify/group-message", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/notify/group-message", requireAuth, async (req: Request, res: Response) => {
     try {
       const { groupId, message, type, metadata } = req.body;
       const senderId = req.session.userId;
@@ -1559,7 +1577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/groups/:groupId/messages", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/groups/:groupId/messages", requireAuth, async (req: Request, res: Response) => {
     try {
       const { groupId } = req.params;
       const userId = req.session.userId;
@@ -1602,7 +1620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contacts/invite", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/contacts/invite", requireAuth, async (req: Request, res: Response) => {
     try {
       const { email } = req.body;
       const userId = req.session.userId;
@@ -1665,7 +1683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/user/:id", requireSameUser, async (req: Request, res: Response) => {
+  apiRouter.get("/user/:id", requireSameUser, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUserById(req.params.id);
       if (!user) {
@@ -1693,7 +1711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/user/:id", requireSameUser, async (req: Request, res: Response) => {
+  apiRouter.put("/user/:id", requireSameUser, async (req: Request, res: Response) => {
     try {
       const { displayName, profileImage, status, twitterLink, telegramLink, themePreference, biometricEnabled, twoFactorEnabled, twoFactorSecret } = req.body;
       
@@ -1735,7 +1753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users/search", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/users/search", requireAuth, async (req: Request, res: Response) => {
     try {
       const email = req.query.email as string;
       
@@ -1768,7 +1786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users/search-username", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/users/search-username", requireAuth, async (req: Request, res: Response) => {
     try {
       const username = req.query.username as string;
       
@@ -1801,7 +1819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users/check-batch", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/users/check-batch", requireAuth, async (req: Request, res: Response) => {
     try {
       const { emails } = req.body;
       
@@ -1843,7 +1861,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/wallet/:userId", requireSameUser, async (req: Request, res: Response) => {
+  apiRouter.get("/wallet/:userId", requireSameUser, async (req: Request, res: Response) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);
       if (!wallet) {
@@ -1864,7 +1882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallet/create", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/wallet/create", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId } = walletCreateSchema.parse(req.body);
       
@@ -1913,7 +1931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallet/import", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/wallet/import", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId, seedPhrase, privateKey } = walletImportSchema.parse(req.body);
       
@@ -1978,7 +1996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/wallet/:userId", requireSameUser, async (req: Request, res: Response) => {
+  apiRouter.delete("/wallet/:userId", requireSameUser, async (req: Request, res: Response) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);
       if (!wallet) {
@@ -2001,7 +2019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/wallet/:userId/recovery", requireSameUser, async (req: Request, res: Response) => {
+  apiRouter.get("/wallet/:userId/recovery", requireSameUser, async (req: Request, res: Response) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);
       if (!wallet) {
@@ -2025,7 +2043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallet/:userId/transfer", requireSameUser, async (req: Request, res: Response) => {
+  apiRouter.post("/wallet/:userId/transfer", requireSameUser, async (req: Request, res: Response) => {
     try {
       const { tokenAddress, toAddress, amount, decimals } = transferSchema.parse(req.body);
       const userId = req.params.userId;
@@ -2155,7 +2173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sign a message for XMTP authentication (server-side signing keeps private key secure)
-  app.post("/api/wallet/:userId/sign", requireSameUser, async (req: Request, res: Response) => {
+  apiRouter.post("/wallet/:userId/sign", requireSameUser, async (req: Request, res: Response) => {
     try {
       const { message } = signMessageSchema.parse(req.body);
       const userId = req.params.userId;
@@ -2201,7 +2219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/qrcode/:address", async (req: Request, res: Response) => {
+  apiRouter.get("/qrcode/:address", async (req: Request, res: Response) => {
     try {
       const { address } = req.params;
       
@@ -2225,7 +2243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/2fa/setup", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/2fa/setup", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId } = req.body;
       
@@ -2261,7 +2279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/2fa/verify", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/2fa/verify", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId, secret, code } = req.body;
       
@@ -2297,7 +2315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/2fa/disable", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/2fa/disable", requireAuth, async (req: Request, res: Response) => {
     try {
       const { userId, code } = req.body;
       
@@ -2338,7 +2356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Passkey endpoints
-  app.post("/api/auth/passkey/check", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/passkey/check", async (req: Request, res: Response) => {
     try {
       const { email } = req.body;
       
@@ -2359,7 +2377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/passkey/register/options", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/auth/passkey/register/options", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
       const user = await storage.getUserById(userId!);
@@ -2410,7 +2428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/passkey/register/complete", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/auth/passkey/register/complete", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
       const { credentialId, publicKey, deviceName } = req.body;
@@ -2445,7 +2463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/passkey/login/options", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/passkey/login/options", async (req: Request, res: Response) => {
     try {
       const challenge = Buffer.from(randomBytes(32)).toString("base64url");
       
@@ -2471,7 +2489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/passkey/login", async (req: Request, res: Response) => {
+  apiRouter.post("/auth/passkey/login", async (req: Request, res: Response) => {
     try {
       const { credentialId, rawId, authenticatorData, clientDataJSON, signature } = req.body;
       
@@ -2576,7 +2594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/auth/passkeys", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/auth/passkeys", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
       const passkeys = await storage.getPasskeysByUserId(userId!);
@@ -2594,7 +2612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/auth/passkey/:id", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.delete("/auth/passkey/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const passkeyId = req.params.id;
       await storage.deletePasskey(passkeyId);
@@ -2606,7 +2624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Creator earnings endpoints
-  app.get("/api/creators/me/earnings", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/creators/me/earnings", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       
@@ -2672,7 +2690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/creators/me/withdraw", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.post("/creators/me/withdraw", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const { amount, currency = "pathUSD" } = req.body;
@@ -2791,7 +2809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Revenue dashboard endpoints (admin/analytics)
-  app.get("/api/revenue/stats", requireAuth, async (_req: Request, res: Response) => {
+  apiRouter.get("/revenue/stats", requireAuth, async (_req: Request, res: Response) => {
     try {
       const stats = await storage.getRevenueStats();
       res.json(stats);
@@ -2801,7 +2819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/revenue/ledger", requireAuth, async (req: Request, res: Response) => {
+  apiRouter.get("/revenue/ledger", requireAuth, async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 100;
       const entries = await storage.getRecentRevenueLedger(limit);
@@ -2812,7 +2830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/realtime/token", requireAuth, (req: Request, res: Response) => {
+  apiRouter.get("/realtime/token", requireAuth, (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const token = realtimeService.generateAuthToken(userId);
@@ -2823,11 +2841,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/realtime/status/:userId", requireAuth, (req: Request, res: Response) => {
+  apiRouter.get("/realtime/status/:userId", requireAuth, (req: Request, res: Response) => {
     const { userId } = req.params;
     const isOnline = realtimeService.isUserOnline(userId);
     res.json({ userId, isOnline });
   });
+
+  // Mount API router at both /api (legacy) and /api/v1 (versioned)
+  app.use("/api", apiRouter);
+  app.use("/api/v1", apiRouter);
 
   const httpServer = createServer(app);
   

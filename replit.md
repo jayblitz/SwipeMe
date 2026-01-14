@@ -82,3 +82,41 @@ The application is built with an Expo/React Native frontend and an Express.js ba
 - Voice/Video calling was removed due to WebRTC native module conflicts between XMTP SDK and VideoSDK. May be re-added in future with compatible solution.
 - Android development build is the primary target. iOS support deferred.
 - expo-doctor passes 16/17 checks (only warning is third-party library metadata for XMTP, Privy, Passkeys).
+
+## Version Control & Release Process
+
+### Semantic Versioning
+SwipeMe follows [Semantic Versioning](https://semver.org/):
+- **MAJOR** (1.x.x): Breaking API changes, data format changes, incompatible updates
+- **MINOR** (x.1.x): New features, backward-compatible functionality
+- **PATCH** (x.x.1): Bug fixes, security patches, performance improvements
+
+### Version Files
+- `app.json`: Contains `version`, `runtimeVersion`, `buildNumber` (iOS), `versionCode` (Android)
+- `CHANGELOG.md`: Documents all changes following Keep a Changelog format
+- `/api/version` endpoint: Returns current API version info
+
+### Release Checklist
+1. Update version in `app.json` (version, runtimeVersion)
+2. Increment buildNumber/versionCode for store submissions
+3. Add release notes to `CHANGELOG.md`
+4. Tag release in git: `git tag v1.0.x`
+5. Create EAS build for distribution
+
+### API Versioning
+- Current API: v1 (stable)
+- Base URL: `/api/`
+- Version endpoint: `GET /api/version`
+- Future breaking changes will use `/api/v2/` prefix
+
+### Database Migrations
+- Drizzle ORM with migration files in `/migrations/`
+- Generate migrations: `npx drizzle-kit generate`
+- Apply migrations: `npx drizzle-kit push` or `npm run db:push`
+- Migration files are committed to version control
+- Never manually edit generated migration SQL files
+
+### Rollback Strategy
+- Replit checkpoints provide code/database rollback
+- EAS Update channels enable OTA rollback for published apps
+- Database migrations should be reversible when possible
