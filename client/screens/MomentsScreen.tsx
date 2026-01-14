@@ -120,7 +120,7 @@ export default function MomentsScreen() {
   const videoPositionsRef = useRef<Map<string, number>>(new Map());
   const videoDurationRef = useRef<Map<string, number>>(new Map());
 
-  const [feedMode, _setFeedMode] = useState<"recommended" | "chronological">("recommended");
+  const [feedMode, setFeedMode] = useState<"recommended" | "trending" | "following">("recommended");
   
   const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null);
   const [showTrending, setShowTrending] = useState(true);
@@ -904,16 +904,39 @@ export default function MomentsScreen() {
       />
 
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
-        <View style={styles.topBarRow}>
-          {selectedHashtag ? (
+        {selectedHashtag ? (
+          <View style={styles.topBarRow}>
             <Pressable style={styles.hashtagBackButton} onPress={clearHashtagFilter}>
               <Feather name="arrow-left" size={20} color="#FFF" />
             </Pressable>
-          ) : null}
-          <Text style={styles.topBarTitle}>
-            {selectedHashtag ? `#${selectedHashtag}` : "Moments"}
-          </Text>
-        </View>
+            <Text style={styles.topBarTitle}>#{selectedHashtag}</Text>
+          </View>
+        ) : (
+          <View style={styles.feedModeContainer}>
+            {(["recommended", "trending", "following"] as const).map((mode) => (
+              <Pressable
+                key={mode}
+                style={[
+                  styles.feedModeTab,
+                  feedMode === mode && styles.feedModeTabActive,
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setFeedMode(mode);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.feedModeText,
+                    feedMode === mode && styles.feedModeTextActive,
+                  ]}
+                >
+                  {mode === "recommended" ? "For You" : mode === "trending" ? "Trending" : "Following"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         <Pressable
           style={styles.createButton}
           onPress={() => setIsComposeOpen(true)}
@@ -1509,6 +1532,29 @@ function createStyles(theme: ReturnType<typeof useTheme>["theme"], _isDark: bool
       color: "#FFF",
       fontSize: 20,
       fontWeight: "700",
+    },
+    feedModeContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "rgba(255,255,255,0.1)",
+      borderRadius: BorderRadius.lg,
+      padding: 4,
+    },
+    feedModeTab: {
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.xs,
+      borderRadius: BorderRadius.md,
+    },
+    feedModeTabActive: {
+      backgroundColor: "rgba(255,255,255,0.25)",
+    },
+    feedModeText: {
+      color: "rgba(255,255,255,0.6)",
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    feedModeTextActive: {
+      color: "#FFF",
     },
     trendingContainer: {
       position: "absolute",

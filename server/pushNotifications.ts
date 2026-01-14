@@ -156,3 +156,56 @@ export async function sendSilentWakeup(
     return false;
   }
 }
+
+export async function sendLikeNotification(
+  pushToken: string,
+  likerUsername: string,
+  postId: string
+): Promise<boolean> {
+  const displayName = likerUsername.startsWith("@") ? likerUsername : `@${likerUsername}`;
+  
+  return sendPushNotification(
+    pushToken,
+    "New Like",
+    `${displayName} liked your moment`,
+    { type: "post_like", postId },
+    "moments"
+  );
+}
+
+export async function sendCommentNotification(
+  pushToken: string,
+  commenterUsername: string,
+  commentPreview: string,
+  postId: string
+): Promise<boolean> {
+  const displayName = commenterUsername.startsWith("@") ? commenterUsername : `@${commenterUsername}`;
+  const truncatedComment = commentPreview.length > 50 
+    ? commentPreview.slice(0, 47) + "..." 
+    : commentPreview;
+  
+  return sendPushNotification(
+    pushToken,
+    "New Comment",
+    `${displayName}: ${truncatedComment}`,
+    { type: "post_comment", postId },
+    "moments"
+  );
+}
+
+export async function sendTipNotification(
+  pushToken: string,
+  tipperUsername: string,
+  amount: string,
+  postId: string
+): Promise<boolean> {
+  const displayName = tipperUsername.startsWith("@") ? tipperUsername : `@${tipperUsername}`;
+  
+  return sendPushNotification(
+    pushToken,
+    "You got tipped!",
+    `${displayName} tipped you $${amount} on your moment`,
+    { type: "post_tip", postId, amount },
+    "moments"
+  );
+}

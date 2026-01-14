@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { posts, postLikes, postTips, follows, postEngagements } from "@shared/schema";
+import { posts, postLikes, postTips, follows, postEngagements, users, type Post, type User } from "@shared/schema";
 import { eq, desc, sql, and, gte, inArray } from "drizzle-orm";
 
 interface ScoredPost {
@@ -365,6 +365,85 @@ export class RecommenderService {
     }
     
     return Math.min(1, score);
+  }
+
+  async getTrendingFeed(userId: string, limit: number = 50): Promise<(Post & { author: User; isLiked: boolean })[]> {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    const trendingPosts = await db.select()
+      .from(posts)
+      .where(and(
+        eq(posts.visibility, "public"),
+        gte(posts.createdAt, oneDayAgo)
+      ))
+      .orderBy(desc(sql`(
+        COALESCE(NULLIF(${posts.likesCount}, '')::integer, 0) * 2 +
+        COALESCE(NULLIF(${posts.commentsCount}, '')::integer, 0) * 3 +
+        COALESCE(NULLIF(${posts.tipsTotal}, '')::numeric, 0) * 10 +
+        COALESCE(NULLIF(${posts.viewsCount}, '')::integer, 0) * 0.1
+      ) / EXTRACT(EPOCH FROM (NOW() - ${posts.createdAt})) * 3600`))
+      .limit(limit);
+    
+    const postsWithAuthors = await Promise.all(
+      trendingPosts.map(async (post) => {
+        const author = await this.getUserById(post.authorId);
+        const isLiked = await this.hasUserLikedPost(post.id, userId);
+        return {
+          ...post,
+          author: author!,
+          isLiked,
+        };
+      })
+    );
+    
+    return postsWithAuthors;
+  }
+
+  async getFollowingFeed(userId: string, limit: number = 50): Promise<(Post & { author: User; isLiked: boolean })[]> {
+    const following = await db.select({ followingId: follows.followingId })
+      .from(follows)
+      .where(eq(follows.followerId, userId));
+
+    if (following.length === 0) {
+      return [];
+    }
+
+    const followingIds = following.map(f => f.followingId);
+
+    const followingPosts = await db.select()
+      .from(posts)
+      .where(and(
+        eq(posts.visibility, "public"),
+        inArray(posts.authorId, followingIds)
+      ))
+      .orderBy(desc(posts.createdAt))
+      .limit(limit);
+
+    const postsWithAuthors = await Promise.all(
+      followingPosts.map(async (post) => {
+        const author = await this.getUserById(post.authorId);
+        const isLiked = await this.hasUserLikedPost(post.id, userId);
+        return {
+          ...post,
+          author: author!,
+          isLiked,
+        };
+      })
+    );
+
+    return postsWithAuthors;
+  }
+
+  private async getUserById(userId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    return user;
+  }
+
+  private async hasUserLikedPost(postId: string, userId: string): Promise<boolean> {
+    const [existing] = await db.select()
+      .from(postLikes)
+      .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)));
+    return !!existing;
   }
 }
 

@@ -40,7 +40,7 @@ import {
   signMessage,
   type TransferParams
 } from "./wallet";
-import { sendPaymentNotification } from "./pushNotifications";
+import { sendPaymentNotification, sendLikeNotification, sendCommentNotification, sendTipNotification } from "./pushNotifications";
 import { pool, db } from "./db";
 import { realtimeService } from "./websocket";
 import { posts, postEngagements } from "@shared/schema";
@@ -1004,7 +1004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.session.userId!;
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
-      const mode = req.query.mode as string || "chronological";
+      const mode = req.query.mode as string || "recommended";
       
       if (mode === "recommended") {
         const { recommenderService } = await import("./recommender");
@@ -1017,6 +1017,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const orderedPosts = await storage.getPostsByIds(postIds, userId);
         return res.json(orderedPosts);
+      }
+      
+      if (mode === "trending") {
+        const { recommenderService } = await import("./recommender");
+        const trendingPosts = await recommenderService.getTrendingFeed(userId, limit);
+        return res.json(trendingPosts);
+      }
+      
+      if (mode === "following") {
+        const { recommenderService } = await import("./recommender");
+        const followingPosts = await recommenderService.getFollowingFeed(userId, limit);
+        return res.json(followingPosts);
       }
       
       const posts = await storage.getPosts(userId, limit, offset);
@@ -1118,6 +1130,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const isLiked = await storage.likePost(postId, userId);
+      
+      if (isLiked && post.authorId !== userId) {
+        const [liker, postAuthor] = await Promise.all([
+          storage.getUserById(userId),
+          storage.getUserById(post.authorId),
+        ]);
+        
+        if (postAuthor?.pushToken && liker) {
+          sendLikeNotification(
+            postAuthor.pushToken,
+            liker.username || liker.displayName || "Someone",
+            postId
+          ).catch(err => console.error("Failed to send like notification:", err));
+        }
+      }
+      
       res.json({ isLiked });
     } catch (error) {
       console.error("Like moment error:", error);
@@ -1154,6 +1182,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const comment = await storage.addPostComment(postId, userId, content.trim(), parentId);
       const author = await storage.getUserById(userId);
+      
+      if (post.authorId !== userId) {
+        const postAuthor = await storage.getUserById(post.authorId);
+        if (postAuthor?.pushToken && author) {
+          sendCommentNotification(
+            postAuthor.pushToken,
+            author.username || author.displayName || "Someone",
+            content.trim(),
+            postId
+          ).catch(err => console.error("Failed to send comment notification:", err));
+        }
+      }
+      
       res.json({ ...comment, author });
     } catch (error: unknown) {
       console.error("Add comment error:", error);
@@ -1250,12 +1291,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (author?.pushToken) {
         const tipper = await storage.getUserById(userId);
         const tipperUsername = tipper?.username || tipper?.displayName || "Someone";
-        sendPaymentNotification(
+        sendTipNotification(
           author.pushToken,
           tipperUsername,
           amount,
-          currency || "pathUSD",
-          txHash
+          postId
         ).catch(err => console.error("Tip notification error:", err));
       }
       
