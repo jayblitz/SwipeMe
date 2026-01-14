@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "notification_preferences" jsonb DEFAULT '{"likes":true,"comments":true,"tips":true,"payments":true}'::jsonb;

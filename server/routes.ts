@@ -1763,9 +1763,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const notificationPreferencesSchema = z.object({
+    likes: z.boolean(),
+    comments: z.boolean(),
+    tips: z.boolean(),
+    payments: z.boolean(),
+  }).optional();
+
   apiRouter.put("/user/:id", requireSameUser, async (req: Request, res: Response) => {
     try {
       const { displayName, profileImage, status, twitterLink, telegramLink, themePreference, biometricEnabled, twoFactorEnabled, twoFactorSecret, notificationPreferences } = req.body;
+      
+      // Validate notification preferences if provided
+      let validatedPrefs = undefined;
+      if (notificationPreferences !== undefined) {
+        const parsed = notificationPreferencesSchema.safeParse(notificationPreferences);
+        if (!parsed.success) {
+          return res.status(400).json({ error: "Invalid notification preferences format" });
+        }
+        validatedPrefs = parsed.data;
+      }
       
       const user = await storage.updateUser(req.params.id, {
         displayName,
@@ -1777,7 +1794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         biometricEnabled,
         twoFactorEnabled,
         twoFactorSecret,
-        notificationPreferences,
+        notificationPreferences: validatedPrefs,
       });
       
       if (!user) {
